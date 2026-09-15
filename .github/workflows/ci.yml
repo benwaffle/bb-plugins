@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache BB plugin toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.bb/plugins/toolchain-*
+          key: bb-toolchain-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: bb-toolchain-${{ runner.os }}-
+
+      - name: Typecheck, test, and build every plugin
+        run: npm run check
+
+      - name: Ensure checks leave tracked files clean
+        run: git diff --exit-code
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Chrome extension manifests and scripts
+        run: |
+          for manifest in extensions/*/manifest.json; do
+            echo "Checking $manifest"
+            node --input-type=module -e "
+              import { readFileSync } from 'node:fs';
+              const path = process.argv[1];
+              const manifest = JSON.parse(readFileSync(path, 'utf8'));
+              if (manifest.manifest_version !== 3) {
+                throw new Error(path + ': expected manifest_version 3');
+              }
+            " "$manifest"
+          done
+          for script in extensions/*/*.js; do
+            echo "Parsing $script"
+            node --check "$script"
+          done

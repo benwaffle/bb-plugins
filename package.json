@@ -1,0 +1,21 @@
+{
+  "name": "benwaffle-bb-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "plugins/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present"
+  },
+  "devDependencies": {
+    "bb-app": "0.43.1"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
