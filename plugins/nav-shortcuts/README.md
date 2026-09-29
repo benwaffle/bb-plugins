@@ -24,8 +24,10 @@ bb plugin install path:. --plugin nav-shortcuts
 | `plugin:nav-shortcuts/forward` | Go forward | `Mod+]` |
 
 Both appear in the quick palette (`Mod+Shift+P`) and in Settings → Keyboard,
-where either can be rebound or cleared. `bb settings keyboard list` shows the
-resolved bindings, and `bb settings keyboard set` rebinds them from a shell.
+where either can be rebound or cleared. From a shell,
+`bb settings keyboard set plugin:nav-shortcuts/back <shortcut>` rebinds one
+and `disabled` clears it. `bb settings keyboard list` shows those overrides but
+not the plugin defaults, which the app resolves.
 
 They fire from the composer and other text fields, and not while a modal is
 open. A command is unavailable, so the key passes through, when the window's
