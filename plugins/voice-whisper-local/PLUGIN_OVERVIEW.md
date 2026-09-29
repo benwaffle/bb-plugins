@@ -8,13 +8,15 @@ Use voice input in bb without an OpenAI or Codex account. This plugin transcribe
 
 ## How it works
 
-The plugin runs on the host that bb uses for transcription, normally your local machine. When you stop a recording, bb sends the audio to the host, ffmpeg converts it to 16 kHz mono WAV, and `whisper-cli` produces the text. Models live in the plugin's data directory on that host. Model names follow whisper.cpp: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v3-turbo`, and so on. English-only models end in `.en`; other models detect the spoken language automatically.
+The plugin transcribes on your primary machine, normally your local machine. When you stop a recording, bb sends the audio to the host, ffmpeg converts it to 16 kHz mono WAV, and `whisper-cli` produces the text. Models live in the plugin's data directory on that host. Model names follow whisper.cpp: `tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v3-turbo`, and so on. English-only models end in `.en`; other models detect the spoken language automatically.
 
 Set it up once:
 
 1. Install the tools on the host: `brew install whisper.cpp ffmpeg`.
 2. Download a model: `bb whisper prepare base.en`.
-3. Point voice input at it: `bb-app config set BB_TRANSCRIPTION whisper/base.en`.
+3. Point voice input at it: `bb settings ai-services set voice whisper`, or choose Local whisper.cpp for voice in Settings → AI services.
+
+`bb whisper prepare` also selects the model it downloads; the plugin's "Whisper model" setting holds that choice and defaults to `base.en`.
 
 `base.en` transcribes a ten-second clip in well under a second on Apple Silicon. `small.en` is more accurate and a few seconds slower. bb allows ten seconds per transcription, so larger models suit short recordings only.
 

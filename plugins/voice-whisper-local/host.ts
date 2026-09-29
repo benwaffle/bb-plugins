@@ -15,21 +15,17 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
-import type {
-  ExperimentalAiInferenceCompleteOutput,
-  ExperimentalAiServiceErrorCode,
-  ExperimentalAiVoiceTranscribeInput,
-  ExperimentalAiVoiceTranscribeOutput,
-} from "@get-bb/plugin-sdk/ai-services";
 import {
   experimental_defineHostEntry,
   type ExperimentalHostPaths,
 } from "@get-bb/plugin-sdk/host";
 import {
-  WHISPER_SERVICE_ID,
   whisperHostContract,
   type InstalledModel,
   type PrepareModelOutput,
+  type TranscribeInput,
+  type TranscribeOutput,
+  type WhisperFailureCode,
   type WhisperStatus,
 } from "./contract.js";
 
@@ -101,9 +97,9 @@ export interface ResolvedTools {
 }
 
 class WhisperFailure extends Error {
-  readonly code: ExperimentalAiServiceErrorCode;
+  readonly code: WhisperFailureCode;
 
-  constructor(code: ExperimentalAiServiceErrorCode, message: string) {
+  constructor(code: WhisperFailureCode, message: string) {
     super(message);
     this.name = "WhisperFailure";
     this.code = code;
@@ -284,7 +280,7 @@ function describeFailure(label: string, result: CommandResult): string {
   return detail.length > 0 ? `${label} ${exit}: ${detail}` : `${label} ${exit}`;
 }
 
-function audioExtension(input: ExperimentalAiVoiceTranscribeInput): string {
+function audioExtension(input: TranscribeInput): string {
   const fromName = path.extname(input.filename);
   if (fromName.length > 1 && fromName.length <= 8) {
     return fromName.toLowerCase();
@@ -414,9 +410,9 @@ async function requireModel(
 async function transcribe(
   deps: WhisperHostDependencies,
   paths: ExperimentalHostPaths,
-  input: ExperimentalAiVoiceTranscribeInput,
+  input: TranscribeInput,
   signal: AbortSignal,
-): Promise<Extract<ExperimentalAiVoiceTranscribeOutput, { ok: true }>> {
+): Promise<Extract<TranscribeOutput, { ok: true }>> {
   const deadline = new Deadline(input.timeoutMs);
   const tools = await requireTools(deps);
   const modelPath = await requireModel(paths, input.model);
@@ -468,11 +464,7 @@ async function transcribe(
         describeFailure(WHISPER_CLI_NAME, recognized),
       );
     }
-    return {
-      ok: true,
-      model: input.model,
-      text: normalizeTranscript(recognized.stdout),
-    };
+    return { ok: true, text: normalizeTranscript(recognized.stdout) };
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -480,7 +472,7 @@ async function transcribe(
 
 function toFailure(error: unknown): {
   ok: false;
-  code: ExperimentalAiServiceErrorCode;
+  code: WhisperFailureCode;
   message: string;
 } {
   if (error instanceof WhisperFailure) {
@@ -624,41 +616,11 @@ async function prepareModel(
   };
 }
 
-function wrongService(serviceId: string): {
-  ok: false;
-  code: ExperimentalAiServiceErrorCode;
-  message: string;
-} {
-  return {
-    ok: false,
-    code: "request_failed",
-    message: `This plugin serves no AI service "${serviceId}".`,
-  };
-}
-
 export function createWhisperHostEntry(deps: WhisperHostDependencies) {
   return experimental_defineHostEntry({
     contract: whisperHostContract,
     handlers: {
-      "ai.inference.complete": (
-        input,
-      ): ExperimentalAiInferenceCompleteOutput => {
-        if (input.serviceId !== WHISPER_SERVICE_ID) {
-          return wrongService(input.serviceId);
-        }
-        return {
-          ok: false,
-          code: "request_failed",
-          message: "The whisper service transcribes voice only.",
-        };
-      },
-      "ai.voice.transcribe": async (
-        input,
-        context,
-      ): Promise<ExperimentalAiVoiceTranscribeOutput> => {
-        if (input.serviceId !== WHISPER_SERVICE_ID) {
-          return wrongService(input.serviceId);
-        }
+      transcribe: async (input, context): Promise<TranscribeOutput> => {
         try {
           return await transcribe(
             deps,

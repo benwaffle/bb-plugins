@@ -1,5 +1,7 @@
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { Buffer } from "node:buffer";
+import type { BbPluginApi, PluginAiServiceStatus } from "@get-bb/plugin-sdk";
 import {
+  DEFAULT_WHISPER_MODEL,
   WHISPER_SERVICE_ID,
   whisperHostContract,
   whisperModelNameSchema,
@@ -12,7 +14,8 @@ const USAGE = `Usage: bb ${CLI_NAME} <status|prepare <model>> [--host <id-or-nam
 const PREPARE_TIMEOUT_MS = 30 * 60_000;
 const STATUS_TIMEOUT_MS = 30_000;
 const MEGABYTE = 1024 * 1024;
-const RECOMMENDED_MODEL = "base.en";
+const TRANSCRIBE_TIMEOUT_MS = 10_000;
+const HOST_CALL_GRACE_MS = 1_000;
 
 interface ParsedArgv {
   readonly command: string | null;
@@ -79,14 +82,24 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function transcriptionSettingHint(model: string): string {
-  return `bb-app config set BB_TRANSCRIPTION ${WHISPER_SERVICE_ID}/${model}`;
+const VOICE_SELECTION_HINT = `bb settings ai-services set voice ${WHISPER_SERVICE_ID}`;
+
+type VoiceSelection = Awaited<
+  ReturnType<BbPluginApi["sdk"]["system"]["aiServices"]>
+>["selections"]["voice"];
+
+function describeVoiceSelection(selection: VoiceSelection): string {
+  return selection.mode === "service"
+    ? `${selection.serviceId} (plugin ${selection.pluginId})`
+    : selection.mode;
 }
 
 function formatStatus(args: {
   host: TargetHost;
   status: WhisperStatus;
-  transcription: string;
+  model: string;
+  voice: VoiceSelection;
+  voiceUsesWhisper: boolean;
 }): string {
   const { status } = args;
   const lines = [
@@ -97,7 +110,7 @@ function formatStatus(args: {
   ];
   if (status.models.length === 0) {
     lines.push(
-      `Models: none downloaded. Run: bb ${CLI_NAME} prepare ${RECOMMENDED_MODEL}`,
+      `Models: none downloaded. Run: bb ${CLI_NAME} prepare ${args.model}`,
     );
   } else {
     lines.push("Models:");
@@ -105,11 +118,16 @@ function formatStatus(args: {
       lines.push(`  ${model.name} (${formatMegabytes(model.sizeBytes)})`);
     }
   }
-  lines.push(`BB_TRANSCRIPTION: ${args.transcription}`);
-  if (!args.transcription.startsWith(`${WHISPER_SERVICE_ID}/`)) {
-    const model = status.models[0]?.name ?? RECOMMENDED_MODEL;
+  lines.push(`Selected model: ${args.model}`);
+  if (!status.models.some((model) => model.name === args.model)) {
     lines.push(
-      `Voice input does not use whisper yet. Run: ${transcriptionSettingHint(model)}`,
+      `The selected model is not downloaded. Run: bb ${CLI_NAME} prepare ${args.model}`,
+    );
+  }
+  lines.push(`Voice input service: ${describeVoiceSelection(args.voice)}`);
+  if (!args.voiceUsesWhisper) {
+    lines.push(
+      `Voice input does not use whisper yet. Run: ${VOICE_SELECTION_HINT}`,
     );
   }
   return lines.join("\n");
@@ -118,30 +136,115 @@ function formatStatus(args: {
 function formatPrepared(args: {
   host: TargetHost;
   result: PrepareModelOutput;
-  transcription: string;
+  voiceUsesWhisper: boolean;
 }): string {
   const { model } = args.result;
   const lines = [
     `${args.result.downloaded ? "Downloaded" : "Found"} ${model.name} (${formatMegabytes(model.sizeBytes)}) at ${model.path} on ${args.host.name}`,
     `Warm-up transcription took ${formatSeconds(args.result.warmupMs)}`,
+    `Selected ${model.name} for whisper transcription`,
   ];
-  const expected = `${WHISPER_SERVICE_ID}/${model.name}`;
-  if (args.transcription !== expected) {
-    lines.push(
-      `To use it for voice input, run: ${transcriptionSettingHint(model.name)}`,
-    );
+  if (!args.voiceUsesWhisper) {
+    lines.push(`To use it for voice input, run: ${VOICE_SELECTION_HINT}`);
   }
   return lines.join("\n");
 }
 
+async function readHostId(bb: BbPluginApi): Promise<string> {
+  const { primaryHostId } = await bb.sdk.system.config();
+  if (primaryHostId === null) {
+    throw new Error("No primary machine is connected");
+  }
+  return primaryHostId;
+}
+
 export default function plugin(bb: BbPluginApi): void {
-  bb.experimental_aiServices.register({
-    id: WHISPER_SERVICE_ID,
-    displayName: "Local whisper.cpp",
-    kinds: ["voice"],
+  const settings = bb.settings.define({
+    model: {
+      type: "string",
+      label: "Whisper model",
+      description: `whisper.cpp model used for voice input, like base.en or small.en. Download it with bb ${CLI_NAME} prepare <model>, which also selects it.`,
+      experimental_schema: whisperModelNameSchema,
+      default: DEFAULT_WHISPER_MODEL,
+    },
   });
 
   const host = bb.hosts.experimental_client({ contract: whisperHostContract });
+
+  async function voiceSelection(): Promise<{
+    voice: VoiceSelection;
+    voiceUsesWhisper: boolean;
+  }> {
+    const { selections } = await bb.sdk.system.aiServices();
+    const voice = selections.voice;
+    return {
+      voice,
+      voiceUsesWhisper:
+        voice.mode === "service" &&
+        voice.pluginId === bb.pluginId &&
+        voice.serviceId === WHISPER_SERVICE_ID,
+    };
+  }
+
+  bb.experimental_aiServices.register({
+    id: WHISPER_SERVICE_ID,
+    displayName: "Local whisper.cpp",
+    async transcribe(audio, { signal, hint }) {
+      const [hostId, { model }] = await Promise.all([
+        readHostId(bb),
+        settings.get(),
+      ]);
+      const result = await host.call(
+        "transcribe",
+        {
+          model,
+          audioBase64: Buffer.from(await audio.arrayBuffer()).toString(
+            "base64",
+          ),
+          mimeType: audio.type || "application/octet-stream",
+          filename: audio.name || "voice-input",
+          prompt: hint,
+          timeoutMs: TRANSCRIBE_TIMEOUT_MS,
+        },
+        {
+          hostId,
+          signal,
+          timeoutMs: TRANSCRIBE_TIMEOUT_MS + HOST_CALL_GRACE_MS,
+        },
+      );
+      if (!result.ok) {
+        throw new Error(result.message);
+      }
+      return result.text;
+    },
+    async status(): Promise<PluginAiServiceStatus> {
+      const { primaryHostId } = await bb.sdk.system.config();
+      if (primaryHostId === null) {
+        return { ready: false, message: "No primary machine is connected" };
+      }
+      const [whisper, { model }] = await Promise.all([
+        host.call("status", null, {
+          hostId: primaryHostId,
+          timeoutMs: STATUS_TIMEOUT_MS,
+        }),
+        settings.get(),
+      ]);
+      if (whisper.whisperCli === null || whisper.ffmpeg === null) {
+        return {
+          ready: false,
+          message:
+            "Install whisper.cpp and ffmpeg on the primary machine: brew install whisper.cpp ffmpeg",
+        };
+      }
+      if (!whisper.models.some((installed) => installed.name === model)) {
+        return {
+          ready: false,
+          message: `Download the ${model} model: bb ${CLI_NAME} prepare ${model}`,
+        };
+      }
+      return { ready: true };
+    },
+  });
 
   async function resolveTargetHost(
     selector: string | null,
@@ -203,18 +306,31 @@ export default function plugin(bb: BbPluginApi): void {
           parsed.host,
           config.primaryHostId,
         );
-        const transcription = config.aiServices.transcription;
+        const selection = await voiceSelection();
         if (parsed.command === "status" && parsed.positionals.length === 0) {
-          const result = await host.call("status", null, {
-            hostId: target.id,
-            timeoutMs: STATUS_TIMEOUT_MS,
-            ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
-          });
+          const [result, { model }] = await Promise.all([
+            host.call("status", null, {
+              hostId: target.id,
+              timeoutMs: STATUS_TIMEOUT_MS,
+              ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
+            }),
+            settings.get(),
+          ]);
           return {
             exitCode: 0,
             stdout: parsed.json
-              ? JSON.stringify({ host: target, transcription, ...result })
-              : formatStatus({ host: target, status: result, transcription }),
+              ? JSON.stringify({
+                  host: target,
+                  selectedModel: model,
+                  voice: selection.voice,
+                  ...result,
+                })
+              : formatStatus({
+                  host: target,
+                  status: result,
+                  model,
+                  ...selection,
+                }),
           };
         }
         if (parsed.command === "prepare" && parsed.positionals.length === 1) {
@@ -233,11 +349,16 @@ export default function plugin(bb: BbPluginApi): void {
               ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
             },
           );
+          await settings.experimental_set({ model: result.model.name });
           return {
             exitCode: 0,
             stdout: parsed.json
-              ? JSON.stringify({ host: target, transcription, ...result })
-              : formatPrepared({ host: target, result, transcription }),
+              ? JSON.stringify({ host: target, voice: selection.voice, ...result })
+              : formatPrepared({
+                  host: target,
+                  result,
+                  voiceUsesWhisper: selection.voiceUsesWhisper,
+                }),
           };
         }
         return { exitCode: 1, stderr: USAGE };

@@ -21,10 +21,14 @@ bb plugin install path:. --plugin voice-whisper-local
 1. Install the tools on the host that will transcribe:
    `brew install whisper.cpp ffmpeg`.
 2. Download a model: `bb whisper prepare base.en`.
-3. Point voice input at it: `bb-app config set BB_TRANSCRIPTION whisper/base.en`.
+3. Point voice input at it: `bb settings ai-services set voice whisper`, or
+   choose Local whisper.cpp for voice in Settings → AI services.
 
-`bb whisper status` reports whether `whisper-cli` and `ffmpeg` are installed
-and which models are downloaded. Both commands take `--json` for
+`bb whisper prepare` also makes the model the one voice input uses; the
+plugin's "Whisper model" setting holds that choice and defaults to `base.en`.
+`bb whisper status` reports whether `whisper-cli` and `ffmpeg` are installed,
+which models are downloaded, the selected model, and which service voice input
+uses. Both commands take `--json` for
 machine-readable output and `--host <id-or-name>` to target a machine other
 than the primary host.
 
@@ -48,17 +52,18 @@ npm run check   # typecheck, test, build
 npm run dev     # rebuild and reload against a running bb
 ```
 
-## Vendored AI-services contract
+## How the pieces fit
 
-`ai-services-contract.ts` mirrors `experimental_aiServicesHostContract` from
-`@get-bb/plugin-sdk/ai-services`. The SDK version is not usable here: bb aliases
-only the bare `@get-bb/plugin-sdk` specifier at load time, so a server entry's
-subpath import has to be bundled from the plugin's own SDK install, and bb never
-installs a git-sourced plugin's dependencies. Importing the subpath makes
-`bb plugin install git:...` fail while building the server bundle.
+`server.ts` registers the `whisper` AI service with
+`bb.experimental_aiServices.register`. Its `transcribe` function reads the
+selected model and sends the recording to the primary host through the
+plugin's own `transcribe` host method (`contract.ts`); `host.ts` runs ffmpeg
+and `whisper-cli` there. Its `status` function reports the service as not ready
+until the tools and the selected model are on the primary host, which bb shows
+in Settings → AI services.
 
-The types in `host.ts` still come from the SDK subpath, because `import type`
+The server entry imports only the bare `@get-bb/plugin-sdk` specifier. bb
+aliases only that specifier when it loads a server entry and never installs a
+git-sourced plugin's dependencies, so a subpath import there fails
+`bb plugin install git:...`. Type-only imports are fine because `import type`
 is erased before bundling.
-
-Keep this file in step with the SDK when bb changes the `ai.inference.complete`
-or `ai.voice.transcribe` schemas. `npm run types:refresh` does not touch it.
