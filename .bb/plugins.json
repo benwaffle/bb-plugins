@@ -10,6 +10,10 @@
     {
       "name": "plugin-update-review",
       "source": "./plugins/plugin-update-review"
+    },
+    {
+      "name": "nav-shortcuts",
+      "source": "./plugins/nav-shortcuts"
     }
   ]
 }
