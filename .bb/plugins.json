@@ -6,6 +6,10 @@
     {
       "name": "voice-whisper-local",
       "source": "./plugins/voice-whisper-local"
+    },
+    {
+      "name": "plugin-update-review",
+      "source": "./plugins/plugin-update-review"
     }
   ]
 }

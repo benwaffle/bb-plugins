@@ -1,0 +1,55 @@
+{
+  "name": "bb-plugin-plugin-update-review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An agent skill that reads each pending bb plugin update's diff for exfiltration or abuse before applying it.",
+  "license": "MIT",
+  "author": "Ben Iofel",
+  "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/plugin-update-review#readme",
+  "bugs": {
+    "url": "https://github.com/benwaffle/bb-plugins/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benwaffle/bb-plugins.git",
+    "directory": "plugins/plugin-update-review"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "security",
+    "skill"
+  ],
+  "engines": {
+    "bb": ">=0.43",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Plugin update review",
+    "description": "An agent skill that reads each pending plugin update's diff for exfiltration or abuse before applying it.",
+    "branding": {
+      "icon": "SecurityCheck"
+    },
+    "server": "./server.ts"
+  },
+  "files": [
+    "skills/",
+    "README.md",
+    "server.ts"
+  ],
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "env -u BB_CLI bb plugin types --check .",
+    "types:refresh": "env -u BB_CLI bb plugin types .",
+    "lint:script": "bash -n skills/plugin-update-review/scripts/prepare-review.sh",
+    "check": "npm run types:check && npm run typecheck && npm run lint:script && npm run build"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/node": "^22.0.0",
+    "bb-app": "0.44.0",
+    "typescript": "^5.7.0"
+  }
+}
