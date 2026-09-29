@@ -8,6 +8,7 @@ not add commits that have to be carried through every upstream sync.
 
 | Plugin | Directory | What it does |
 | --- | --- | --- |
+| `nav-shortcuts` | [plugins/nav-shortcuts](plugins/nav-shortcuts) | `Mod+[` and `Mod+]` go back and forward through bb's page history. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
 | `voice-whisper-local` | [plugins/voice-whisper-local](plugins/voice-whisper-local) | Transcribe voice input locally with whisper.cpp. |
 
