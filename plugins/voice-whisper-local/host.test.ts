@@ -71,7 +71,6 @@ function basename(command: string): string {
 }
 
 const TRANSCRIBE_INPUT = {
-  serviceId: "whisper",
   model: "base.en",
   audioBase64: Buffer.from("fake-webm-bytes").toString("base64"),
   mimeType: "audio/webm",
@@ -146,13 +145,12 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     const result = await harness.experimental_call(
-      "ai.voice.transcribe",
+      "transcribe",
       TRANSCRIBE_INPUT,
     );
 
     expect(result).toEqual({
       ok: true,
-      model: "base.en",
       text: "Add a unit test. And clean up the recorder.",
     });
     expect(calls.map((call) => call.command)).toEqual([ffmpeg, whisperCli]);
@@ -190,12 +188,12 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     await expect(
-      harness.experimental_call("ai.voice.transcribe", {
+      harness.experimental_call("transcribe", {
         ...TRANSCRIBE_INPUT,
         model: "small",
         prompt: null,
       }),
-    ).resolves.toEqual({ ok: true, model: "small", text: "Hola." });
+    ).resolves.toEqual({ ok: true, text: "Hola." });
     const whisperArgs = calls[1]?.args ?? [];
     expect(whisperArgs).toEqual(expect.arrayContaining(["--language", "auto"]));
     expect(whisperArgs).not.toContain("--prompt");
@@ -209,7 +207,7 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     const result = await harness.experimental_call(
-      "ai.voice.transcribe",
+      "transcribe",
       TRANSCRIBE_INPUT,
     );
 
@@ -229,7 +227,7 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     await expect(
-      harness.experimental_call("ai.voice.transcribe", TRANSCRIBE_INPUT),
+      harness.experimental_call("transcribe", TRANSCRIBE_INPUT),
     ).resolves.toMatchObject({
       ok: false,
       code: "request_failed",
@@ -254,7 +252,7 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     await expect(
-      harness.experimental_call("ai.voice.transcribe", TRANSCRIBE_INPUT, {
+      harness.experimental_call("transcribe", TRANSCRIBE_INPUT, {
         signal: controller.signal,
       }),
     ).resolves.toEqual({
@@ -280,7 +278,7 @@ describe("whisper host entry", () => {
     });
     const harness = harnessFor(spawn);
 
-    const result = await harness.experimental_call("ai.voice.transcribe", {
+    const result = await harness.experimental_call("transcribe", {
       ...TRANSCRIBE_INPUT,
       timeoutMs: 60,
     });
@@ -301,35 +299,12 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn);
 
     await expect(
-      harness.experimental_call("ai.voice.transcribe", TRANSCRIBE_INPUT),
+      harness.experimental_call("transcribe", TRANSCRIBE_INPUT),
     ).resolves.toEqual({
       ok: false,
       code: "request_failed",
       message: "ffmpeg exited with 1: Invalid data found when processing input",
     });
-    await harness.experimental_dispose();
-  });
-
-  it("rejects requests for other AI services and inference", async () => {
-    const { spawn } = createSpawn((_call, child) => child.succeed());
-    const harness = harnessFor(spawn);
-
-    await expect(
-      harness.experimental_call("ai.voice.transcribe", {
-        ...TRANSCRIBE_INPUT,
-        serviceId: "codex",
-      }),
-    ).resolves.toMatchObject({ ok: false, code: "request_failed" });
-    await expect(
-      harness.experimental_call("ai.inference.complete", {
-        serviceId: "whisper",
-        model: "base.en",
-        reasoningEffort: "none",
-        prompt: "hello",
-        outputSchema: { type: "object" },
-        timeoutMs: 1_000,
-      }),
-    ).resolves.toMatchObject({ ok: false, code: "request_failed" });
     await harness.experimental_dispose();
   });
 
@@ -367,7 +342,7 @@ describe("whisper host entry", () => {
     const harness = harnessFor(spawn, fetch);
 
     await expect(
-      harness.experimental_call("ai.voice.transcribe", TRANSCRIBE_INPUT),
+      harness.experimental_call("transcribe", TRANSCRIBE_INPUT),
     ).resolves.toMatchObject({
       ok: false,
       message: expect.stringContaining("bb whisper prepare base.en"),

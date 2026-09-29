@@ -1,8 +1,9 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
-import { aiServicesHostContract } from "./ai-services-contract.js";
 import { z } from "zod";
 
 export const WHISPER_SERVICE_ID = "whisper";
+
+export const DEFAULT_WHISPER_MODEL = "base.en";
 
 export const whisperModelNameSchema = z
   .string()
@@ -48,8 +49,41 @@ export const prepareModelOutputSchema = z
 
 export type PrepareModelOutput = z.infer<typeof prepareModelOutputSchema>;
 
+export const whisperFailureCodeSchema = z.enum(["timeout", "request_failed"]);
+
+export type WhisperFailureCode = z.infer<typeof whisperFailureCodeSchema>;
+
+export const transcribeInputSchema = z
+  .object({
+    model: whisperModelNameSchema,
+    audioBase64: z.string().min(1),
+    mimeType: z.string().min(1),
+    filename: z.string().min(1),
+    prompt: z.string().nullable(),
+    timeoutMs: z.number().int().positive(),
+  })
+  .strict();
+
+export type TranscribeInput = z.infer<typeof transcribeInputSchema>;
+
+export const transcribeOutputSchema = z.union([
+  z.object({ ok: z.literal(true), text: z.string() }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      code: whisperFailureCodeSchema,
+      message: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export type TranscribeOutput = z.infer<typeof transcribeOutputSchema>;
+
 export const whisperHostContract = defineRpcContract({
-  ...aiServicesHostContract,
+  transcribe: {
+    input: transcribeInputSchema,
+    output: transcribeOutputSchema,
+  },
   status: {
     input: z.null(),
     output: whisperStatusSchema,

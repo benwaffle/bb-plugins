@@ -25,7 +25,7 @@
   ],
   "engines": {
     "bb": ">=0.43",
-    "bbPluginSdk": ">=0.4.87"
+    "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Local voice (whisper.cpp)",
@@ -61,9 +61,9 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.4.87",
+    "@get-bb/plugin-sdk": "0.5.29",
     "@types/node": "^22.0.0",
-    "bb-app": "0.43.1",
+    "bb-app": "0.44.0",
     "cron-parser": "^5.5.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.1"

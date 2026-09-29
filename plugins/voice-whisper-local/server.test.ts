@@ -11,6 +11,17 @@ type FakePluginHostOptions = NonNullable<
 type HostRpcResponder = NonNullable<
   FakePluginHostOptions["experimental_callHostRpc"]
 >;
+type VoiceSelection =
+  | { mode: "automatic" }
+  | { mode: "off" }
+  | { mode: "service"; pluginId: string; serviceId: string };
+
+const PLUGIN_ID = "voice-whisper-local";
+const WHISPER_SELECTED: VoiceSelection = {
+  mode: "service",
+  pluginId: PLUGIN_ID,
+  serviceId: "whisper",
+};
 
 const STATUS = {
   whisperCli: "/opt/homebrew/bin/whisper-cli",
@@ -25,21 +36,41 @@ const STATUS = {
   ],
 };
 
+const PRIMARY = makeHostResponse({
+  id: "host-primary",
+  name: "studio",
+  status: "connected",
+});
+
 function createHost(args: {
-  transcription: string;
-  primaryHostId: string | null;
-  hosts: ReturnType<typeof makeHostResponse>[];
+  voice?: VoiceSelection;
+  primaryHostId?: string | null;
+  hosts?: ReturnType<typeof makeHostResponse>[];
+  settings?: Record<string, string>;
   respond: HostRpcResponder;
 }) {
+  const voice = args.voice ?? { mode: "automatic" };
   return createFakePluginHost({
-    pluginId: "voice-whisper-local",
+    pluginId: PLUGIN_ID,
+    ...(args.settings === undefined ? {} : { settings: args.settings }),
     sdk: {
-      hosts: { list: async () => args.hosts },
+      hosts: { list: async () => args.hosts ?? [PRIMARY] },
       system: {
         config: async () =>
           ({
-            primaryHostId: args.primaryHostId,
-            aiServices: { transcription: args.transcription },
+            primaryHostId:
+              args.primaryHostId === undefined
+                ? PRIMARY.id
+                : args.primaryHostId,
+          }) as never,
+        aiServices: async () =>
+          ({
+            selections: {
+              "thread-title": { mode: "automatic" },
+              "commit-message": { mode: "automatic" },
+              voice,
+            },
+            services: [],
           }) as never,
       },
     },
@@ -47,36 +78,141 @@ function createHost(args: {
   });
 }
 
-describe("whisper server entry", () => {
-  it("registers the whisper voice service", async () => {
+function registeredService(host: ReturnType<typeof createHost>) {
+  const [service] = host.harness.registrations.aiServiceRegistrations;
+  if (service === undefined) throw new Error("no AI service registered");
+  return service;
+}
+
+function recording(): File {
+  return new File([Buffer.from("fake-webm-bytes")], "voice-input.webm", {
+    type: "audio/webm",
+  });
+}
+
+describe("whisper AI service", () => {
+  it("registers a transcribe-only whisper service", async () => {
+    const host = createHost({ respond: () => STATUS });
+    await plugin(host.bb);
+
+    const service = registeredService(host);
+    expect(service).toMatchObject({
+      id: "whisper",
+      displayName: "Local whisper.cpp",
+    });
+    expect(service.transcribe).toBeTypeOf("function");
+    expect(service.complete).toBeUndefined();
+  });
+
+  it("transcribes on the primary host with the selected model and the hint as prompt", async () => {
     const host = createHost({
-      transcription: "codex/gpt-transcribe",
-      primaryHostId: null,
-      hosts: [],
-      respond: () => STATUS,
+      settings: { model: "small.en" },
+      respond: () => ({ ok: true, text: "Add a unit test." }),
     });
     await plugin(host.bb);
 
-    expect(host.harness.registrations.aiServiceRegistrations).toMatchObject([
-      { id: "whisper", kinds: ["voice"] },
+    const text = await registeredService(host).transcribe?.(recording(), {
+      signal: new AbortController().signal,
+      hint: "bb, useEffect",
+    });
+
+    expect(text).toBe("Add a unit test.");
+    expect(host.harness.experimental_hostRpcCalls).toMatchObject([
+      {
+        method: "transcribe",
+        hostId: "host-primary",
+        input: {
+          model: "small.en",
+          audioBase64: Buffer.from("fake-webm-bytes").toString("base64"),
+          mimeType: "audio/webm",
+          filename: "voice-input.webm",
+          prompt: "bb, useEffect",
+          timeoutMs: 10_000,
+        },
+      },
     ]);
   });
 
+  it("uses base.en when no model is configured", async () => {
+    const host = createHost({ respond: () => ({ ok: true, text: "" }) });
+    await plugin(host.bb);
+
+    await registeredService(host).transcribe?.(recording(), {
+      signal: new AbortController().signal,
+      hint: null,
+    });
+
+    expect(host.harness.experimental_hostRpcCalls).toMatchObject([
+      { input: { model: "base.en", prompt: null } },
+    ]);
+  });
+
+  it("rejects with the host's failure message", async () => {
+    const host = createHost({
+      respond: () => ({
+        ok: false,
+        code: "request_failed",
+        message: 'Whisper model "base.en" is not downloaded on this host.',
+      }),
+    });
+    await plugin(host.bb);
+
+    await expect(
+      registeredService(host).transcribe?.(recording(), {
+        signal: new AbortController().signal,
+        hint: null,
+      }),
+    ).rejects.toThrow('Whisper model "base.en" is not downloaded');
+  });
+
+  it("reports ready only when the tools and the selected model are on the primary host", async () => {
+    const ready = createHost({ respond: () => STATUS });
+    await plugin(ready.bb);
+    await expect(registeredService(ready).status?.()).resolves.toEqual({
+      ready: true,
+    });
+
+    const missingModel = createHost({
+      settings: { model: "small.en" },
+      respond: () => STATUS,
+    });
+    await plugin(missingModel.bb);
+    await expect(registeredService(missingModel).status?.()).resolves.toEqual({
+      ready: false,
+      message: "Download the small.en model: bb whisper prepare small.en",
+    });
+
+    const missingTools = createHost({
+      respond: () => ({ ...STATUS, whisperCli: null }),
+    });
+    await plugin(missingTools.bb);
+    await expect(
+      registeredService(missingTools).status?.(),
+    ).resolves.toMatchObject({ ready: false, message: /brew install/ });
+
+    const noPrimary = createHost({
+      primaryHostId: null,
+      respond: () => STATUS,
+    });
+    await plugin(noPrimary.bb);
+    await expect(registeredService(noPrimary).status?.()).resolves.toEqual({
+      ready: false,
+      message: "No primary machine is connected",
+    });
+    expect(noPrimary.harness.experimental_hostRpcCalls).toEqual([]);
+  });
+});
+
+describe("whisper CLI", () => {
   it("shows status for the primary host and how to switch voice input to whisper", async () => {
     const host = createHost({
-      transcription: "codex/gpt-transcribe",
-      primaryHostId: "host-primary",
       hosts: [
         makeHostResponse({
           id: "host-other",
           name: "laptop",
           status: "connected",
         }),
-        makeHostResponse({
-          id: "host-primary",
-          name: "studio",
-          status: "connected",
-        }),
+        PRIMARY,
       ],
       respond: ({ method }) => {
         expect(method).toBe("status");
@@ -90,29 +226,42 @@ describe("whisper server entry", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Host: studio (host-primary)");
     expect(result.stdout).toContain("base.en (148 MB)");
+    expect(result.stdout).toContain("Selected model: base.en");
+    expect(result.stdout).toContain("Voice input service: automatic");
     expect(result.stdout).toContain(
-      "bb-app config set BB_TRANSCRIPTION whisper/base.en",
+      "bb settings ai-services set voice whisper",
     );
     expect(host.harness.experimental_hostRpcCalls).toMatchObject([
       { method: "status", hostId: "host-primary" },
     ]);
   });
 
+  it("omits the switch hint once voice input uses whisper and flags an undownloaded model", async () => {
+    const host = createHost({
+      voice: WHISPER_SELECTED,
+      settings: { model: "small.en" },
+      respond: () => STATUS,
+    });
+    await plugin(host.bb);
+
+    const result = await host.harness.runCli(["status"]);
+
+    expect(result.stdout).toContain(
+      "The selected model is not downloaded. Run: bb whisper prepare small.en",
+    );
+    expect(result.stdout).not.toContain("bb settings ai-services set");
+  });
+
   it("targets an explicit --host by name and emits JSON", async () => {
     const host = createHost({
-      transcription: "whisper/base.en",
-      primaryHostId: "host-primary",
+      voice: WHISPER_SELECTED,
       hosts: [
         makeHostResponse({
           id: "host-other",
           name: "laptop",
           status: "connected",
         }),
-        makeHostResponse({
-          id: "host-primary",
-          name: "studio",
-          status: "connected",
-        }),
+        PRIMARY,
       ],
       respond: () => STATUS,
     });
@@ -128,23 +277,16 @@ describe("whisper server entry", () => {
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout ?? "")).toMatchObject({
       host: { id: "host-other", name: "laptop" },
-      transcription: "whisper/base.en",
+      selectedModel: "base.en",
+      voice: WHISPER_SELECTED,
       models: [{ name: "base.en" }],
     });
   });
 
-  it("downloads a model with a long-running host call", async () => {
+  it("downloads a model with a long-running host call and selects it", async () => {
     const host = createHost({
-      transcription: "codex/gpt-transcribe",
-      primaryHostId: "host-primary",
-      hosts: [
-        makeHostResponse({
-          id: "host-primary",
-          name: "studio",
-          status: "connected",
-        }),
-      ],
       respond: ({ method, input }) => {
+        if (method === "status") return STATUS;
         expect(method).toBe("prepareModel");
         expect(input).toEqual({ model: "small.en" });
         return {
@@ -166,26 +308,23 @@ describe("whisper server entry", () => {
     expect(result.stdout).toContain("Downloaded small.en (488 MB)");
     expect(result.stdout).toContain("17.8s");
     expect(result.stdout).toContain(
-      "bb-app config set BB_TRANSCRIPTION whisper/small.en",
+      "Selected small.en for whisper transcription",
+    );
+    expect(result.stdout).toContain(
+      "bb settings ai-services set voice whisper",
     );
     expect(host.harness.experimental_hostRpcCalls).toMatchObject([
       { method: "prepareModel", hostId: "host-primary" },
     ]);
+
+    const status = await host.harness.runCli(["status", "--json"]);
+    expect(JSON.parse(status.stdout ?? "")).toMatchObject({
+      selectedModel: "small.en",
+    });
   });
 
   it("rejects bad model names, unknown hosts, and unknown flags without calling the host", async () => {
-    const host = createHost({
-      transcription: "codex/gpt-transcribe",
-      primaryHostId: "host-primary",
-      hosts: [
-        makeHostResponse({
-          id: "host-primary",
-          name: "studio",
-          status: "connected",
-        }),
-      ],
-      respond: () => STATUS,
-    });
+    const host = createHost({ respond: () => STATUS });
     await plugin(host.bb);
 
     const badModel = await host.harness.runCli(["prepare", "../etc/passwd"]);
@@ -205,7 +344,6 @@ describe("whisper server entry", () => {
 
   it("asks for --host when no primary host is known and several machines are connected", async () => {
     const host = createHost({
-      transcription: "codex/gpt-transcribe",
       primaryHostId: null,
       hosts: [
         makeHostResponse({ id: "a", name: "alpha", status: "connected" }),
