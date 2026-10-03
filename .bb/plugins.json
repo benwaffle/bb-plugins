@@ -18,6 +18,10 @@
     {
       "name": "project-emoji",
       "source": "./plugins/project-emoji"
+    },
+    {
+      "name": "pr-review",
+      "source": "./plugins/pr-review"
     }
   ]
 }
