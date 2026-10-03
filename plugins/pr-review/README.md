@@ -67,6 +67,17 @@ A new review thread:
 Because the worktree is on the PR branch, the GitHub plugin's **GitHub PR**
 thread panel tab shows the PR's diff and checks for that thread.
 
+**Review** and **Open** open the thread as three columns: a compact **Review
+queue** with the current PR highlighted, the GitHub plugin's **GitHub PR** tab,
+then the review thread. The first two are docked thread panel tabs. Drag the
+dividers to resize them; bb remembers the widths. Use each column's header to
+move it back to the right panel or close it. Pick another PR in the queue
+column to switch threads; the columns follow. The **Review queue** tab is
+also in the thread panel's new-tab launcher. This needs a bb build with
+docked thread panels (`toThread`'s `experimental_dockedPanels`). Older builds
+open the thread without the columns. Without the GitHub plugin, only the
+queue is docked.
+
 ## Thread header
 
 Threads with refs show chips in the header: the PR, the ticket (hover for its
