@@ -13,6 +13,7 @@ function pull(number: number, overrides: Partial<PullSnapshot> = {}): PullSnapsh
     url: `https://github.com/acme/widgets/pull/${number}`,
     isDraft: false,
     author: "bob",
+    authorAvatarUrl: null,
     headRefName: `branch-${number}`,
     headRefOid: HEAD,
     additions: 10,
@@ -27,7 +28,7 @@ function pull(number: number, overrides: Partial<PullSnapshot> = {}): PullSnapsh
 }
 
 function review(login: string, state: PullReview["state"], commitOid: string = HEAD, isBot = false): PullReview {
-  return { login, state, isBot, commitOid, submittedAt: "2026-10-01T00:00:00Z" };
+  return { login, avatarUrl: `https://avatars.example/${login}`, state, isBot, commitOid, submittedAt: "2026-10-01T00:00:00Z" };
 }
 
 function order(pulls: PullSnapshot[]): number[] {
@@ -76,7 +77,9 @@ describe("classifyPull", () => {
       }),
       ME,
     );
-    expect(classified.otherReviews).toEqual([{ login: "alice", state: "APPROVED" }]);
+    expect(classified.otherReviews).toEqual([
+      { login: "alice", avatarUrl: "https://avatars.example/alice", state: "APPROVED" },
+    ]);
     expect(classified.otherApprovals).toBe(1);
   });
 
@@ -110,10 +113,23 @@ describe("sortQueue", () => {
 });
 
 describe("agentState", () => {
-  it("reports none, reviewing, brief ready, and follow-ups", () => {
-    expect(agentState(null)).toBe("none");
-    expect(agentState({ userMessageCount: 1, isRunning: true })).toBe("reviewing");
-    expect(agentState({ userMessageCount: 1, isRunning: false })).toBe("brief-ready");
-    expect(agentState({ userMessageCount: 2, isRunning: true })).toBe("follow-ups");
+  const COMMAND = "/tncqr review pr";
+  const state = (userMessages: string[], isRunning: boolean) => agentState({ userMessages, isRunning }, COMMAND);
+
+  it("reports a thread with only its context message as opened, running or not", () => {
+    expect(agentState(null, COMMAND)).toBe("none");
+    expect(state(["Review context"], true)).toBe("opened");
+    expect(state(["Review context"], false)).toBe("opened");
+  });
+
+  it("reports reviewing, then brief ready, once the review command is sent", () => {
+    expect(state(["Review context", `${COMMAND} 596`], true)).toBe("reviewing");
+    expect(state(["Review context", `${COMMAND} 596`], false)).toBe("brief-ready");
+  });
+
+  it("reports follow-ups for messages after the context or the last review", () => {
+    expect(state(["Review context", "What does this change do?"], false)).toBe("follow-ups");
+    expect(state(["Review context", `${COMMAND} 596`, "Fix the first finding"], true)).toBe("follow-ups");
+    expect(state(["Review context", `${COMMAND} 596`, "Why?", `${COMMAND} 596`], true)).toBe("reviewing");
   });
 });
