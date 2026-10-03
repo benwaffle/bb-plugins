@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import {
   definePluginApp,
+  experimental_Icon as Icon,
   useBbNavigate,
   useRealtime,
   useRpc,
@@ -63,6 +64,7 @@ const ME_LABELS: Record<QueueEntry["me"], string> = {
 
 const AGENT_LABELS: Record<QueueEntry["agent"]["state"], string> = {
   none: "—",
+  opened: "opened",
   reviewing: "reviewing",
   "brief-ready": "brief ready",
   "follow-ups": "follow-ups",
@@ -79,6 +81,37 @@ const REVIEW_GLYPHS: Record<QueueEntry["otherReviews"][number]["state"], string>
 const buttonClass =
   "inline-flex h-7 items-center rounded-md border border-border px-2 text-xs outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 const linkClass = "text-left underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring rounded-sm";
+const iconButtonClass =
+  "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring";
+
+function stopping(action: () => void) {
+  return (event: MouseEvent) => {
+    event.stopPropagation();
+    action();
+  };
+}
+
+function Avatar({ login, url }: { login: string; url: string | null }) {
+  if (url === null) return null;
+  return <img src={url} alt="" title={login} width={16} height={16} className="size-4 shrink-0 rounded-full" />;
+}
+
+function User({ login, url }: { login: string; url: string | null }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1">
+      <Avatar login={login} url={url} />
+      <span className="truncate">{login}</span>
+    </span>
+  );
+}
+
+function DraftBadge() {
+  return (
+    <span className="inline-flex h-4 shrink-0 items-center rounded border border-border px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      Draft
+    </span>
+  );
+}
 
 function QueueRow({
   entry,
@@ -95,24 +128,33 @@ function QueueRow({
 }) {
   const navigate = useBbNavigate();
   const key = `${entry.repo}#${entry.number}`;
+  const review = () => {
+    if (!starting) onReview(entry);
+  };
   return (
-    <tr className="border-b border-border align-top last:border-b-0">
+    <tr
+      className={`cursor-pointer border-b border-border align-top outline-none last:border-b-0 hover:bg-accent/50 focus-visible:bg-accent/50 ${
+        entry.isDraft ? "text-muted-foreground" : ""
+      }`}
+      tabIndex={0}
+      aria-busy={starting}
+      onClick={review}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          review();
+        }
+      }}
+    >
       <td className="py-2 pr-3">
-        <button
-          type="button"
-          className={`${linkClass} font-medium`}
-          onClick={() => openPull(navigate, githubPanel, key, entry.url)}
-          title={githubPanel ? "Open in the GitHub panel" : "Open on GitHub"}
-        >
-          #{entry.number} {entry.title}
-        </button>
+        <div className={`flex items-center gap-1.5 ${entry.isDraft ? "" : "font-medium"}`}>
+          {entry.isDraft ? <DraftBadge /> : null}
+          <span>
+            #{entry.number} {entry.title}
+          </span>
+        </div>
         <div className="text-xs text-muted-foreground">
-          {entry.author}
-          {entry.isDraft ? " · draft" : ""}
-          {" · "}
-          <button type="button" className={linkClass} onClick={() => openExternal(navigate, entry.url)}>
-            GitHub
-          </button>
+          <User login={entry.author} url={entry.authorAvatarUrl} />
         </div>
       </td>
       <td className="py-2 pr-3 whitespace-nowrap">
@@ -123,7 +165,7 @@ function QueueRow({
             type="button"
             className={linkClass}
             title={ticket?.summary ?? entry.ticketKey}
-            onClick={() => ticket !== undefined && openExternal(navigate, ticket.url)}
+            onClick={stopping(() => ticket !== undefined && openExternal(navigate, ticket.url))}
           >
             {entry.ticketKey}
           </button>
@@ -140,8 +182,13 @@ function QueueRow({
         ) : (
           <ul className="space-y-0.5 text-xs">
             {entry.otherReviews.map((review) => (
-              <li key={review.login} title={review.state.toLowerCase().replace("_", " ")}>
-                {REVIEW_GLYPHS[review.state]} {review.login}
+              <li
+                key={review.login}
+                className="flex items-center gap-1"
+                title={review.state.toLowerCase().replace("_", " ")}
+              >
+                <span aria-hidden>{REVIEW_GLYPHS[review.state]}</span>
+                <User login={review.login} url={review.avatarUrl} />
               </li>
             ))}
           </ul>
@@ -153,10 +200,32 @@ function QueueRow({
         </span>
       </td>
       <td className="py-2 pr-3 whitespace-nowrap">{AGENT_LABELS[entry.agent.state]}</td>
-      <td className="py-2 text-right">
-        <button type="button" className={buttonClass} disabled={starting} onClick={() => onReview(entry)}>
-          {starting ? "Starting…" : entry.agent.threadId === null ? "Review" : "Open"}
-        </button>
+      <td className="py-2">
+        <div className="flex items-center justify-end gap-0.5">
+          <button type="button" className={buttonClass} disabled={starting} onClick={stopping(review)}>
+            {starting ? "Starting…" : entry.agent.threadId === null ? "Review" : "Open"}
+          </button>
+          {githubPanel ? (
+            <button
+              type="button"
+              className={iconButtonClass}
+              title="Open in the GitHub panel"
+              aria-label="Open in the GitHub panel"
+              onClick={stopping(() => openPull(navigate, true, key, entry.url))}
+            >
+              <Icon name="GitPullRequest" className="size-3.5" aria-hidden />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={iconButtonClass}
+            title="Open on github.com"
+            aria-label="Open on github.com"
+            onClick={stopping(() => openExternal(navigate, entry.url))}
+          >
+            <Icon name="ExternalLink" className="size-3.5" aria-hidden />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -338,11 +407,16 @@ function QueueColumnRow({
           current ? "bg-accent text-accent-foreground" : ""
         }`}
       >
-        <div className="truncate text-sm font-medium">
-          #{entry.number} {entry.title}
+        <div
+          className={`flex items-center gap-1.5 text-sm ${entry.isDraft ? "text-muted-foreground" : "font-medium"}`}
+        >
+          {entry.isDraft ? <DraftBadge /> : null}
+          <span className="truncate">
+            #{entry.number} {entry.title}
+          </span>
         </div>
         <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-          <span className="truncate">{entry.author}</span>
+          <User login={entry.author} url={entry.authorAvatarUrl} />
           <span aria-hidden>·</span>
           <span className="tabular-nums">
             +{entry.additions} −{entry.deletions}
@@ -504,6 +578,32 @@ function WorktreeButtons({ threadId, worktree }: { threadId: string; worktree: N
   );
 }
 
+function RunReviewButton({ threadId }: { threadId: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [sending, setSending] = useState(false);
+  const run = () => {
+    setSending(true);
+    rpc
+      .call("runReview", { threadId })
+      .then(({ delivery }) => {
+        if (delivery === "queued") toast.success("Review queued after the current turn");
+      })
+      .catch((error: unknown) => toast.error(`Could not run the review: ${errorMessage(error)}`))
+      .finally(() => setSending(false));
+  };
+  return (
+    <button
+      type="button"
+      className={buttonClass}
+      disabled={sending}
+      title="Run the thermo-nuclear code quality review on this PR"
+      onClick={run}
+    >
+      {sending ? "Sending…" : "Run TNCQR"}
+    </button>
+  );
+}
+
 function ThreadRefsHeader({ threadId, isCompactViewport }: PluginThreadHeaderActionProps) {
   const refs = useThreadRefs(threadId);
   if (refs.status !== "ready") return null;
@@ -511,12 +611,16 @@ function ThreadRefsHeader({ threadId, isCompactViewport }: PluginThreadHeaderAct
   const chips = isCompactViewport
     ? refs.value.refs.filter((ref) => ref.kind === "jira" || ref.source === "review-target")
     : refs.value.refs;
+  const reviewable = refs.value.refs.some(
+    (ref) => ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment"),
+  );
   if (chips.length === 0 && worktree === null) return null;
   return (
     <div className="flex max-w-[48rem] items-center gap-1 overflow-hidden">
       {chips.map((ref) => (
         <Chip key={`${ref.kind}:${ref.key}`} threadRef={ref} githubPanel={githubPanel} />
       ))}
+      {reviewable ? <RunReviewButton threadId={threadId} /> : null}
       {worktree === null || isCompactViewport ? null : <WorktreeButtons threadId={threadId} worktree={worktree} />}
     </div>
   );
