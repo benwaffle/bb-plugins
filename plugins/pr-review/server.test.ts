@@ -145,6 +145,7 @@ describe("startReview", () => {
       environment: {
         type: "provider",
         environmentProviderId: "git-worktree",
+        machine: { type: "existing", hostId: "host_local" },
         inputs: { branch: { kind: "named", name: "origin/bob/cx-current-impi" } },
       },
     });
@@ -155,6 +156,21 @@ describe("startReview", () => {
     expect(prompt.split("\n").at(-1)).toBe("/thermo-nuclear-code-quality-review review pr 596");
 
     await expect.poll(() => runner.calls.find((call) => call.args[1] === "checkout")?.cwd).toBe("/worktrees/hss-596");
+  });
+
+  it("puts the CLI start thread's worktree on the bb server machine", async () => {
+    const { harness } = await load();
+    const result = await harness.runCli(["start", `${REPO}#596`]);
+    expect(result).toMatchObject({ exitCode: 0, stdout: "started\tthr_1\n" });
+    const [[spawn]] = harness.sdk.callsTo("threads.spawn") as [[{ environment: Record<string, unknown> }]];
+    expect(spawn.environment.machine).toEqual({ type: "existing", hostId: "host_local" });
+  });
+
+  it("refuses to start without a server machine instead of spawning a thread with no machine", async () => {
+    const { harness } = await load();
+    harness.sdk.stub("system.config", async () => ({ primaryHostId: null }));
+    await expect(harness.callRpc("startReview", { repo: REPO, number: 596 })).rejects.toThrow(/no server machine/);
+    expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(0);
   });
 
   it("records refs and reuses the thread on a second start", async () => {
