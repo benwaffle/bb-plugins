@@ -1,0 +1,80 @@
+{
+  "name": "bb-plugin-pr-review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and PR, ticket, and issue chips on threads.",
+  "license": "MIT",
+  "author": "Ben Iofel",
+  "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/pr-review#readme",
+  "bugs": {
+    "url": "https://github.com/benwaffle/bb-plugins/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benwaffle/bb-plugins.git",
+    "directory": "plugins/pr-review"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "github",
+    "pull-requests",
+    "code-review",
+    "jira"
+  ],
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "PR review",
+    "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and PR, ticket, and issue chips on threads.",
+    "branding": {
+      "icon": "GitPullRequest"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/server.meta.json",
+    "dist/app.js",
+    "dist/app.css",
+    "dist/app.meta.json",
+    "README.md",
+    "skills",
+    "server.ts",
+    "app.tsx",
+    "channel.ts",
+    "contract.ts",
+    "links.ts",
+    "parse.ts",
+    "queue.ts",
+    "store.ts",
+    "tools.ts"
+  ],
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "env -u BB_CLI bb plugin types --check .",
+    "types:refresh": "env -u BB_CLI bb plugin types .",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "bb-app": "0.44.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^1.7.4",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  }
+}
