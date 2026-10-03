@@ -2,6 +2,7 @@ export type ReviewState = "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISM
 
 export interface PullReview {
   login: string;
+  avatarUrl: string | null;
   isBot: boolean;
   state: ReviewState;
   submittedAt: string;
@@ -16,6 +17,7 @@ export interface PullSnapshot {
   url: string;
   isDraft: boolean;
   author: string;
+  authorAvatarUrl: string | null;
   headRefName: string;
   headRefOid: string;
   additions: number;
@@ -51,6 +53,7 @@ export type QueueBucket =
 
 export interface OtherReview {
   login: string;
+  avatarUrl: string | null;
   state: ReviewState;
 }
 
@@ -78,7 +81,7 @@ export function classifyPull(pull: PullSnapshot, viewer: Viewer): Classified {
   const otherReviews = pull.latestReviews
     .filter((review) => !review.isBot && !sameLogin(review.login, viewer.login))
     .filter((review) => review.state !== "PENDING")
-    .map((review) => ({ login: review.login, state: review.state }));
+    .map((review) => ({ login: review.login, avatarUrl: review.avatarUrl, state: review.state }));
   const otherApprovals = otherReviews.filter((review) => review.state === "APPROVED").length;
   const mine = pull.latestReviews.find(
     (review) => sameLogin(review.login, viewer.login) && review.state !== "PENDING",
@@ -151,13 +154,21 @@ export function sortQueue<T extends { pull: PullSnapshot; classified: Classified
   return [...entries].sort(compareQueueEntries);
 }
 
-export type AgentState = "none" | "reviewing" | "brief-ready" | "follow-ups";
+export type AgentState = "none" | "opened" | "reviewing" | "brief-ready" | "follow-ups";
 
-export function agentState(thread: {
-  userMessageCount: number;
-  isRunning: boolean;
-} | null): AgentState {
+/**
+ * A review thread opens with one context message and runs the review only when
+ * a later message starts with `reviewCommand`. Messages after the last review
+ * request are follow-ups.
+ */
+export function agentState(
+  thread: { userMessages: readonly string[]; isRunning: boolean } | null,
+  reviewCommand: string,
+): AgentState {
   if (thread === null) return "none";
-  if (thread.userMessageCount > 1) return "follow-ups";
+  const { userMessages } = thread;
+  const lastReview = userMessages.map((message) => message.startsWith(reviewCommand)).lastIndexOf(true);
+  if (lastReview === -1) return userMessages.length > 1 ? "follow-ups" : "opened";
+  if (lastReview < userMessages.length - 1) return "follow-ups";
   return thread.isRunning ? "reviewing" : "brief-ready";
 }
