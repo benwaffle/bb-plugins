@@ -1,13 +1,13 @@
 ---
 name: pr-review
-description: "List the PR review queue, start or find the agent review thread for a PR, and read the PR, Jira ticket, and issue refs on a thread with the bb pr-review commands."
+description: "List the PR review queue, open the review thread for a PR, run its thermo-nuclear review, and read the PR, Jira ticket, and issue refs on a thread with the bb pr-review commands."
 ---
 
 # PR review
 
 The pr-review plugin keeps a queue of open PRs in the configured repositories
-(default `private-tech-inc/hss`). It starts agent review threads in a worktree
-on the PR's head branch and records which PR, Jira ticket, issues, and sibling
+(default `private-tech-inc/hss`). It opens review threads in a worktree on the
+PR's head branch and records which PR, Jira ticket, issues, and sibling
 PRs belong to each thread.
 
 ## Commands
@@ -15,6 +15,7 @@ PRs belong to each thread.
 ```
 bb pr-review queue [--refresh] [--json]
 bb pr-review start <n | owner/repo#n | PR URL> [--json]
+bb pr-review review <n | owner/repo#n | PR URL> [--json]
 bb pr-review refs <threadId> [--json]
 bb pr-review related <threadId> [--json]
 ```
@@ -26,9 +27,14 @@ bb pr-review related <threadId> [--json]
   `approved`. `--json` adds other reviewers and the review thread id.
   `--refresh` skips the 30 second cache.
 - `start` returns the existing review thread for the PR, or starts one with
-  the PR context and `/thermo-nuclear-code-quality-review review pr <n>`. It
-  prints `started` or `existing` and the thread id. A bare number uses the
-  first configured repository.
+  the PR context only; it does not run the review. It returns after the
+  worktree is on the PR branch and prints `started` or `existing` and the
+  thread id. A bare number uses the first configured repository.
+- `review` does what `start` does, then sends
+  `/thermo-nuclear-code-quality-review review pr <n>` to the thread. It prints
+  `sent`, or `queued` when the agent is busy, and the thread id.
+- Agent states in `queue`: `none`, `opened` (no review yet), `reviewing`,
+  `brief-ready`, `follow-ups`.
 - `refs` prints `kind key source title url` per ref and the workspace path.
   Kinds are `gh-pr`, `gh-issue`, and `jira`.
 - `related` lists other threads that share a Jira ticket with the thread.
