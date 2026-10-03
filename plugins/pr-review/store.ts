@@ -1,0 +1,106 @@
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { ThreadRef } from "./contract.js";
+
+type Storage = BbPluginApi["storage"];
+
+const MIGRATIONS = [
+  `CREATE TABLE refs (
+    thread_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('gh-pr', 'gh-issue', 'jira')),
+    key TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (thread_id, kind, key)
+  )`,
+  `CREATE INDEX refs_by_key ON refs (kind, key)`,
+];
+
+interface RefRow {
+  thread_id: string;
+  kind: ThreadRef["kind"];
+  key: string;
+  url: string;
+  title: string | null;
+  source: ThreadRef["source"];
+}
+
+function toRef(row: RefRow): ThreadRef {
+  return { kind: row.kind, key: row.key, url: row.url, title: row.title, source: row.source };
+}
+
+export interface RefStore {
+  record(threadId: string, refs: readonly ThreadRef[]): void;
+  forThread(threadId: string): ThreadRef[];
+  threadsWith(kind: ThreadRef["kind"], key: string): string[];
+  reviewThreadFor(pullKey: string): string[];
+  threadsForPulls(pullKeys: readonly string[]): Map<string, string>;
+}
+
+export function createRefStore(storage: Storage): RefStore {
+  const db = () => {
+    const handle = storage.database();
+    storage.migrate(handle, MIGRATIONS);
+    return handle;
+  };
+
+  return {
+    record(threadId, refs) {
+      const handle = db();
+      const upsert = handle.prepare(
+        `INSERT INTO refs (thread_id, kind, key, url, title, source, created_at)
+         VALUES (@threadId, @kind, @key, @url, @title, @source, @createdAt)
+         ON CONFLICT (thread_id, kind, key) DO UPDATE SET
+           url = excluded.url,
+           title = COALESCE(excluded.title, refs.title),
+           source = CASE WHEN refs.source = 'review-target' THEN refs.source ELSE excluded.source END`,
+      );
+      const createdAt = new Date().toISOString();
+      handle.transaction(() => {
+        for (const ref of refs) upsert.run({ threadId, createdAt, ...ref });
+      })();
+    },
+
+    forThread(threadId) {
+      const rows = db()
+        .prepare(
+          `SELECT thread_id, kind, key, url, title, source FROM refs
+           WHERE thread_id = ? ORDER BY created_at, kind, key`,
+        )
+        .all(threadId) as RefRow[];
+      return rows.map(toRef);
+    },
+
+    threadsWith(kind, key) {
+      const rows = db()
+        .prepare(`SELECT DISTINCT thread_id FROM refs WHERE kind = ? AND key = ?`)
+        .all(kind, key) as Array<{ thread_id: string }>;
+      return rows.map((row) => row.thread_id);
+    },
+
+    reviewThreadFor(pullKey) {
+      const rows = db()
+        .prepare(
+          `SELECT thread_id FROM refs
+           WHERE kind = 'gh-pr' AND key = ? AND source = 'review-target'
+           ORDER BY created_at DESC`,
+        )
+        .all(pullKey) as Array<{ thread_id: string }>;
+      return rows.map((row) => row.thread_id);
+    },
+
+    threadsForPulls(pullKeys) {
+      if (pullKeys.length === 0) return new Map();
+      const placeholders = pullKeys.map(() => "?").join(", ");
+      const rows = db()
+        .prepare(
+          `SELECT key, thread_id FROM refs
+           WHERE kind = 'gh-pr' AND source = 'review-target' AND key IN (${placeholders})
+           ORDER BY created_at`,
+        )
+        .all(...pullKeys) as Array<{ key: string; thread_id: string }>;
+      return new Map(rows.map((row) => [row.key, row.thread_id]));
+    },
+  };
+}
