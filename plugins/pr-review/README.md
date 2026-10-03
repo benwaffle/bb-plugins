@@ -1,7 +1,8 @@
 # PR review
 
-A review queue for open GitHub pull requests. A Review button starts an agent
-review thread in a worktree on the PR's head branch. Threads get chips for
+A review queue for open GitHub pull requests. A Review button opens a review
+thread in a worktree on the PR's head branch; the review itself runs when you
+ask for it. Threads get chips for
 their PR, Jira ticket, linked issues, and sibling PRs. Diffs, checks, and
 comments stay in bb's built-in GitHub plugin, which this plugin links to.
 
@@ -34,21 +35,24 @@ repositories in this order:
 
 PRs you approved at their current head go into a collapsed **Approved,
 waiting on merge** section. Merged and closed PRs are not listed. Inside each
-group, ready PRs come before drafts, then oldest number first.
+group, ready PRs come before drafts, then oldest number first. Drafts show in
+muted text with a **Draft** badge.
 
 A review request counts as yours if it names you, or if it names one of your
 teams and you have not reviewed yet. Columns:
 
 | Column | Shows |
 | --- | --- |
-| PR | Number and title. Click it to open the PR in the GitHub plugin's panel, or on github.com when that plugin is not running. |
+| PR | Number, title, and the author with their GitHub avatar. |
 | Ticket | Jira key from a `ACME-n:` title prefix, or else a bare `ACME-n` line or `/browse/ACME-n` link in the body. Hover for the summary. |
 | Size | Additions, deletions, and changed files. |
-| Reviews | The latest review state of every human reviewer other than you. |
+| Reviews | The latest review state and avatar of every human reviewer other than you. |
 | Me | `requested`, `commented`, `changes requested`, `approved`, `approved, new commits`, `author`, or `—`. |
-| Agent | `—` when there is no review thread, `reviewing` while its first turn runs, `brief ready` after it, `follow-ups` once you sent more messages. |
+| Agent | `—` when there is no review thread, `opened` before the review runs, `reviewing` while it runs, `brief ready` after it, `follow-ups` once you sent other messages. |
 
-**Review** finds the PR's review thread, or starts one when there is none.
+Click a row, or its **Review** button, to open the PR's review thread; one is
+started when there is none. The icons at the row's end open the PR in the
+GitHub plugin's panel (when that plugin is running) and on github.com.
 
 ## Review threads
 
@@ -60,12 +64,19 @@ A new review thread:
   `gh pr checkout <n>` in it once the worktree is ready. If that branch is
   already checked out in another worktree, it checks out as `review/pr-<n>`;
 - is titled `widgets#596 ACME-51: <PR title>`, cut to 120 characters;
-- gets a prompt with the PR, the ticket's summary and status, the linked
-  issues, and the other open PRs on the same ticket, followed by
-  `/thermo-nuclear-code-quality-review review pr <n>`.
+- gets a first message with the PR, the ticket's summary and status, the
+  linked issues, and the other open PRs on the same ticket, and an instruction
+  to reply "Ready." and wait. bb cannot start a thread without a message, so
+  the agent runs one short turn; it does not review.
 
-Because the worktree is on the PR branch, the GitHub plugin's **GitHub PR**
-thread panel tab shows the PR's diff and checks for that thread.
+The thread opens after `gh pr checkout` finishes and bb's branch lookup for the
+worktree finds the PR (up to 30 seconds after checkout). The GitHub plugin's
+**GitHub PR** tab reads that lookup once when it opens, so it shows the PR's
+diff and checks instead of a PR picker.
+
+**Run TNCQR** in the thread header, or `bb pr-review review <n>`, sends
+`/thermo-nuclear-code-quality-review review pr <n>` to the thread. When the
+agent is busy, the message is queued.
 
 **Review** and **Open** open the thread as three columns: a compact **Review
 queue** with the current PR highlighted, the GitHub plugin's **GitHub PR** tab,
@@ -109,13 +120,16 @@ threads that have the same ticket ref, with their title and first message.
 ```
 bb pr-review queue [--refresh] [--json]
 bb pr-review start <n | owner/repo#n | PR URL> [--json]
+bb pr-review review <n | owner/repo#n | PR URL> [--json]
 bb pr-review refs <threadId> [--json]
 bb pr-review related <threadId> [--json]
 ```
 
 `queue` prints one tab-separated line per PR: `owner/repo#n`, group, ticket,
 size, your state, agent state, title. `start` prints `started` or `existing`
-and the thread id. A bare number uses the first configured repository.
+and the thread id. `review` opens the thread if needed, sends the review
+command, and prints `sent` or `queued` and the thread id. A bare number uses
+the first configured repository.
 
 ## Storage
 
