@@ -49,6 +49,7 @@
     "channel.ts",
     "contract.ts",
     "links.ts",
+    "sidebar.ts",
     "parse.ts",
     "queue.ts",
     "store.ts",

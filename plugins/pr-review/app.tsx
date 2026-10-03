@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactN
 import {
   definePluginApp,
   experimental_Icon as Icon,
+  experimental_useSidebarThreads,
   useBbNavigate,
   useRealtime,
   useRpc,
@@ -16,11 +17,13 @@ import type {
   QueueResult as Queue,
   RelatedResult as Related,
   RefsResult as Refs,
+  SidebarGroupsResult,
   Ticket,
   ThreadRef,
   rpcContract,
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
+import { ticketGroups } from "./sidebar";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
 
@@ -254,10 +257,8 @@ function QueueTable({ children }: { children: ReactNode }) {
 
 function useReviewQueue() {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
   const [queue, setQueue] = useState<Load<Queue>>({ status: "loading" });
   const [tickets, setTickets] = useState<ReadonlyMap<string, Ticket>>(() => new Map());
-  const [starting, setStarting] = useState<string | null>(null);
 
   const load = useCallback(
     (refresh: boolean) => {
@@ -292,7 +293,15 @@ function useReviewQueue() {
     };
   }, [rpc, ticketKeyList]);
 
-  const githubPanel = queue.status === "ready" && queue.value.githubPanel;
+  const { starting, review } = useStartReview(queue.status === "ready" && queue.value.githubPanel);
+
+  return { queue, tickets, starting, load, review };
+}
+
+function useStartReview(githubPanel: boolean) {
+  const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
+  const [starting, setStarting] = useState<string | null>(null);
   const review = useCallback(
     (entry: QueueEntry) => {
       if (entry.agent.threadId !== null) {
@@ -309,8 +318,78 @@ function useReviewQueue() {
     },
     [githubPanel, navigate, rpc],
   );
+  return { starting, review };
+}
 
-  return { queue, tickets, starting, load, review };
+interface SidebarThreadGroupRow {
+  id: string;
+  title: string;
+  description?: string;
+  tooltip?: string;
+  onSelect(): void;
+  action?: { label: string; run(): void };
+}
+
+interface SidebarThreadGroup {
+  projectId: string;
+  key: string;
+  label: string;
+  tooltip?: string;
+  threadIds: readonly string[];
+  rows: readonly SidebarThreadGroupRow[];
+}
+
+type SidebarThreadGroupsSlot = (registration: {
+  id: string;
+  title: string;
+  useGroups(): readonly SidebarThreadGroup[];
+}) => void;
+
+const SIDEBAR_REFRESH_MS = 60_000;
+const NO_SIDEBAR_GROUPS: readonly SidebarThreadGroup[] = [];
+
+function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
+  const rpc = useRpc<typeof rpcContract>();
+  const { threads } = experimental_useSidebarThreads();
+  const [result, setResult] = useState<SidebarGroupsResult | null>(null);
+  const load = useCallback(() => {
+    rpc
+      .call("sidebarGroups", {})
+      .then(setResult)
+      .catch(() => undefined);
+  }, [rpc]);
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, SIDEBAR_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [load]);
+  useRealtime(REFS_CHANNEL, () => load());
+  const { starting, review } = useStartReview(result?.githubPanel ?? false);
+  const projectIdByThreadId = useMemo(
+    () => new Map(threads.map((thread) => [thread.id, thread.projectId])),
+    [threads],
+  );
+  return useMemo(() => {
+    if (result === null) return NO_SIDEBAR_GROUPS;
+    return ticketGroups(result, projectIdByThreadId).map((group) => ({
+      projectId: group.projectId,
+      key: group.key,
+      label: group.label,
+      ...(group.tooltip === null ? {} : { tooltip: group.tooltip }),
+      threadIds: group.threadIds,
+      rows: group.pulls.map((entry) => {
+        const key = `${entry.repo}#${entry.number}`;
+        return {
+          id: key,
+          title: `#${entry.number} ${entry.title}`,
+          description: entry.isDraft ? `${entry.author} · draft` : entry.author,
+          tooltip: `${key} · +${entry.additions} −${entry.deletions} · ${ME_LABELS[entry.me]}`,
+          onSelect: () => review(entry),
+          action: { label: starting === key ? "Starting…" : "Start", run: () => review(entry) },
+        };
+      }),
+    }));
+  }, [projectIdByThreadId, result, review, starting]);
 }
 
 function ReviewQueuePanel() {
@@ -678,6 +757,12 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
 }
 
 export default definePluginApp((app) => {
+  const slots: typeof app.slots & { experimental_sidebarThreadGroups?: SidebarThreadGroupsSlot } = app.slots;
+  slots.experimental_sidebarThreadGroups?.({
+    id: "tickets",
+    title: "Review threads by ticket",
+    useGroups: useSidebarReviewGroups,
+  });
   app.slots.navPanel({
     id: "review-queue",
     title: "Review queue",

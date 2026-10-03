@@ -277,6 +277,37 @@ describe("reviewQueue", () => {
   });
 });
 
+describe("sidebarGroups", () => {
+  it("maps review threads to their ticket and lists unstarted PRs with their project", async () => {
+    const { harness } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const groups = (await harness.callRpc("sidebarGroups", {})) as {
+      githubPanel: boolean;
+      tickets: Array<{ key: string; summary: string | null }>;
+      threadTickets: Array<{ threadId: string; ticketKey: string }>;
+      pulls: Array<{ projectId: string; entry: { number: number; ticketKey: string | null } }>;
+    };
+    expect(groups.githubPanel).toBe(true);
+    expect(groups.threadTickets).toEqual([{ threadId: "thr_1", ticketKey: "CORE-51" }]);
+    expect(groups.pulls.map(({ projectId, entry }) => [projectId, entry.number, entry.ticketKey])).toEqual([
+      ["proj_hss", 590, null],
+      ["proj_hss", 599, "CORE-51"],
+    ]);
+    expect(groups.tickets).toEqual([expect.objectContaining({ key: "CORE-51", summary: "Track currently used IMPI" })]);
+
+    const cli = await harness.runCli(["groups"]);
+    expect(cli).toMatchObject({
+      exitCode: 0,
+      stdout: [
+        "CORE-51\tthread\tthr_1",
+        `-\tpr\t${REPO}#590\tRun the review workflow`,
+        `CORE-51\tpr\t${REPO}#599\tDe-register the old IMS identity`,
+        "",
+      ].join("\n"),
+    });
+  });
+});
+
 describe("related threads and editors", () => {
   it("lists other threads sharing the ticket and opens the worktree in GoLand", async () => {
     const { harness, runner, bb } = await load();

@@ -108,10 +108,22 @@ const relatedResultSchema = z.object({
 });
 export type RelatedResult = z.infer<typeof relatedResultSchema>;
 
+const sidebarGroupsResultSchema = z.object({
+  githubPanel: z.boolean(),
+  tickets: z.array(ticketSchema),
+  threadTickets: z.array(z.object({ threadId: threadIdSchema, ticketKey: z.string() })),
+  pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),
+});
+export type SidebarGroupsResult = z.infer<typeof sidebarGroupsResultSchema>;
+
 export const rpcContract = defineRpcContract({
   reviewQueue: {
     input: z.object({ refresh: z.boolean() }).strict(),
     output: queueResultSchema,
+  },
+  sidebarGroups: {
+    input: z.object({}).strict(),
+    output: sidebarGroupsResultSchema,
   },
   tickets: {
     input: z.object({ keys: z.array(z.string().min(1)).max(100) }).strict(),
