@@ -16,7 +16,6 @@ export interface ReviewDockedPanel {
 }
 
 export function reviewDockedPanels(number: number | null, githubPanel: boolean): ReviewDockedPanel[] {
-  const queue: ReviewDockedPanel = { actionId: QUEUE_PANEL_ACTION_ID, title: "Review queue" };
-  if (!githubPanel) return [queue];
-  return [queue, { pluginId: "github", actionId: "pull", title: number === null ? "GitHub PR" : `PR #${number}` }];
+  if (!githubPanel) return [];
+  return [{ pluginId: "github", actionId: "pull", title: number === null ? "GitHub PR" : `PR #${number}` }];
 }

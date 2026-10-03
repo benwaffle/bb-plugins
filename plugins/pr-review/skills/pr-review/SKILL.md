@@ -14,6 +14,7 @@ PRs belong to each thread.
 
 ```
 bb pr-review queue [--refresh] [--json]
+bb pr-review groups [--json]
 bb pr-review start <n | owner/repo#n | PR URL> [--json]
 bb pr-review review <n | owner/repo#n | PR URL> [--json]
 bb pr-review refs <threadId> [--json]
@@ -26,6 +27,11 @@ bb pr-review related <threadId> [--json]
   commits came), `requested`, `requested-approved`, `commented`, `other`, and
   `approved`. `--json` adds other reviewers and the review thread id.
   `--refresh` skips the 30 second cache.
+- `groups` lists what bb's sidebar nests under ticket rows: tab-separated
+  `ticket thread <threadId>` lines for threads with a Jira ticket, then
+  `ticket pr owner/repo#n title` lines for open PRs without a review thread
+  (`-` when the PR has no ticket). `--json` adds ticket summaries, project ids,
+  and the full queue entries.
 - `start` returns the existing review thread for the PR, or starts one with
   the PR context only; it does not run the review. It returns after the
   worktree is on the PR branch and prints `started` or `existing` and the

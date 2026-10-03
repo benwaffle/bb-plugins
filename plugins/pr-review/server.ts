@@ -354,6 +354,47 @@ export function createPlugin(deps: PluginDeps) {
       );
     }
 
+    async function sidebarGroups() {
+      const queue = await reviewQueue(false);
+      const threadTickets = store.ticketThreads();
+      for (const entry of queue.entries) {
+        if (entry.agent.threadId !== null && entry.ticketKey !== null) {
+          threadTickets.set(entry.agent.threadId, entry.ticketKey);
+        }
+      }
+      const projectIds = new Map<string, Promise<string | null>>();
+      const projectFor = (repo: string) => {
+        let projectId = projectIds.get(repo);
+        if (projectId === undefined) {
+          projectId = resolveProjectId(repo).catch((error: unknown) => {
+            bb.log.warn(`no sidebar group project for ${repo}: ${errorMessage(error)}`);
+            return null;
+          });
+          projectIds.set(repo, projectId);
+        }
+        return projectId;
+      };
+      const pulls = (
+        await Promise.all(
+          queue.entries
+            .filter((entry) => entry.agent.threadId === null && entry.bucket !== "approved")
+            .map(async (entry) => {
+              const projectId = await projectFor(entry.repo);
+              return projectId === null ? null : { projectId, entry };
+            }),
+        )
+      ).filter((pull) => pull !== null);
+      const keys = [
+        ...new Set(queue.entries.flatMap((entry) => (entry.ticketKey === null ? [] : [entry.ticketKey]))),
+      ];
+      return {
+        githubPanel: queue.githubPanel,
+        tickets: await Promise.all(keys.map((key) => ticket(key))),
+        threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
+        pulls,
+      };
+    }
+
     async function issueTitle(key: string): Promise<string | null> {
       const parsed = parseRepoKey(key);
       if (parsed === null) return null;
@@ -630,6 +671,7 @@ export function createPlugin(deps: PluginDeps) {
 
     bb.rpc.register(rpcContract, {
       reviewQueue: ({ refresh }) => reviewQueue(refresh),
+      sidebarGroups: () => sidebarGroups(),
       async tickets({ keys }) {
         return { tickets: await Promise.all([...new Set(keys)].map((key) => ticket(key))) };
       },
@@ -681,6 +723,21 @@ export function createPlugin(deps: PluginDeps) {
               );
               const errors = queue.errors.map((error) => `error\t${error.repo}\t${error.message}`);
               return { exitCode: 0, stdout: [...lines, ...errors].map((line) => `${line}\n`).join("") };
+            },
+          }),
+          groups: cliCommand({
+            summary: "List the ticket groups the sidebar nests review threads and unstarted PRs under",
+            options: jsonOption,
+            async run(input) {
+              const result = await sidebarGroups();
+              if (input.options.json) return { exitCode: 0, stdout: `${JSON.stringify(result)}\n` };
+              const lines = [
+                ...result.threadTickets.map(({ threadId, ticketKey }) => `${ticketKey}\tthread\t${threadId}`),
+                ...result.pulls.map(
+                  ({ entry }) => `${entry.ticketKey ?? "-"}\tpr\t${pullKey(entry.repo, entry.number)}\t${entry.title}`,
+                ),
+              ];
+              return { exitCode: 0, stdout: lines.map((line) => `${line}\n`).join("") };
             },
           }),
           start: cliCommand({

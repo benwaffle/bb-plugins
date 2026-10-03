@@ -54,6 +54,23 @@ Click a row, or its **Review** button, to open the PR's review thread; one is
 started when there is none. The icons at the row's end open the PR in the
 GitHub plugin's panel (when that plugin is running) and on github.com.
 
+## Sidebar
+
+In bb's thread list, organized **By project**, review threads are nested under
+their Jira ticket, such as **ACME-21**, when the ticket has at least two
+threads or an open PR that has no review thread yet. Hover the ticket row for
+the summary. An open PR without a review thread is a muted row under its
+ticket, with the author and a **Start** button; PRs without a ticket are under
+**No ticket**. Click the row, or **Start**, to open the PR's review thread; one
+is started when there is none. PRs you approved at their current head are not
+listed. Threads keep their own rows, so pinning, archiving, renaming, and
+dragging work as usual. A thread's ticket is its PR's ticket, or else the
+first Jira ref recorded for it. Threads without a ticket are not grouped.
+
+The groups refresh when a review thread starts and once a minute. This needs
+a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds
+show the thread list without ticket groups.
+
 ## Review threads
 
 A new review thread:
@@ -78,16 +95,14 @@ diff and checks instead of a PR picker.
 `/thermo-nuclear-code-quality-review review pr <n>` to the thread. When the
 agent is busy, the message is queued.
 
-**Review** and **Open** open the thread as three columns: a compact **Review
-queue** with the current PR highlighted, the GitHub plugin's **GitHub PR** tab,
-then the review thread. The first two are docked thread panel tabs. Drag the
-dividers to resize them; bb remembers the widths. Use each column's header to
-move it back to the right panel or close it. Pick another PR in the queue
-column to switch threads; the columns follow. The **Review queue** tab is
-also in the thread panel's new-tab launcher. This needs a bb build with
-docked thread panels (`toThread`'s `experimental_dockedPanels`). Older builds
-open the thread without the columns. Without the GitHub plugin, only the
-queue is docked.
+**Review** and **Open** open the thread with the GitHub plugin's **GitHub PR**
+tab docked as a column to its left. Drag the divider to resize it; bb
+remembers the width. Use the column's header to move it back to the right
+panel or close it. A compact **Review queue** tab, with the current PR
+highlighted, is in the thread panel's new-tab launcher. Docking needs a bb
+build with docked thread panels (`toThread`'s `experimental_dockedPanels`).
+Older builds, or bb without the GitHub plugin, open the thread with no docked
+column.
 
 ## Thread header
 
@@ -119,6 +134,7 @@ threads that have the same ticket ref, with their title and first message.
 
 ```
 bb pr-review queue [--refresh] [--json]
+bb pr-review groups [--json]
 bb pr-review start <n | owner/repo#n | PR URL> [--json]
 bb pr-review review <n | owner/repo#n | PR URL> [--json]
 bb pr-review refs <threadId> [--json]
@@ -126,7 +142,10 @@ bb pr-review related <threadId> [--json]
 ```
 
 `queue` prints one tab-separated line per PR: `owner/repo#n`, group, ticket,
-size, your state, agent state, title. `start` prints `started` or `existing`
+size, your state, agent state, title. `groups` prints what the sidebar groups
+come from: one `ACME-n thread <threadId>` line per thread with a ticket, and
+one `ACME-n pr owner/repo#n <title>` line per open PR without a review thread,
+with `-` for no ticket. `start` prints `started` or `existing`
 and the thread id. `review` opens the thread if needed, sends the review
 command, and prints `sent` or `queued` and the thread id. A bare number uses
 the first configured repository.

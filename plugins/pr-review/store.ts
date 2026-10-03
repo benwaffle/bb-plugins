@@ -36,6 +36,7 @@ export interface RefStore {
   threadsWith(kind: ThreadRef["kind"], key: string): string[];
   reviewThreadFor(pullKey: string): string[];
   threadsForPulls(pullKeys: readonly string[]): Map<string, string>;
+  ticketThreads(): Map<string, string>;
 }
 
 export function createRefStore(storage: Storage): RefStore {
@@ -88,6 +89,13 @@ export function createRefStore(storage: Storage): RefStore {
         )
         .all(pullKey) as Array<{ thread_id: string }>;
       return rows.map((row) => row.thread_id);
+    },
+
+    ticketThreads() {
+      const rows = db()
+        .prepare(`SELECT thread_id, key FROM refs WHERE kind = 'jira' ORDER BY created_at DESC, key DESC`)
+        .all() as Array<{ thread_id: string; key: string }>;
+      return new Map(rows.map((row) => [row.thread_id, row.key]));
     },
 
     threadsForPulls(pullKeys) {
