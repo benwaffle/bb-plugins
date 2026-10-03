@@ -1,0 +1,238 @@
+import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { describe, expect, it } from "vitest";
+import { createPlugin, reviewTitle } from "./server.js";
+import type { RunOptions } from "./tools.js";
+
+const REPO = "private-tech-inc/hss";
+
+interface Call {
+  command: string;
+  args: readonly string[];
+  cwd: string | undefined;
+}
+
+function graphqlNode(number: number, title: string, body: string) {
+  return {
+    number,
+    title,
+    body,
+    url: `https://github.com/${REPO}/pull/${number}`,
+    isDraft: false,
+    headRefName: `branch-${number}`,
+    headRefOid: `oid-${number}`,
+    additions: 5,
+    deletions: 1,
+    changedFiles: 2,
+    updatedAt: "2026-10-01T00:00:00Z",
+    author: { login: "meisbobzheng" },
+    reviewRequests: {
+      nodes: [{ requestedReviewer: { __typename: "Team", combinedSlug: "private-tech-inc/network-services" } }],
+    },
+    latestReviews: {
+      nodes: [
+        { author: { __typename: "Bot", login: "copilot-pull-request-reviewer" }, state: "COMMENTED", submittedAt: "2026-10-01T00:00:00Z", commit: { oid: "" } },
+      ],
+    },
+  };
+}
+
+const OPEN_PULLS = JSON.stringify({
+  data: {
+    repository: {
+      pullRequests: {
+        nodes: [
+          graphqlNode(596, "CORE-51: Track the private identity the S-CSCF registered", "Fixes #12\nBuilds on #590"),
+          graphqlNode(599, "De-register the old IMS identity", "CORE-51\n\nFollow-up."),
+          graphqlNode(590, "Run the review workflow", ""),
+        ],
+      },
+    },
+  },
+});
+
+const PULL_VIEW = JSON.stringify({
+  number: 596,
+  title: "CORE-51: Track the private identity the S-CSCF registered",
+  body: "Fixes #12\nBuilds on #590",
+  headRefName: "bob/cx-current-impi",
+  url: `https://github.com/${REPO}/pull/596`,
+  reviews: [],
+  reviewDecision: "REVIEW_REQUIRED",
+  latestReviews: [],
+  files: [{ path: "a.go" }, { path: "b.go" }],
+  additions: 279,
+  deletions: 61,
+  isCrossRepository: false,
+  state: "OPEN",
+});
+
+function fakeRunner() {
+  const calls: Call[] = [];
+  const run = async (command: string, args: readonly string[], options: RunOptions): Promise<string> => {
+    calls.push({ command, args, cwd: options.cwd });
+    const line = [command, ...args].join(" ");
+    if (args[0] === "--version") return "1.0\n";
+    if (line.startsWith("gh api user --jq")) return "benwaffle\n";
+    if (line.startsWith("gh api user/teams")) return "private-tech-inc/network-services\n";
+    if (line.startsWith("gh api graphql")) return OPEN_PULLS;
+    if (line.startsWith("gh pr view 596")) return PULL_VIEW;
+    if (line.startsWith("gh issue view 12")) return JSON.stringify({ title: "Wrong IMPI in RTR" });
+    if (line.startsWith("twg jira workitem get CORE-51")) {
+      return JSON.stringify({
+        data: [{ key: "CORE-51", summary: "Track currently used IMPI", status: { name: "In Progress" } }],
+      });
+    }
+    if (line.startsWith("gh pr checkout") || command === "open") return "";
+    throw new Error(`unexpected command: ${line}`);
+  };
+  return { calls, run };
+}
+
+async function load() {
+  const runner = fakeRunner();
+  const plugin = createPlugin({ run: runner.run, platform: "darwin" });
+  const host = createFakePluginHost({ pluginId: "pr-review" });
+  const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
+  const sdk = host.harness.sdk;
+  sdk.stub("projects.list", async () => [
+    { id: "proj_hss", name: "hss", gitRemoteUrl: "git@github.com:private-tech-inc/hss.git", sources: [] },
+  ]);
+  sdk.stub("plugins.list", async () => ({ plugins: [{ id: "github", enabled: true, status: "running" }] }));
+  sdk.stub("system.config", async () => ({ primaryHostId: "host_local" }));
+  sdk.stub("threads.spawn", async (args: { title: string }) => {
+    const thread = { id: `thr_${threads.size + 1}`, environmentId: "env_review", status: "active", title: args.title };
+    threads.set(thread.id, thread);
+    return thread;
+  });
+  sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => {
+    const thread = threads.get(threadId);
+    if (thread === undefined) throw new Error("not found");
+    return { ...thread, deletedAt: null, titleFallback: null, updatedAt: 1 };
+  });
+  sdk.stub("threads.promptHistory", async () => [
+    { id: "msg_1", createdAt: 1, input: [{ type: "text", text: "Review context", mentions: [] }] },
+  ]);
+  sdk.stub("environments.get", async () => ({
+    id: "env_review",
+    status: "ready",
+    path: "/worktrees/hss-596",
+    hostId: "host_local",
+  }));
+  await plugin(host.bb);
+  return { ...host, runner, threads };
+}
+
+describe("reviewTitle", () => {
+  it("leads with the short repo, number, and ticket and stays within 120 characters", () => {
+    expect(reviewTitle(REPO, 596, "CORE-51: Track the IMPI", "CORE-51")).toBe("hss#596 CORE-51: Track the IMPI");
+    expect(reviewTitle(REPO, 590, "Run the review workflow", null)).toBe("hss#590 Run the review workflow");
+    const long = reviewTitle(REPO, 1, "x".repeat(200), "CORE-1");
+    expect(long).toHaveLength(120);
+    expect(long.endsWith("…")).toBe(true);
+  });
+});
+
+describe("startReview", () => {
+  it("spawns a worktree thread at the PR head with the context block and review command", async () => {
+    const { harness, runner } = await load();
+    const result = await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    expect(result).toEqual({ threadId: "thr_1", created: true });
+
+    const [[spawn]] = harness.sdk.callsTo("threads.spawn") as [[Record<string, unknown>]];
+    expect(spawn).toMatchObject({
+      projectId: "proj_hss",
+      title: "hss#596 CORE-51: Track the private identity the S-CSCF registered",
+      environment: {
+        type: "provider",
+        environmentProviderId: "git-worktree",
+        inputs: { branch: { kind: "named", name: "origin/bob/cx-current-impi" } },
+      },
+    });
+    const prompt = String(spawn.prompt);
+    expect(prompt).toContain('Ticket: CORE-51 "Track currently used IMPI" [In Progress]');
+    expect(prompt).toContain('Linked issue: private-tech-inc/hss#12 "Wrong IMPI in RTR"');
+    expect(prompt).toContain('private-tech-inc/hss#599 "De-register the old IMS identity"');
+    expect(prompt.split("\n").at(-1)).toBe("/thermo-nuclear-code-quality-review review pr 596");
+
+    await expect.poll(() => runner.calls.find((call) => call.args[1] === "checkout")?.cwd).toBe("/worktrees/hss-596");
+  });
+
+  it("records refs and reuses the thread on a second start", async () => {
+    const { harness } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    expect(await harness.callRpc("startReview", { repo: REPO, number: 596 })).toEqual({
+      threadId: "thr_1",
+      created: false,
+    });
+    expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
+
+    const refs = (await harness.callRpc("threadRefs", { threadId: "thr_1" })) as {
+      refs: Array<{ kind: string; key: string; source: string }>;
+      worktree: unknown;
+    };
+    expect(refs.refs.map((ref) => `${ref.source} ${ref.kind} ${ref.key}`)).toEqual(
+      expect.arrayContaining([
+        `review-target gh-pr ${REPO}#596`,
+        "title jira CORE-51",
+        `fixes gh-issue ${REPO}#12`,
+        `mention gh-pr ${REPO}#590`,
+        `sibling gh-pr ${REPO}#599`,
+      ]),
+    );
+    expect(refs.worktree).toEqual({ path: "/worktrees/hss-596", isLocal: true });
+  });
+});
+
+describe("reviewQueue", () => {
+  it("returns open PRs with tickets and the agent thread state", async () => {
+    const { harness } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as {
+      viewer: string;
+      githubPanel: boolean;
+      entries: Array<{ number: number; ticketKey: string | null; me: string; agent: { state: string } }>;
+    };
+    expect(queue.viewer).toBe("benwaffle");
+    expect(queue.githubPanel).toBe(true);
+    expect(queue.entries.map((entry) => [entry.number, entry.ticketKey, entry.me, entry.agent.state])).toEqual([
+      [590, null, "requested", "none"],
+      [596, "CORE-51", "requested", "reviewing"],
+      [599, "CORE-51", "requested", "none"],
+    ]);
+  });
+});
+
+describe("related threads and editors", () => {
+  it("lists other threads sharing the ticket and opens the worktree in GoLand", async () => {
+    const { harness, runner, bb } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const store = (await import("./store.js")).createRefStore(bb.storage);
+    store.record("thr_other", [
+      { kind: "jira", key: "CORE-51", url: "https://east-stout.atlassian.net/browse/CORE-51", title: null, source: "title" },
+    ]);
+    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
+      id: threadId,
+      environmentId: "env_review",
+      status: "idle",
+      title: threadId === "thr_other" ? "Implement CORE-51" : "hss#596",
+      titleFallback: null,
+      deletedAt: null,
+      updatedAt: 1,
+    }));
+    const related = (await harness.callRpc("relatedThreads", { threadId: "thr_1" })) as {
+      tickets: string[];
+      threads: Array<{ threadId: string; title: string; firstMessage: string | null }>;
+    };
+    expect(related.tickets).toEqual(["CORE-51"]);
+    expect(related.threads).toEqual([
+      expect.objectContaining({ threadId: "thr_other", title: "Implement CORE-51", firstMessage: "Review context" }),
+    ]);
+
+    expect(await harness.callRpc("openWorktree", { threadId: "thr_1", editor: "goland" })).toEqual({
+      opened: true,
+      path: "/worktrees/hss-596",
+      error: null,
+    });
+    expect(runner.calls.at(-1)).toMatchObject({ command: "open", args: ["-a", "GoLand", "/worktrees/hss-596"] });
+  });
+});
