@@ -19,7 +19,7 @@ import type {
   ThreadRef,
   rpcContract,
 } from "./contract";
-import { githubPanelPath } from "./links";
+import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
 
@@ -39,6 +39,16 @@ function openPull(navigate: BbNavigate, githubPanel: boolean, key: string, url: 
   }
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+type ToThreadWithDockedPanels = (
+  threadId: string,
+  options?: { experimental_dockedPanels?: readonly ReviewDockedPanel[] },
+) => void;
+
+function openReviewThread(navigate: BbNavigate, threadId: string, number: number | null, githubPanel: boolean): void {
+  const toThread: ToThreadWithDockedPanels = navigate.toThread;
+  toThread(threadId, { experimental_dockedPanels: reviewDockedPanels(number, githubPanel) });
 }
 
 const ME_LABELS: Record<QueueEntry["me"], string> = {
@@ -173,12 +183,11 @@ function QueueTable({ children }: { children: ReactNode }) {
   );
 }
 
-function ReviewQueuePanel() {
+function useReviewQueue() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [queue, setQueue] = useState<Load<Queue>>({ status: "loading" });
   const [tickets, setTickets] = useState<ReadonlyMap<string, Ticket>>(() => new Map());
-  const [showApproved, setShowApproved] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
 
   const load = useCallback(
@@ -214,22 +223,30 @@ function ReviewQueuePanel() {
     };
   }, [rpc, ticketKeyList]);
 
+  const githubPanel = queue.status === "ready" && queue.value.githubPanel;
   const review = useCallback(
     (entry: QueueEntry) => {
       if (entry.agent.threadId !== null) {
-        navigate.toThread(entry.agent.threadId);
+        openReviewThread(navigate, entry.agent.threadId, entry.number, githubPanel);
         return;
       }
       const key = `${entry.repo}#${entry.number}`;
       setStarting(key);
       rpc
         .call("startReview", { repo: entry.repo, number: entry.number })
-        .then(({ threadId }) => navigate.toThread(threadId))
+        .then(({ threadId }) => openReviewThread(navigate, threadId, entry.number, githubPanel))
         .catch((error: unknown) => toast.error(`Could not start the review: ${errorMessage(error)}`))
         .finally(() => setStarting(null));
     },
-    [navigate, rpc],
+    [githubPanel, navigate, rpc],
   );
+
+  return { queue, tickets, starting, load, review };
+}
+
+function ReviewQueuePanel() {
+  const { queue, tickets, starting, load, review } = useReviewQueue();
+  const [showApproved, setShowApproved] = useState(false);
 
   if (queue.status === "loading") {
     return <div className="p-4 text-sm text-muted-foreground md:p-5">Loading open pull requests…</div>;
@@ -291,6 +308,114 @@ function ReviewQueuePanel() {
               {showApproved ? "▾" : "▸"} Approved, waiting on merge ({approved.length})
             </button>
             {showApproved ? <QueueTable>{approved.map(row)}</QueueTable> : null}
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QueueColumnRow({
+  entry,
+  current,
+  starting,
+  onReview,
+}: {
+  entry: QueueEntry;
+  current: boolean;
+  starting: boolean;
+  onReview: (entry: QueueEntry) => void;
+}) {
+  const status = entry.agent.state === "none" ? ME_LABELS[entry.me] : AGENT_LABELS[entry.agent.state];
+  return (
+    <li>
+      <button
+        type="button"
+        aria-current={current ? "page" : undefined}
+        disabled={starting}
+        onClick={() => onReview(entry)}
+        className={`w-full rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+          current ? "bg-accent text-accent-foreground" : ""
+        }`}
+      >
+        <div className="truncate text-sm font-medium">
+          #{entry.number} {entry.title}
+        </div>
+        <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <span className="truncate">{entry.author}</span>
+          <span aria-hidden>·</span>
+          <span className="tabular-nums">
+            +{entry.additions} −{entry.deletions}
+          </span>
+          <span aria-hidden>·</span>
+          <span className={entry.me === "approved-stale" ? "text-amber-600 dark:text-amber-400" : ""}>
+            {starting ? "starting…" : status}
+          </span>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
+  const { queue, starting, load, review } = useReviewQueue();
+  const [showApproved, setShowApproved] = useState(false);
+
+  if (queue.status === "loading") {
+    return <p className="p-3 text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (queue.status === "error") {
+    return (
+      <div className="space-y-2 p-3 text-sm">
+        <p className="text-destructive">{queue.message}</p>
+        <button type="button" className={buttonClass} onClick={() => load(true)}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+  const { entries, errors } = queue.value;
+  const active = entries.filter((entry) => entry.bucket !== "approved");
+  const approved = entries.filter((entry) => entry.bucket === "approved");
+  const row = (entry: QueueEntry) => (
+    <QueueColumnRow
+      key={`${entry.repo}#${entry.number}`}
+      entry={entry}
+      current={entry.agent.threadId === threadId}
+      starting={starting === `${entry.repo}#${entry.number}`}
+      onReview={review}
+    />
+  );
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
+        <span>{active.length} to look at</span>
+        <button type="button" className={buttonClass} onClick={() => load(true)}>
+          Refresh
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-1 pb-3">
+        {errors.map((error) => (
+          <p key={error.repo} className="px-2 text-xs text-destructive">
+            {error.repo}: {error.message}
+          </p>
+        ))}
+        {active.length === 0 ? (
+          <p className="px-2 text-sm text-muted-foreground">Nothing waiting on you.</p>
+        ) : (
+          <ul className="space-y-0.5">{active.map(row)}</ul>
+        )}
+        {approved.length === 0 ? null : (
+          <section className="space-y-1">
+            <button
+              type="button"
+              className={`${linkClass} px-2 text-xs font-medium text-muted-foreground`}
+              aria-expanded={showApproved}
+              onClick={() => setShowApproved((open) => !open)}
+            >
+              {showApproved ? "▾" : "▸"} Approved ({approved.length})
+            </button>
+            {showApproved ? <ul className="space-y-0.5">{approved.map(row)}</ul> : null}
           </section>
         )}
       </div>
@@ -460,6 +585,13 @@ export default definePluginApp((app) => {
     id: "refs",
     title: "PR and ticket refs",
     component: ThreadRefsHeader,
+  });
+  app.slots.threadPanelAction({
+    id: QUEUE_PANEL_ACTION_ID,
+    title: "Review queue",
+    icon: "GitPullRequest",
+    layout: "flush",
+    component: ReviewQueueColumn,
   });
   app.slots.threadPanelAction({
     id: "related",
