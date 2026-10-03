@@ -428,6 +428,14 @@ export function createPlugin(deps: PluginDeps) {
       bb.log.info(`checked out ${pullKey(repo, number)} in ${path}`);
     }
 
+    async function serverHostId(): Promise<string> {
+      const { primaryHostId } = await bb.sdk.system.config();
+      if (primaryHostId === null) {
+        throw new Error("bb has no server machine to create the review worktree on. Connect a machine first.");
+      }
+      return primaryHostId;
+    }
+
     async function startReview(repo: string, number: number): Promise<{ threadId: string; created: boolean }> {
       const existing = await existingReviewThread(repo, number);
       if (existing !== null) return { threadId: existing, created: false };
@@ -437,6 +445,7 @@ export function createPlugin(deps: PluginDeps) {
         throw new Error(`${pullKey(repo, number)} is ${resolved.pull.state.toLowerCase()}, not open`);
       }
       const projectId = await resolveProjectId(repo);
+      const hostId = await serverHostId();
       const base: { kind: "default" } | { kind: "named"; name: string } = resolved.pull.isCrossRepository
         ? { kind: "default" }
         : { kind: "named", name: `origin/${resolved.pull.headRefName}` };
@@ -445,6 +454,7 @@ export function createPlugin(deps: PluginDeps) {
         environment: {
           type: "provider",
           environmentProviderId: WORKTREE_PROVIDER_ID,
+          machine: { type: "existing", hostId },
           inputs: { branch: base },
         },
         title: reviewTitle(repo, number, resolved.pull.title, resolved.ticket?.key ?? null),
