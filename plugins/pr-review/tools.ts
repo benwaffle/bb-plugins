@@ -65,12 +65,12 @@ export const OPEN_PULLS_QUERY = `query($owner: String!, $name: String!) {
     pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
         number title body url isDraft headRefName headRefOid additions deletions changedFiles updatedAt
-        author { login }
+        author { login avatarUrl(size: 32) }
         reviewRequests(first: 30) {
           nodes { requestedReviewer { __typename ... on User { login } ... on Team { combinedSlug } } }
         }
         latestReviews(first: 50) {
-          nodes { author { __typename login } state submittedAt commit { oid } }
+          nodes { author { __typename login avatarUrl(size: 32) } state submittedAt commit { oid } }
         }
       }
     }
@@ -98,14 +98,14 @@ const openPullsSchema = z.object({
             deletions: z.number(),
             changedFiles: z.number(),
             updatedAt: z.string(),
-            author: z.object({ login: z.string() }).nullable(),
+            author: z.object({ login: z.string(), avatarUrl: z.string() }).nullable(),
             reviewRequests: z.object({
               nodes: z.array(z.object({ requestedReviewer: reviewerSchema })),
             }),
             latestReviews: z.object({
               nodes: z.array(
                 z.object({
-                  author: z.object({ __typename: z.string(), login: z.string() }).nullable(),
+                  author: z.object({ __typename: z.string(), login: z.string(), avatarUrl: z.string() }).nullable(),
                   state: z.enum(["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"]),
                   submittedAt: z.string().nullable(),
                   commit: z.object({ oid: z.string() }).nullable(),
@@ -129,6 +129,7 @@ export function parseOpenPulls(repo: string, raw: string): PullSnapshot[] {
         : [
             {
               login: review.author.login,
+              avatarUrl: review.author.avatarUrl,
               isBot: review.author.__typename === "Bot",
               state: review.state,
               submittedAt: review.submittedAt ?? "",
@@ -144,6 +145,7 @@ export function parseOpenPulls(repo: string, raw: string): PullSnapshot[] {
       url: node.url,
       isDraft: node.isDraft,
       author: node.author?.login ?? "ghost",
+      authorAvatarUrl: node.author?.avatarUrl ?? null,
       headRefName: node.headRefName,
       headRefOid: node.headRefOid,
       additions: node.additions,

@@ -37,6 +37,7 @@ export const queueEntrySchema = z.object({
   url: z.string(),
   isDraft: z.boolean(),
   author: z.string(),
+  authorAvatarUrl: z.string().nullable(),
   headRefName: z.string(),
   ticketKey: z.string().nullable(),
   additions: z.number().int(),
@@ -59,9 +60,11 @@ export const queueEntrySchema = z.object({
     "other",
     "approved",
   ]),
-  otherReviews: z.array(z.object({ login: z.string(), state: reviewStateSchema })),
+  otherReviews: z.array(
+    z.object({ login: z.string(), avatarUrl: z.string().nullable(), state: reviewStateSchema }),
+  ),
   agent: z.object({
-    state: z.enum(["none", "reviewing", "brief-ready", "follow-ups"]),
+    state: z.enum(["none", "opened", "reviewing", "brief-ready", "follow-ups"]),
     threadId: z.string().nullable(),
   }),
 });
@@ -125,6 +128,10 @@ export const rpcContract = defineRpcContract({
   relatedThreads: {
     input: z.object({ threadId: threadIdSchema }).strict(),
     output: relatedResultSchema,
+  },
+  runReview: {
+    input: z.object({ threadId: threadIdSchema }).strict(),
+    output: z.object({ delivery: z.enum(["sent", "queued"]) }),
   },
   openWorktree: {
     input: z

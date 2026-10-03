@@ -41,13 +41,14 @@ export { rpcContract };
 
 const GITHUB_PLUGIN_ID = "github";
 const WORKTREE_PROVIDER_ID = "git-worktree";
-const REVIEW_COMMAND = "/thermo-nuclear-code-quality-review review pr";
+export const REVIEW_COMMAND = "/thermo-nuclear-code-quality-review review pr";
 const TITLE_LIMIT = 120;
 const QUEUE_TTL_MS = 30_000;
 const TICKET_TTL_MS = 60 * 60_000;
 const VIEWER_TTL_MS = 60 * 60_000;
-const ENVIRONMENT_READY_TIMEOUT_MS = 15 * 60_000;
-const ENVIRONMENT_POLL_MS = 3_000;
+const ENVIRONMENT_READY_TIMEOUT_MS = 5 * 60_000;
+const ENVIRONMENT_POLL_MS = 2_000;
+const PULL_LINK_TIMEOUT_MS = 30_000;
 const FIRST_MESSAGE_LIMIT = 400;
 
 interface Cached<T> {
@@ -85,7 +86,15 @@ export interface ReviewContext {
   siblings: ReadonlyArray<{ key: string; title: string; url: string }>;
 }
 
-export function reviewPrompt(context: ReviewContext): string {
+export function reviewCommand(number: number): string {
+  return `${REVIEW_COMMAND} ${number}`;
+}
+
+/**
+ * The first message of a review thread: the gathered context and nothing that
+ * starts the review. The review runs when `reviewCommand` is sent.
+ */
+export function contextPrompt(context: ReviewContext): string {
   const { pull, ticket } = context;
   const lines = [
     "Review context (data gathered by the pr-review plugin):",
@@ -107,16 +116,21 @@ export function reviewPrompt(context: ReviewContext): string {
       lines.push(`  - ${sibling.key} "${sibling.title}" ${sibling.url}`);
     }
   }
-  lines.push("", `${REVIEW_COMMAND} ${pull.number}`);
+  lines.push("", 'Do not review yet. Reply only "Ready." and wait for instructions.');
   return lines.join("\n");
 }
 
 export interface PluginDeps {
   run: Runner;
   platform: NodeJS.Platform;
+  pollMs: number;
 }
 
-const defaultDeps: PluginDeps = { run: runCommand, platform: process.platform };
+const defaultDeps: PluginDeps = { run: runCommand, platform: process.platform, pollMs: ENVIRONMENT_POLL_MS };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export function createPlugin(deps: PluginDeps) {
   return function plugin(bb: BbPluginApi): void {
@@ -248,14 +262,14 @@ export function createPlugin(deps: PluginDeps) {
       if (threadId === undefined) return { state: "none", threadId: null };
       const thread = await liveThread(threadId);
       if (thread === null) return { state: "none", threadId: null };
-      let userMessageCount = 1;
+      let messages: string[] = [];
       try {
-        userMessageCount = (await userMessages(threadId)).length;
+        messages = await userMessages(threadId);
       } catch (error) {
         bb.log.warn(`could not read prompt history for ${threadId}: ${errorMessage(error)}`);
       }
       const isRunning = thread.status === "active" || thread.status === "starting";
-      return { state: agentState({ userMessageCount, isRunning }), threadId };
+      return { state: agentState({ userMessages: messages, isRunning }, REVIEW_COMMAND), threadId };
     }
 
     async function reviewQueue(refresh: boolean) {
@@ -284,6 +298,7 @@ export function createPlugin(deps: PluginDeps) {
           url: pull.url,
           isDraft: pull.isDraft,
           author: pull.author,
+          authorAvatarUrl: pull.authorAvatarUrl,
           headRefName: pull.headRefName,
           ticketKey: ticketKey(pull, projectKeys)?.key ?? null,
           additions: pull.additions,
@@ -397,35 +412,68 @@ export function createPlugin(deps: PluginDeps) {
       return null;
     }
 
-    async function checkoutWhenReady(threadId: string, repo: string, number: number): Promise<void> {
-      const deadline = Date.now() + ENVIRONMENT_READY_TIMEOUT_MS;
+    async function readyEnvironment(threadId: string, deadline: number) {
       while (!disposed.signal.aborted && Date.now() < deadline) {
         const thread = await liveThread(threadId);
-        if (thread === null) return;
+        if (thread === null) return null;
         if (thread.environmentId !== null) {
           const environment = await bb.sdk.environments.get({ environmentId: thread.environmentId });
           if (environment.status === "ready" && environment.path !== null) {
-            await checkoutPull(environment.path, repo, number);
-            return;
+            return { id: environment.id, path: environment.path };
           }
-          if (environment.status !== "creating") {
+          if (environment.status !== "creating" && environment.status !== "provisioning") {
             bb.log.warn(`environment for ${threadId} is ${environment.status}; skipped gh pr checkout`);
-            return;
+            return null;
           }
         }
-        await new Promise((resolve) => setTimeout(resolve, ENVIRONMENT_POLL_MS));
+        await sleep(deps.pollMs);
       }
+      bb.log.warn(`environment for ${threadId} was not ready in time; skipped gh pr checkout`);
+      return null;
     }
 
-    async function checkoutPull(path: string, repo: string, number: number): Promise<void> {
+    async function checkoutPull(path: string, repo: string, pull: PullView): Promise<void> {
       try {
-        await gh(["pr", "checkout", String(number), "-R", repo], 120_000, path);
+        await gh(["pr", "checkout", String(pull.number), "-R", repo], 120_000, path);
       } catch (error) {
-        const branch = `review/pr-${number}`;
-        bb.log.info(`gh pr checkout ${number} failed (${errorMessage(error)}); retrying as ${branch}`);
-        await gh(["pr", "checkout", String(number), "-R", repo, "--branch", branch, "--force"], 120_000, path);
+        const branch = `review/pr-${pull.number}`;
+        bb.log.info(`gh pr checkout ${pull.number} failed (${errorMessage(error)}); retrying as ${branch}`);
+        await gh(["pr", "checkout", String(pull.number), "-R", repo, "--branch", branch, "--force"], 120_000, path);
       }
-      bb.log.info(`checked out ${pullKey(repo, number)} in ${path}`);
+      const branch = (
+        await deps.run("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: path, timeoutMs: 15_000 })
+      ).trim();
+      if (branch !== pull.headRefName) {
+        bb.log.warn(`${pullKey(repo, pull.number)} is checked out as ${branch}, not its head branch ${pull.headRefName}`);
+      }
+      bb.log.info(`checked out ${pullKey(repo, pull.number)} as ${branch} in ${path}`);
+    }
+
+    /**
+     * Polls bb's branch lookup for the environment until it names the PR. The
+     * GitHub plugin's PR tab resolves a thread's PR through this lookup once,
+     * when it mounts, so the thread is opened only after it succeeds.
+     */
+    async function awaitEnvironmentPull(environmentId: string, pull: PullView): Promise<boolean> {
+      const deadline = Date.now() + PULL_LINK_TIMEOUT_MS;
+      while (!disposed.signal.aborted && Date.now() < deadline) {
+        const result = await bb.sdk.environments.pullRequest({ environmentId }).catch(() => null);
+        if (result?.outcome === "available") {
+          if (result.pullRequest.url === pull.url) return true;
+          bb.log.warn(`environment ${environmentId} resolves to ${result.pullRequest.url}, not ${pull.url}`);
+          return false;
+        }
+        await sleep(deps.pollMs);
+      }
+      bb.log.warn(`bb did not resolve ${pull.url} for environment ${environmentId} in time`);
+      return false;
+    }
+
+    async function prepareWorktree(threadId: string, repo: string, pull: PullView): Promise<void> {
+      const environment = await readyEnvironment(threadId, Date.now() + ENVIRONMENT_READY_TIMEOUT_MS);
+      if (environment === null) return;
+      await checkoutPull(environment.path, repo, pull);
+      await awaitEnvironmentPull(environment.id, pull);
     }
 
     async function serverHostId(): Promise<string> {
@@ -458,16 +506,31 @@ export function createPlugin(deps: PluginDeps) {
           inputs: { branch: base },
         },
         title: reviewTitle(repo, number, resolved.pull.title, resolved.ticket?.key ?? null),
-        prompt: reviewPrompt({ repo, ...resolved }),
+        prompt: contextPrompt({ repo, ...resolved }),
         pluginMetadata: { repo, number },
       });
       store.record(thread.id, resolved.refs);
       bb.realtime.publish(REFS_CHANNEL, { threadId: thread.id });
-      void checkoutWhenReady(thread.id, repo, number).catch((error: unknown) =>
+      await prepareWorktree(thread.id, repo, resolved.pull).catch((error: unknown) =>
         bb.log.warn(`could not check out ${pullKey(repo, number)} for ${thread.id}: ${errorMessage(error)}`),
       );
       bb.log.info(`started review thread ${thread.id} for ${pullKey(repo, number)}`);
       return { threadId: thread.id, created: true };
+    }
+
+    async function runReview(threadId: string): Promise<{ delivery: "sent" | "queued" }> {
+      const target = store
+        .forThread(threadId)
+        .find((ref) => ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment"));
+      const pull = target === undefined ? null : parseRepoKey(target.key);
+      if (pull === null) throw new Error(`${threadId} has no PR to review`);
+      const result = await bb.sdk.threads.send({
+        threadId,
+        mode: "auto",
+        input: [{ type: "text", text: reviewCommand(pull.number), mentions: [] }],
+      });
+      bb.realtime.publish(REFS_CHANNEL, { threadId });
+      return { delivery: result.delivery };
     }
 
     const environmentLookups = new Map<string, Cached<null>>();
@@ -573,6 +636,7 @@ export function createPlugin(deps: PluginDeps) {
       startReview: ({ repo, number }) => startReview(repo, number),
       threadRefs: ({ threadId }) => threadRefs(threadId),
       relatedThreads: ({ threadId }) => relatedThreads(threadId),
+      runReview: ({ threadId }) => runReview(threadId),
       openWorktree: ({ threadId, editor }) => openWorktree(threadId, editor),
     });
 
@@ -620,7 +684,7 @@ export function createPlugin(deps: PluginDeps) {
             },
           }),
           start: cliCommand({
-            summary: "Find or start the agent review thread for a PR",
+            summary: "Find or open the review thread for a PR without running the review",
             positionals: [
               { name: "pull", description: "PR number (first configured repo), owner/repo#n, or PR URL", required: true },
             ],
@@ -634,6 +698,25 @@ export function createPlugin(deps: PluginDeps) {
                 stdout: input.options.json
                   ? `${JSON.stringify(result)}\n`
                   : `${result.created ? "started" : "existing"}\t${result.threadId}\n`,
+              };
+            },
+          }),
+          review: cliCommand({
+            summary: "Run the thermo-nuclear code quality review in a PR's review thread, opening it first if needed",
+            positionals: [
+              { name: "pull", description: "PR number (first configured repo), owner/repo#n, or PR URL", required: true },
+            ],
+            options: jsonOption,
+            async run(input) {
+              const { repos } = await config();
+              const { repo, number } = parsePullArgument(input.positionals.pull, repos[0]);
+              const { threadId } = await startReview(repo, number);
+              const { delivery } = await runReview(threadId);
+              return {
+                exitCode: 0,
+                stdout: input.options.json
+                  ? `${JSON.stringify({ threadId, delivery })}\n`
+                  : `${delivery}\t${threadId}\n`,
               };
             },
           }),

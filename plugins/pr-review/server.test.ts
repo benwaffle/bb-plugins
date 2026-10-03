@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
-import { createPlugin, reviewTitle } from "./server.js";
+import { createPlugin, REVIEW_COMMAND, reviewTitle } from "./server.js";
 import type { RunOptions } from "./tools.js";
 
 const REPO = "private-tech-inc/hss";
@@ -24,13 +24,13 @@ function graphqlNode(number: number, title: string, body: string) {
     deletions: 1,
     changedFiles: 2,
     updatedAt: "2026-10-01T00:00:00Z",
-    author: { login: "meisbobzheng" },
+    author: { login: "meisbobzheng", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=32" },
     reviewRequests: {
       nodes: [{ requestedReviewer: { __typename: "Team", combinedSlug: "private-tech-inc/network-services" } }],
     },
     latestReviews: {
       nodes: [
-        { author: { __typename: "Bot", login: "copilot-pull-request-reviewer" }, state: "COMMENTED", submittedAt: "2026-10-01T00:00:00Z", commit: { oid: "" } },
+        { author: { __typename: "Bot", login: "copilot-pull-request-reviewer", avatarUrl: "https://avatars.githubusercontent.com/in/2?s=32" }, state: "COMMENTED", submittedAt: "2026-10-01T00:00:00Z", commit: { oid: "" } },
       ],
     },
   };
@@ -83,6 +83,7 @@ function fakeRunner() {
       });
     }
     if (line.startsWith("gh pr checkout") || command === "open") return "";
+    if (line === "git rev-parse --abbrev-ref HEAD") return "bob/cx-current-impi\n";
     throw new Error(`unexpected command: ${line}`);
   };
   return { calls, run };
@@ -90,7 +91,7 @@ function fakeRunner() {
 
 async function load() {
   const runner = fakeRunner();
-  const plugin = createPlugin({ run: runner.run, platform: "darwin" });
+  const plugin = createPlugin({ run: runner.run, platform: "darwin", pollMs: 1 });
   const host = createFakePluginHost({ pluginId: "pr-review" });
   const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
   const sdk = host.harness.sdk;
@@ -112,6 +113,11 @@ async function load() {
   sdk.stub("threads.promptHistory", async () => [
     { id: "msg_1", createdAt: 1, input: [{ type: "text", text: "Review context", mentions: [] }] },
   ]);
+  sdk.stub("environments.pullRequest", async () => ({
+    outcome: "available",
+    pullRequest: { url: `https://github.com/${REPO}/pull/596` },
+  }));
+  sdk.stub("threads.send", async () => ({ ok: true, delivery: "sent" }));
   sdk.stub("environments.get", async () => ({
     id: "env_review",
     status: "ready",
@@ -133,8 +139,8 @@ describe("reviewTitle", () => {
 });
 
 describe("startReview", () => {
-  it("spawns a worktree thread at the PR head with the context block and review command", async () => {
-    const { harness, runner } = await load();
+  it("spawns a worktree thread at the PR head with a context message that does not start the review", async () => {
+    const { harness } = await load();
     const result = await harness.callRpc("startReview", { repo: REPO, number: 596 });
     expect(result).toEqual({ threadId: "thr_1", created: true });
 
@@ -153,15 +159,31 @@ describe("startReview", () => {
     expect(prompt).toContain('Ticket: CORE-51 "Track currently used IMPI" [In Progress]');
     expect(prompt).toContain('Linked issue: private-tech-inc/hss#12 "Wrong IMPI in RTR"');
     expect(prompt).toContain('private-tech-inc/hss#599 "De-register the old IMS identity"');
-    expect(prompt.split("\n").at(-1)).toBe("/thermo-nuclear-code-quality-review review pr 596");
+    expect(prompt).not.toContain(REVIEW_COMMAND);
+    expect(prompt.split("\n").at(-1)).toBe('Do not review yet. Reply only "Ready." and wait for instructions.');
+  });
 
-    await expect.poll(() => runner.calls.find((call) => call.args[1] === "checkout")?.cwd).toBe("/worktrees/hss-596");
+  it("returns once the worktree is on the PR head branch and bb resolves the PR for it", async () => {
+    const { harness, runner } = await load();
+    let lookups = 0;
+    harness.sdk.stub("environments.pullRequest", async () =>
+      ++lookups < 3
+        ? { outcome: "absent" }
+        : { outcome: "available", pullRequest: { url: `https://github.com/${REPO}/pull/596` } },
+    );
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const checkout = runner.calls.findIndex((call) => call.args[1] === "checkout");
+    expect(runner.calls[checkout]?.cwd).toBe("/worktrees/hss-596");
+    expect(runner.calls[checkout + 1]).toMatchObject({ command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"] });
+    expect(lookups).toBe(3);
+    expect(harness.sdk.callsTo("environments.pullRequest")[0]).toEqual([{ environmentId: "env_review" }]);
   });
 
   it("puts the CLI start thread's worktree on the bb server machine", async () => {
     const { harness } = await load();
     const result = await harness.runCli(["start", `${REPO}#596`]);
     expect(result).toMatchObject({ exitCode: 0, stdout: "started\tthr_1\n" });
+    expect(harness.sdk.callsTo("threads.send")).toHaveLength(0);
     const [[spawn]] = harness.sdk.callsTo("threads.spawn") as [[{ environment: Record<string, unknown> }]];
     expect(spawn.environment.machine).toEqual({ type: "existing", hostId: "host_local" });
   });
@@ -199,6 +221,36 @@ describe("startReview", () => {
   });
 });
 
+describe("runReview", () => {
+  it("sends the review command to the PR's review thread", async () => {
+    const { harness } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    expect(await harness.callRpc("runReview", { threadId: "thr_1" })).toEqual({ delivery: "sent" });
+    expect(harness.sdk.callsTo("threads.send")).toEqual([
+      [
+        {
+          threadId: "thr_1",
+          mode: "auto",
+          input: [{ type: "text", text: `${REVIEW_COMMAND} 596`, mentions: [] }],
+        },
+      ],
+    ]);
+  });
+
+  it("opens the thread and runs the review from the CLI", async () => {
+    const { harness } = await load();
+    const result = await harness.runCli(["review", "596"]);
+    expect(result).toMatchObject({ exitCode: 0, stdout: "sent\tthr_1\n" });
+    expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
+    expect(harness.sdk.callsTo("threads.send")).toHaveLength(1);
+  });
+
+  it("refuses a thread without a PR ref", async () => {
+    const { harness } = await load();
+    await expect(harness.callRpc("runReview", { threadId: "thr_none" })).rejects.toThrow(/no PR to review/);
+  });
+});
+
 describe("reviewQueue", () => {
   it("returns open PRs with tickets and the agent thread state", async () => {
     const { harness } = await load();
@@ -206,15 +258,22 @@ describe("reviewQueue", () => {
     const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as {
       viewer: string;
       githubPanel: boolean;
-      entries: Array<{ number: number; ticketKey: string | null; me: string; agent: { state: string } }>;
+      entries: Array<{
+        number: number;
+        ticketKey: string | null;
+        me: string;
+        authorAvatarUrl: string | null;
+        agent: { state: string };
+      }>;
     };
     expect(queue.viewer).toBe("benwaffle");
     expect(queue.githubPanel).toBe(true);
     expect(queue.entries.map((entry) => [entry.number, entry.ticketKey, entry.me, entry.agent.state])).toEqual([
       [590, null, "requested", "none"],
-      [596, "CORE-51", "requested", "reviewing"],
+      [596, "CORE-51", "requested", "opened"],
       [599, "CORE-51", "requested", "none"],
     ]);
+    expect(queue.entries[0]?.authorAvatarUrl).toBe("https://avatars.githubusercontent.com/u/1?s=32");
   });
 });
 
