@@ -23,7 +23,7 @@ import {
   type PullSnapshot,
   type Viewer,
 } from "./queue.js";
-import { createRefStore } from "./store.js";
+import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
 import {
   OPEN_PULLS_QUERY,
   PULL_VIEW_FIELDS,
@@ -31,7 +31,7 @@ import {
   parseIssueTitle,
   parseOpenPulls,
   parsePullView,
-  parseTwgWorkItem,
+  parseTwgWorkItems,
   runCommand,
   type PullView,
   type Runner,
@@ -45,6 +45,8 @@ export const REVIEW_COMMAND = "/thermo-nuclear-code-quality-review review pr";
 const TITLE_LIMIT = 120;
 const QUEUE_TTL_MS = 30_000;
 const TICKET_TTL_MS = 60 * 60_000;
+const TICKET_RETRY_MS = 5 * 60_000;
+const TWG_TIMEOUT_MS = 20_000;
 const VIEWER_TTL_MS = 60 * 60_000;
 const ENVIRONMENT_READY_TIMEOUT_MS = 5 * 60_000;
 const ENVIRONMENT_POLL_MS = 2_000;
@@ -58,6 +60,10 @@ interface Cached<T> {
 
 function fresh<T>(entry: Cached<T> | undefined, ttlMs: number): entry is Cached<T> {
   return entry !== undefined && Date.now() - entry.at < ttlMs;
+}
+
+function distinct(values: Iterable<string | null>): string[] {
+  return [...new Set([...values].filter((value) => value !== null))];
 }
 
 function errorMessage(error: unknown): string {
@@ -124,9 +130,15 @@ export interface PluginDeps {
   run: Runner;
   platform: NodeJS.Platform;
   pollMs: number;
+  now: () => number;
 }
 
-const defaultDeps: PluginDeps = { run: runCommand, platform: process.platform, pollMs: ENVIRONMENT_POLL_MS };
+const defaultDeps: PluginDeps = {
+  run: runCommand,
+  platform: process.platform,
+  pollMs: ENVIRONMENT_POLL_MS,
+  now: Date.now,
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -161,6 +173,7 @@ export function createPlugin(deps: PluginDeps) {
       },
     });
     const store = createRefStore(bb.storage);
+    const ticketStore = createTicketStore(bb.storage);
     const resolveTool = createToolResolver(deps.run);
     const disposed = new AbortController();
     bb.onDispose(() => disposed.abort());
@@ -315,29 +328,83 @@ export function createPlugin(deps: PluginDeps) {
         fetchedAt: new Date().toISOString(),
         githubPanel: await githubPanel(),
         entries,
+        tickets: await tickets(entries.map((entry) => entry.ticketKey)),
         errors,
       };
     }
 
-    const ticketCache = new Map<string, Cached<Ticket>>();
-    async function ticket(key: string): Promise<Ticket> {
-      const cached = ticketCache.get(key);
-      if (fresh(cached, TICKET_TTL_MS)) return cached.value;
-      const { jiraBaseUrl } = await config();
-      const url = `${jiraBaseUrl}/browse/${key}`;
-      let value: Ticket = { key, summary: null, status: null, url };
+    const ticketLookups = new Map<string, Promise<void>>();
+    const ticketFailures = new Map<string, number>();
+
+    /**
+     * Looks up `keys` with one twg call and caches what it resolves. A key twg
+     * cannot read keeps its cached row, if any, and is retried after
+     * `TICKET_RETRY_MS`.
+     */
+    async function lookUpTickets(keys: readonly string[]): Promise<void> {
+      let found = new Map<string, TicketFields>();
       try {
         const raw = await deps.run(
           await tool("twg"),
-          ["jira", "workitem", "get", key, "-o", "json", "--output-summary", "none"],
-          { timeoutMs: 30_000 },
+          ["jira", "workitem", "get", ...keys, "-o", "json", "--output-summary", "none"],
+          { timeoutMs: TWG_TIMEOUT_MS },
         );
-        value = { key, url, ...parseTwgWorkItem(raw) };
-        ticketCache.set(key, { value, at: Date.now() });
+        found = parseTwgWorkItems(raw);
+        const missing = keys.filter((key) => !found.has(key));
+        if (missing.length > 0) bb.log.warn(`twg could not read ${missing.join(", ")}`);
       } catch (error) {
-        bb.log.warn(`could not read ${key} with twg: ${errorMessage(error)}`);
+        bb.log.warn(`could not read ${keys.join(", ")} with twg: ${errorMessage(error)}`);
       }
-      return value;
+      const now = deps.now();
+      ticketStore.save(found, now);
+      for (const key of keys) {
+        if (found.has(key)) ticketFailures.delete(key);
+        else ticketFailures.set(key, now);
+      }
+      if (found.size > 0) bb.realtime.publish(REFS_CHANNEL, { tickets: [...found.keys()] });
+    }
+
+    /**
+     * Tickets for every distinct key, from the plugin database. Keys never
+     * looked up are resolved before returning; keys older than `TICKET_TTL_MS`,
+     * and keys twg could not read, are refreshed in the background. A key with
+     * no cached row has a null summary and status.
+     */
+    async function tickets(keys: Iterable<string | null>): Promise<Ticket[]> {
+      const wanted = distinct(keys);
+      const { jiraBaseUrl } = await config();
+      const now = deps.now();
+      let cached = ticketStore.get(wanted);
+      const due = wanted.filter((key) => {
+        if (ticketLookups.has(key)) return false;
+        const row = cached.get(key);
+        if (row !== undefined && now - row.fetchedAt < TICKET_TTL_MS) return false;
+        const failedAt = ticketFailures.get(key);
+        return failedAt === undefined || now - failedAt >= TICKET_RETRY_MS;
+      });
+      if (due.length > 0) {
+        const lookup = lookUpTickets(due)
+          .catch((error: unknown) => bb.log.warn(`could not cache ${due.join(", ")}: ${errorMessage(error)}`))
+          .finally(() => {
+            for (const key of due) ticketLookups.delete(key);
+          });
+        for (const key of due) ticketLookups.set(key, lookup);
+      }
+      const unresolved = new Set(
+        wanted
+          .filter((key) => !cached.has(key) && !ticketFailures.has(key))
+          .flatMap((key) => ticketLookups.get(key) ?? []),
+      );
+      if (unresolved.size > 0) {
+        await Promise.all(unresolved);
+        cached = ticketStore.get(wanted);
+      }
+      return wanted.map((key) => ({
+        key,
+        summary: cached.get(key)?.summary ?? null,
+        status: cached.get(key)?.status ?? null,
+        url: `${jiraBaseUrl}/browse/${key}`,
+      }));
     }
 
     async function resolveProjectId(repo: string): Promise<string> {
@@ -384,12 +451,9 @@ export function createPlugin(deps: PluginDeps) {
             }),
         )
       ).filter((pull) => pull !== null);
-      const keys = [
-        ...new Set(queue.entries.flatMap((entry) => (entry.ticketKey === null ? [] : [entry.ticketKey]))),
-      ];
       return {
         githubPanel: queue.githubPanel,
-        tickets: await Promise.all(keys.map((key) => ticket(key))),
+        tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
         threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
         pulls,
       };
@@ -432,7 +496,7 @@ export function createPlugin(deps: PluginDeps) {
       const mentionedPulls = linked
         .filter((ref) => ref.kind === "gh-pr")
         .map((ref) => ({ key: ref.key, title: openTitles.get(ref.key) ?? null, url: githubUrl("gh-pr", ref.key), source: ref.source }));
-      const ticketInfo = ticketMatch === null ? null : await ticket(ticketMatch.key);
+      const ticketInfo = ticketMatch === null ? null : ((await tickets([ticketMatch.key]))[0] ?? null);
 
       const refs: ThreadRef[] = [
         { kind: "gh-pr", key: pullKey(repo, number), url: pull.url, title: pull.title, source: "review-target" },
@@ -610,7 +674,12 @@ export function createPlugin(deps: PluginDeps) {
           worktree = { path: environment.path, isLocal: environment.hostId === primaryHostId };
         }
       }
-      return { refs, worktree, githubPanel: await githubPanel() };
+      return {
+        refs,
+        tickets: await tickets(refs.map((ref) => (ref.kind === "jira" ? ref.key : null))),
+        worktree,
+        githubPanel: await githubPanel(),
+      };
     }
 
     async function relatedThreads(threadId: string) {
@@ -672,9 +741,6 @@ export function createPlugin(deps: PluginDeps) {
     bb.rpc.register(rpcContract, {
       reviewQueue: ({ refresh }) => reviewQueue(refresh),
       sidebarGroups: () => sidebarGroups(),
-      async tickets({ keys }) {
-        return { tickets: await Promise.all([...new Set(keys)].map((key) => ticket(key))) };
-      },
       startReview: ({ repo, number }) => startReview(repo, number),
       threadRefs: ({ threadId }) => threadRefs(threadId),
       relatedThreads: ({ threadId }) => relatedThreads(threadId),

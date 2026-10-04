@@ -36,19 +36,47 @@ function graphqlNode(number: number, title: string, body: string) {
   };
 }
 
-const OPEN_PULLS = JSON.stringify({
-  data: {
-    repository: {
-      pullRequests: {
-        nodes: [
-          graphqlNode(596, "CORE-51: Track the private identity the S-CSCF registered", "Fixes #12\nBuilds on #590"),
-          graphqlNode(599, "De-register the old IMS identity", "CORE-51\n\nFollow-up."),
-          graphqlNode(590, "Run the review workflow", ""),
-        ],
-      },
+const OPEN_PULL_NODES = [
+  graphqlNode(596, "CORE-51: Track the private identity the S-CSCF registered", "Fixes #12\nBuilds on #590"),
+  graphqlNode(599, "De-register the old IMS identity", "CORE-51\n\nFollow-up."),
+  graphqlNode(590, "Run the review workflow", ""),
+];
+
+function openPulls(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>): string {
+  return JSON.stringify({ data: { repository: { pullRequests: { nodes } } } });
+}
+
+const JIRA = new Map([
+  ["CORE-51", { summary: "Track currently used IMPI", status: "In Progress" }],
+  ["CORE-52", { summary: "Trigger RTR on default IMPU change", status: "To Do" }],
+]);
+
+function workItem(key: string, fields: { summary: string; status: string }) {
+  return { key, summary: fields.summary, status: { name: fields.status }, url: `https://east-stout.atlassian.net/browse/${key}` };
+}
+
+/**
+ * `twg jira workitem get` as it behaves: one key prints `data` as an array and
+ * exits 1 when the key is unreadable; several keys print `data.items` with a
+ * per-key `ok` flag and exit 0.
+ */
+function twgWorkItemGet(keys: readonly string[], jira: ReadonlyMap<string, { summary: string; status: string }>): string {
+  if (keys.length === 1) {
+    const fields = jira.get(keys[0]!);
+    if (fields === undefined) throw new Error("twg jira workitem get: Command failed");
+    return JSON.stringify({ data: [workItem(keys[0]!, fields)] });
+  }
+  return JSON.stringify({
+    data: {
+      items: keys.map((key) => {
+        const fields = jira.get(key);
+        return fields === undefined
+          ? { input: key, ok: false, error: { message: "Issue does not exist", status: 404 } }
+          : { input: key, ok: true, data: workItem(key, fields) };
+      }),
     },
-  },
-});
+  });
+}
 
 const PULL_VIEW = JSON.stringify({
   number: 596,
@@ -66,32 +94,35 @@ const PULL_VIEW = JSON.stringify({
   state: "OPEN",
 });
 
-function fakeRunner() {
+function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
   const calls: Call[] = [];
+  const twg: { jira: typeof JIRA; fail: boolean; gate: Promise<void> | null } = { jira: JIRA, fail: false, gate: null };
   const run = async (command: string, args: readonly string[], options: RunOptions): Promise<string> => {
     calls.push({ command, args, cwd: options.cwd });
     const line = [command, ...args].join(" ");
     if (args[0] === "--version") return "1.0\n";
     if (line.startsWith("gh api user --jq")) return "benwaffle\n";
     if (line.startsWith("gh api user/teams")) return "private-tech-inc/network-services\n";
-    if (line.startsWith("gh api graphql")) return OPEN_PULLS;
+    if (line.startsWith("gh api graphql")) return openPulls(nodes);
     if (line.startsWith("gh pr view 596")) return PULL_VIEW;
     if (line.startsWith("gh issue view 12")) return JSON.stringify({ title: "Wrong IMPI in RTR" });
-    if (line.startsWith("twg jira workitem get CORE-51")) {
-      return JSON.stringify({
-        data: [{ key: "CORE-51", summary: "Track currently used IMPI", status: { name: "In Progress" } }],
-      });
+    if (line.startsWith("twg jira workitem get ")) {
+      await twg.gate;
+      if (twg.fail) throw new Error("twg jira workitem: timed out");
+      const keys = args.slice(3, args.indexOf("-o"));
+      return twgWorkItemGet(keys, twg.jira);
     }
     if (line.startsWith("gh pr checkout") || command === "open") return "";
     if (line === "git rev-parse --abbrev-ref HEAD") return "bob/cx-current-impi\n";
     throw new Error(`unexpected command: ${line}`);
   };
-  return { calls, run };
+  return { calls, twg, run };
 }
 
-async function load() {
-  const runner = fakeRunner();
-  const plugin = createPlugin({ run: runner.run, platform: "darwin", pollMs: 1 });
+async function load(nodes = OPEN_PULL_NODES) {
+  const runner = fakeRunner(nodes);
+  const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
+  const plugin = createPlugin({ run: runner.run, platform: "darwin", pollMs: 1, now: () => clock.now });
   const host = createFakePluginHost({ pluginId: "pr-review" });
   const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
   const sdk = host.harness.sdk;
@@ -125,7 +156,7 @@ async function load() {
     hostId: "host_local",
   }));
   await plugin(host.bb);
-  return { ...host, runner, threads };
+  return { ...host, runner, threads, clock };
 }
 
 describe("reviewTitle", () => {
@@ -340,5 +371,93 @@ describe("related threads and editors", () => {
       error: null,
     });
     expect(runner.calls.at(-1)).toMatchObject({ command: "open", args: ["-a", "GoLand", "/worktrees/hss-596"] });
+  });
+});
+
+describe("ticket summaries", () => {
+  const nodes = [
+    graphqlNode(601, "CORE-51: Track the IMPI", ""),
+    graphqlNode(602, "CORE-52: Trigger RTR", ""),
+    graphqlNode(603, "CORE-51: Follow-up", ""),
+    graphqlNode(604, "CORE-404: Missing ticket", ""),
+    graphqlNode(605, "No ticket", ""),
+  ];
+
+  interface QueueTickets {
+    tickets: Array<{ key: string; summary: string | null; status: string | null }>;
+  }
+
+  const twgCalls = (runner: { calls: Call[] }) => runner.calls.filter((call) => call.args[0] === "jira");
+
+  it("resolves every distinct queue key in one twg call and serves them with the queue", async () => {
+    const { harness, runner } = await load(nodes);
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as QueueTickets;
+
+    expect(twgCalls(runner).map((call) => call.args)).toEqual([
+      ["jira", "workitem", "get", "CORE-51", "CORE-52", "CORE-404", "-o", "json", "--output-summary", "none"],
+    ]);
+    expect(queue.tickets).toEqual([
+      { key: "CORE-51", summary: "Track currently used IMPI", status: "In Progress", url: "https://east-stout.atlassian.net/browse/CORE-51" },
+      { key: "CORE-52", summary: "Trigger RTR on default IMPU change", status: "To Do", url: "https://east-stout.atlassian.net/browse/CORE-52" },
+      { key: "CORE-404", summary: null, status: null, url: "https://east-stout.atlassian.net/browse/CORE-404" },
+    ]);
+  });
+
+  it("caches summaries for an hour, then serves the cached row while refreshing it", async () => {
+    const { harness, runner, clock } = await load(nodes);
+    await harness.callRpc("reviewQueue", { refresh: true });
+    await harness.callRpc("reviewQueue", { refresh: true });
+    expect(twgCalls(runner)).toHaveLength(1);
+
+    clock.now += 61 * 60_000;
+    runner.twg.jira = new Map([...JIRA, ["CORE-51", { summary: "Track the IMPI per registration", status: "Done" }]]);
+    let release = () => {};
+    runner.twg.gate = new Promise((resolve) => (release = resolve));
+    const stale = (await harness.callRpc("reviewQueue", { refresh: true })) as QueueTickets;
+    expect(stale.tickets[0]).toMatchObject({ key: "CORE-51", summary: "Track currently used IMPI" });
+    expect(twgCalls(runner).at(-1)?.args.slice(3, -4)).toEqual(["CORE-51", "CORE-52", "CORE-404"]);
+
+    release();
+    await runner.twg.gate;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const refreshed = (await harness.callRpc("reviewQueue", { refresh: true })) as QueueTickets;
+    expect(refreshed.tickets[0]).toMatchObject({ summary: "Track the IMPI per registration", status: "Done" });
+    expect(twgCalls(runner)).toHaveLength(2);
+  });
+
+  it("keeps cached summaries when twg fails and retries an unreadable key after five minutes", async () => {
+    const { harness, runner, clock } = await load(nodes);
+    await harness.callRpc("reviewQueue", { refresh: true });
+    await harness.callRpc("reviewQueue", { refresh: true });
+    expect(twgCalls(runner)).toHaveLength(1);
+
+    clock.now += 61 * 60_000;
+    runner.twg.fail = true;
+    await harness.callRpc("reviewQueue", { refresh: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as QueueTickets;
+    expect(queue.tickets.map((ticket) => [ticket.key, ticket.summary])).toEqual([
+      ["CORE-51", "Track currently used IMPI"],
+      ["CORE-52", "Trigger RTR on default IMPU change"],
+      ["CORE-404", null],
+    ]);
+    expect(twgCalls(runner)).toHaveLength(2);
+
+    clock.now += 5 * 60_000;
+    runner.twg.fail = false;
+    await harness.callRpc("reviewQueue", { refresh: true });
+    expect(twgCalls(runner)).toHaveLength(3);
+  });
+
+  it("gives the sidebar groups and the thread header the ticket of each review thread", async () => {
+    const { harness, runner } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const groups = (await harness.callRpc("sidebarGroups", {})) as QueueTickets;
+    expect(groups.tickets).toEqual([expect.objectContaining({ key: "CORE-51", summary: "Track currently used IMPI" })]);
+    const refs = (await harness.callRpc("threadRefs", { threadId: "thr_1" })) as QueueTickets;
+    expect(refs.tickets).toEqual([
+      expect.objectContaining({ key: "CORE-51", summary: "Track currently used IMPI", status: "In Progress" }),
+    ]);
+    expect(twgCalls(runner)).toHaveLength(1);
   });
 });

@@ -44,7 +44,7 @@ teams and you have not reviewed yet. Columns:
 | Column | Shows |
 | --- | --- |
 | PR | Number, title, and the author with their GitHub avatar. |
-| Ticket | Jira key from a `CORE-n:` title prefix, or else a bare `CORE-n` line or `/browse/CORE-n` link in the body. Hover for the summary. |
+| Ticket | Jira key from a `CORE-n:` title prefix, or else a bare `CORE-n` line or `/browse/CORE-n` link in the body. Hover for `CORE-n: <summary> (<status>)`. |
 | Size | Additions, deletions, and changed files. |
 | Reviews | The latest review state and avatar of every human reviewer other than you. |
 | Me | `requested`, `commented`, `changes requested`, `approved`, `approved, new commits`, `author`, or `—`. |
@@ -59,7 +59,7 @@ GitHub plugin's panel (when that plugin is running) and on github.com.
 In bb's thread list, organized **By project**, review threads are nested under
 their Jira ticket, such as **CORE-21**, when the ticket has at least two
 threads or an open PR that has no review thread yet. Hover the ticket row for
-the summary. An open PR without a review thread is a muted row under its
+its summary and status. An open PR without a review thread is a muted row under its
 ticket, with the author and a **Start** button; PRs without a ticket are under
 **No ticket**. Click the row, or **Start**, to open the PR's review thread; one
 is started when there is none. PRs you approved at their current head are not
@@ -107,7 +107,7 @@ column.
 ## Thread header
 
 Threads with refs show chips in the header: the PR, the ticket (hover for its
-summary), issues from `Fixes`/`Closes`/`Resolves`/`Refs`/`Part of #n`, other
+summary and status), issues from `Fixes`/`Closes`/`Resolves`/`Refs`/`Part of #n`, other
 PRs mentioned as a bare `#n` or PR URL, and sibling PRs on the same ticket.
 For a thread that the plugin did not start, the refs come from the PR of the
 thread's branch the first time the header loads.
@@ -164,5 +164,10 @@ or `CORE-n`), `url`, `title`, and `source` (`review-target`, `environment`,
   app's history. That works only while the GitHub plugin keeps that route.
 - Sibling PRs come from the open PRs in the same repository, so sibling PRs in
   other repositories are not found.
-- The queue caches GitHub results for 30 seconds and ticket summaries for an
-  hour. **Refresh** and `--refresh` skip the queue cache.
+- The queue caches GitHub results for 30 seconds. **Refresh** and `--refresh`
+  skip that cache.
+- Ticket summaries are read with one `twg jira workitem get` call for all the
+  keys in view and kept in the plugin's database. After an hour the cached
+  summary is shown while it is read again. Until a ticket is read, its tooltip
+  is `CORE-n (loading title)`. A ticket that `twg` cannot read keeps that
+  tooltip, and is tried again after five minutes.

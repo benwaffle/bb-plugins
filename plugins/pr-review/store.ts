@@ -15,7 +15,19 @@ const MIGRATIONS = [
     PRIMARY KEY (thread_id, kind, key)
   )`,
   `CREATE INDEX refs_by_key ON refs (kind, key)`,
+  `CREATE TABLE tickets (
+    key TEXT PRIMARY KEY,
+    summary TEXT,
+    status TEXT,
+    fetched_at INTEGER NOT NULL
+  )`,
 ];
+
+function openDatabase(storage: Storage) {
+  const handle = storage.database();
+  storage.migrate(handle, MIGRATIONS);
+  return handle;
+}
 
 interface RefRow {
   thread_id: string;
@@ -40,11 +52,7 @@ export interface RefStore {
 }
 
 export function createRefStore(storage: Storage): RefStore {
-  const db = () => {
-    const handle = storage.database();
-    storage.migrate(handle, MIGRATIONS);
-    return handle;
-  };
+  const db = () => openDatabase(storage);
 
   return {
     record(threadId, refs) {
@@ -109,6 +117,49 @@ export function createRefStore(storage: Storage): RefStore {
         )
         .all(...pullKeys) as Array<{ key: string; thread_id: string }>;
       return new Map(rows.map((row) => [row.key, row.thread_id]));
+    },
+  };
+}
+
+export interface TicketFields {
+  summary: string | null;
+  status: string | null;
+}
+
+export interface CachedTicket extends TicketFields {
+  fetchedAt: number;
+}
+
+export interface TicketStore {
+  get(keys: readonly string[]): Map<string, CachedTicket>;
+  save(tickets: ReadonlyMap<string, TicketFields>, fetchedAt: number): void;
+}
+
+export function createTicketStore(storage: Storage): TicketStore {
+  const db = () => openDatabase(storage);
+
+  return {
+    get(keys) {
+      if (keys.length === 0) return new Map();
+      const placeholders = keys.map(() => "?").join(", ");
+      const rows = db()
+        .prepare(`SELECT key, summary, status, fetched_at FROM tickets WHERE key IN (${placeholders})`)
+        .all(...keys) as Array<{ key: string; summary: string | null; status: string | null; fetched_at: number }>;
+      return new Map(
+        rows.map((row) => [row.key, { summary: row.summary, status: row.status, fetchedAt: row.fetched_at }]),
+      );
+    },
+
+    save(tickets, fetchedAt) {
+      const handle = db();
+      const upsert = handle.prepare(
+        `INSERT INTO tickets (key, summary, status, fetched_at) VALUES (@key, @summary, @status, @fetchedAt)
+         ON CONFLICT (key) DO UPDATE SET
+           summary = excluded.summary, status = excluded.status, fetched_at = excluded.fetched_at`,
+      );
+      handle.transaction(() => {
+        for (const [key, fields] of tickets) upsert.run({ key, fetchedAt, ...fields });
+      })();
     },
   };
 }

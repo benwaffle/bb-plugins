@@ -53,6 +53,7 @@
     "parse.ts",
     "queue.ts",
     "store.ts",
+    "tickets.ts",
     "tools.ts"
   ],
   "scripts": {

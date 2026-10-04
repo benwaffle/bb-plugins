@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { PullReview, PullSnapshot } from "./queue.js";
+import type { TicketFields } from "./store.js";
 
 export interface RunOptions {
   cwd?: string;
@@ -215,20 +216,32 @@ export function parseIssueTitle(raw: string): string {
   return issueViewSchema.parse(JSON.parse(raw)).title;
 }
 
-const twgWorkItemSchema = z.object({
-  data: z
-    .array(
-      z.object({
-        key: z.string(),
-        summary: z.string().nullable().optional(),
-        status: z.object({ name: z.string() }).nullable().optional(),
-        url: z.string().optional(),
-      }),
-    )
-    .min(1),
+const twgFieldsSchema = z.object({
+  key: z.string(),
+  summary: z.string().nullable().optional(),
+  status: z.object({ name: z.string() }).nullable().optional(),
 });
 
-export function parseTwgWorkItem(raw: string): { summary: string | null; status: string | null } {
-  const item = twgWorkItemSchema.parse(JSON.parse(raw)).data[0]!;
-  return { summary: item.summary ?? null, status: item.status?.name ?? null };
+/**
+ * `twg jira workitem get` prints `data` as an array of work items for one key,
+ * and as `items` with a per-key `ok` flag for several keys.
+ */
+const twgWorkItemsSchema = z.object({
+  data: z.union([
+    z.array(twgFieldsSchema),
+    z.object({
+      items: z.array(z.object({ input: z.string(), ok: z.boolean(), data: twgFieldsSchema.optional() })),
+    }),
+  ]),
+});
+
+/** Summary and status by requested key, for the keys twg resolved. */
+export function parseTwgWorkItems(raw: string): Map<string, TicketFields> {
+  const { data } = twgWorkItemsSchema.parse(JSON.parse(raw));
+  const resolved = Array.isArray(data)
+    ? data.map((item) => [item.key, item] as const)
+    : data.items.flatMap((item) => (item.ok && item.data !== undefined ? [[item.input, item.data] as const] : []));
+  return new Map(
+    resolved.map(([key, item]) => [key, { summary: item.summary ?? null, status: item.status?.name ?? null }]),
+  );
 }
