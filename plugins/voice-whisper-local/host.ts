@@ -18,6 +18,7 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import {
   experimental_defineHostEntry,
   type ExperimentalHostPaths,
+  type ExperimentalHostRpcContext,
 } from "@get-bb/plugin-sdk/host";
 import {
   whisperHostContract,
@@ -43,6 +44,7 @@ const MODEL_DOWNLOAD_BASE_URL =
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
 const WHISPER_SAMPLE_RATE = "16000";
 const WARMUP_TIMEOUT_MS = 5 * 60_000;
+const REWARM_AFTER_IDLE_MS = 10 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
 const STDERR_TAIL_CHARS = 400;
 const INSTALL_HINT =
@@ -89,6 +91,7 @@ export interface WhisperHostDependencies {
   readonly fallbackBinDirs: readonly string[];
   spawn(command: string, args: readonly string[]): SpawnedProcess;
   fetch(url: string, init: { signal: AbortSignal }): Promise<Response>;
+  now(): number;
 }
 
 export interface ResolvedTools {
@@ -420,7 +423,7 @@ async function transcribe(
   const workDir = await mkdtemp(path.join(paths.tempDir, "transcribe-"));
   try {
     const inputPath = path.join(workDir, `input${audioExtension(input)}`);
-    const wavPath = path.join(workDir, "input.wav");
+    const wavPath = path.join(workDir, "whisper-16k.wav");
     await writeFile(inputPath, Buffer.from(input.audioBase64, "base64"));
 
     const converted = await runCommand(deps, {
@@ -593,8 +596,88 @@ async function warmUp(
   }
 }
 
+/**
+ * Runs a silent warm-up transcription in the background whenever a model has
+ * not been run in this worker for REWARM_AFTER_IDLE_MS. A fresh worker has run
+ * nothing, so its first status call warms the model. bb asks for status before
+ * every transcription, so after the machine idles or sleeps the warm-up starts
+ * alongside the next recording without delaying it.
+ */
+class ModelWarmer {
+  private readonly lastRunAt = new Map<string, number>();
+  private readonly inFlight = new Map<string, Promise<void>>();
+
+  constructor(private readonly deps: WhisperHostDependencies) {}
+
+  markRan(model: string): void {
+    this.lastRunAt.set(model, this.deps.now());
+  }
+
+  warmInBackground(
+    model: string,
+    context: Pick<
+      ExperimentalHostRpcContext,
+      "experimental_paths" | "lifecycle" | "experimental_retainWorker"
+    >,
+  ): void {
+    if (
+      this.inFlight.has(model) ||
+      this.isWarm(model) ||
+      context.lifecycle.signal.aborted
+    ) {
+      return;
+    }
+    const lease = context.experimental_retainWorker();
+    const run = this.run(
+      model,
+      context.experimental_paths,
+      context.lifecycle.signal,
+    ).finally(async () => {
+      this.inFlight.delete(model);
+      await lease.dispose();
+    });
+    this.inFlight.set(model, run);
+  }
+
+  async settled(): Promise<void> {
+    await Promise.all(this.inFlight.values());
+  }
+
+  private isWarm(model: string): boolean {
+    const lastRunAt = this.lastRunAt.get(model);
+    return (
+      lastRunAt !== undefined &&
+      this.deps.now() - lastRunAt <= REWARM_AFTER_IDLE_MS
+    );
+  }
+
+  private async run(
+    model: string,
+    paths: ExperimentalHostPaths,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const modelPath = modelFilePath(paths, model);
+    const [tools, hasModel] = await Promise.all([
+      resolveTools(this.deps),
+      hasModelFile(modelPath),
+    ]);
+    if (tools.whisperCli === null || tools.ffmpeg === null || !hasModel) {
+      return;
+    }
+    try {
+      await warmUp(this.deps, paths, modelPath, model, signal);
+      this.markRan(model);
+    } catch (error) {
+      if (signal.aborted) return;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`Warming up whisper model ${model} failed: ${message}`);
+    }
+  }
+}
+
 async function prepareModel(
   deps: WhisperHostDependencies,
+  warmer: ModelWarmer,
   paths: ExperimentalHostPaths,
   model: string,
   signal: AbortSignal,
@@ -605,6 +688,7 @@ async function prepareModel(
     await downloadModel(deps, modelPath, model, signal);
   }
   const warmupMs = await warmUp(deps, paths, modelPath, model, signal);
+  warmer.markRan(model);
   const sizeBytes = await fileSize(modelPath);
   if (sizeBytes === null) {
     throw new Error(`Model file ${modelPath} disappeared after download`);
@@ -617,30 +701,40 @@ async function prepareModel(
 }
 
 export function createWhisperHostEntry(deps: WhisperHostDependencies) {
+  const warmer = new ModelWarmer(deps);
   return experimental_defineHostEntry({
     contract: whisperHostContract,
     handlers: {
       transcribe: async (input, context): Promise<TranscribeOutput> => {
         try {
-          return await transcribe(
+          const result = await transcribe(
             deps,
             context.experimental_paths,
             input,
             context.signal,
           );
+          warmer.markRan(input.model);
+          return result;
         } catch (error) {
           return toFailure(error);
         }
       },
-      status: (_input, context) => status(deps, context.experimental_paths),
+      status: (input, context) => {
+        if (input.warmUpModel !== null) {
+          warmer.warmInBackground(input.warmUpModel, context);
+        }
+        return status(deps, context.experimental_paths);
+      },
       prepareModel: (input, context) =>
         prepareModel(
           deps,
+          warmer,
           context.experimental_paths,
           input.model,
           context.signal,
         ),
     },
+    dispose: () => warmer.settled(),
   });
 }
 
@@ -653,4 +747,5 @@ export default createWhisperHostEntry({
   fetch(url, init) {
     return fetch(url, init);
   },
+  now: () => Date.now(),
 });

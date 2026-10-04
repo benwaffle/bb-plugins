@@ -52,18 +52,40 @@ class FakeChild extends EventEmitter implements SpawnedProcess {
   }
 }
 
-function createSpawn(script: CommandScript) {
+function isWarmUpCall(call: SpawnCall): boolean {
+  return call.args.some(
+    (arg) => arg.startsWith("anullsrc=") || arg.endsWith("silence.wav"),
+  );
+}
+
+const succeedWarmUp: CommandScript = async (call, child) => {
+  if (basename(call.command) === "ffmpeg") {
+    await writeFile(call.args[call.args.length - 1] ?? "", "RIFF");
+  }
+  child.succeed();
+};
+
+/**
+ * Background warm-up runs go to `warmUpScript` and `warmUpCalls`, so `calls`
+ * holds only the commands a handler ran for its own request.
+ */
+function createSpawn(
+  script: CommandScript,
+  warmUpScript: CommandScript = succeedWarmUp,
+) {
   const calls: SpawnCall[] = [];
+  const warmUpCalls: SpawnCall[] = [];
   const spawn = (command: string, args: readonly string[]): SpawnedProcess => {
     const child = new FakeChild();
     const call = { command, args: [...args] };
-    calls.push(call);
+    const warmUp = isWarmUpCall(call);
+    (warmUp ? warmUpCalls : calls).push(call);
     queueMicrotask(() => {
-      void script(call, child);
+      void (warmUp ? warmUpScript : script)(call, child);
     });
     return child;
   };
-  return { calls, spawn };
+  return { calls, warmUpCalls, spawn };
 }
 
 function basename(command: string): string {
@@ -85,6 +107,7 @@ describe("whisper host entry", () => {
   let dataDir: string;
   let tempDir: string;
   let env: NodeJS.ProcessEnv;
+  let clockMs: number;
 
   async function installTool(name: string): Promise<string> {
     const filePath = path.join(binDir, name);
@@ -109,7 +132,13 @@ describe("whisper host entry", () => {
     ) => Promise<Response> = () => Promise.reject(new Error("no network")),
   ) {
     return experimental_createHostEntryHarness(
-      createWhisperHostEntry({ env, fallbackBinDirs: [], spawn, fetch }),
+      createWhisperHostEntry({
+        env,
+        fallbackBinDirs: [],
+        spawn,
+        fetch,
+        now: () => clockMs,
+      }),
       { experimental_paths: { dataDir, tempDir } },
     );
   }
@@ -121,6 +150,7 @@ describe("whisper host entry", () => {
     tempDir = path.join(root, "tmp");
     await mkdir(binDir, { recursive: true });
     env = { PATH: binDir };
+    clockMs = 0;
   });
 
   afterEach(async () => {
@@ -165,13 +195,50 @@ describe("whisper host entry", () => {
       "-m",
       modelPath,
       "-f",
-      expect.stringMatching(/input\.wav$/),
+      expect.stringMatching(/whisper-16k\.wav$/),
       "--no-timestamps",
       "--no-prints",
       "--prompt",
       "bb, useEffect",
     ]);
+    await harness.experimental_dispose();
     await expect(readdir(tempDir)).resolves.toEqual([]);
+  });
+
+  it("converts a .wav upload into a separate file instead of overwriting the input", async () => {
+    await installTool("ffmpeg");
+    await installTool("whisper-cli");
+    await installModel("base.en");
+    const { calls, spawn } = createSpawn(async (call, child) => {
+      if (basename(call.command) === "ffmpeg") {
+        const inputPath = call.args[call.args.indexOf("-i") + 1];
+        const wavPath = call.args[call.args.length - 1];
+        if (inputPath === wavPath) {
+          child.fail(234, `Output ${wavPath} same as Input #0 - exiting`);
+          return;
+        }
+        await writeFile(wavPath ?? "", "RIFF");
+        child.succeed();
+        return;
+      }
+      child.succeed(" Hello.\n");
+    });
+    const harness = harnessFor(spawn);
+
+    await expect(
+      harness.experimental_call("transcribe", {
+        ...TRANSCRIBE_INPUT,
+        mimeType: "audio/wav",
+        filename: "voice-input.wav",
+      }),
+    ).resolves.toEqual({ ok: true, text: "Hello." });
+    const [ffmpegCall, whisperCall] = calls;
+    const wavPath = ffmpegCall?.args[ffmpegCall.args.length - 1];
+    expect(ffmpegCall?.args[ffmpegCall.args.indexOf("-i") + 1]).toMatch(
+      /input\.wav$/,
+    );
+    expect(wavPath).toMatch(/whisper-16k\.wav$/);
+    expect(whisperCall?.args[whisperCall.args.indexOf("-f") + 1]).toBe(wavPath);
     await harness.experimental_dispose();
   });
 
@@ -285,8 +352,8 @@ describe("whisper host entry", () => {
 
     expect(result).toMatchObject({ ok: false, code: "timeout" });
     expect(hung.child?.killedWith).toBe("SIGKILL");
-    await expect(readdir(tempDir)).resolves.toEqual([]);
     await harness.experimental_dispose();
+    await expect(readdir(tempDir)).resolves.toEqual([]);
   });
 
   it("surfaces ffmpeg failures with the tail of its stderr", async () => {
@@ -316,7 +383,7 @@ describe("whisper host entry", () => {
     const { spawn } = createSpawn((_call, child) => child.succeed());
     const harness = harnessFor(spawn);
 
-    await expect(harness.experimental_call("status", null)).resolves.toEqual({
+    await expect(harness.experimental_call("status", { warmUpModel: null })).resolves.toEqual({
       whisperCli,
       ffmpeg: null,
       modelDir: path.join(dataDir, "models"),
@@ -361,12 +428,9 @@ describe("whisper host entry", () => {
   it("downloads a missing model once and warms it up", async () => {
     await installTool("ffmpeg");
     await installTool("whisper-cli");
-    const { calls, spawn } = createSpawn(async (call, child) => {
-      if (basename(call.command) === "ffmpeg") {
-        await writeFile(call.args[call.args.length - 1] ?? "", "RIFF");
-      }
-      child.succeed();
-    });
+    const { calls, warmUpCalls, spawn } = createSpawn((_call, child) =>
+      child.succeed(),
+    );
     const fetch = vi.fn(async (url: string) => {
       expect(url).toBe(
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
@@ -387,11 +451,12 @@ describe("whisper host entry", () => {
       downloaded: true,
       warmupMs: expect.any(Number),
     });
-    expect(calls.map((call) => basename(call.command))).toEqual([
+    expect(calls).toEqual([]);
+    expect(warmUpCalls.map((call) => basename(call.command))).toEqual([
       "ffmpeg",
       "whisper-cli",
     ]);
-    expect(calls[0]?.args).toEqual(
+    expect(warmUpCalls[0]?.args).toEqual(
       expect.arrayContaining(["-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono"]),
     );
 
@@ -420,5 +485,162 @@ describe("whisper host entry", () => {
     ).rejects.toThrow(/HTTP 404/);
     await expect(readdir(path.join(dataDir, "models"))).resolves.toEqual([]);
     await harness.experimental_dispose();
+  });
+  describe("background warm-up", () => {
+    const TEN_MINUTES_MS = 10 * 60_000;
+
+    async function installEverything(): Promise<void> {
+      await installTool("ffmpeg");
+      await installTool("whisper-cli");
+      await installModel("base.en");
+    }
+
+    function transcribeScript(text: string): CommandScript {
+      return async (call, child) => {
+        if (basename(call.command) === "ffmpeg") {
+          await writeFile(call.args[call.args.length - 1] ?? "", "RIFF");
+          child.succeed();
+          return;
+        }
+        child.succeed(text);
+      };
+    }
+
+    async function warmUpFinished(
+      harness: ReturnType<typeof harnessFor>,
+    ): Promise<void> {
+      await vi.waitFor(() =>
+        expect(harness.experimental_getRetainedWorkerLeaseCount()).toBe(0),
+      );
+    }
+
+    it("warms the requested model on a status call and holds the worker while it runs", async () => {
+      await installEverything();
+      let releaseWarmUp = (): void => {};
+      const { calls, warmUpCalls, spawn } = createSpawn(
+        (_call, child) => child.succeed(),
+        async (call, child) => {
+          if (basename(call.command) === "ffmpeg") {
+            await succeedWarmUp(call, child);
+            return;
+          }
+          releaseWarmUp = () => child.succeed();
+        },
+      );
+      const harness = harnessFor(spawn);
+
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+
+      await vi.waitFor(() => expect(warmUpCalls).toHaveLength(2));
+      expect(warmUpCalls[1]?.args).toEqual(
+        expect.arrayContaining([path.join(dataDir, "models", "ggml-base.en.bin")]),
+      );
+      expect(harness.experimental_getRetainedWorkerLeaseCount()).toBe(1);
+      releaseWarmUp();
+      await warmUpFinished(harness);
+      expect(calls).toEqual([]);
+      await harness.experimental_dispose();
+      await expect(readdir(tempDir)).resolves.toEqual([]);
+    });
+
+    it("re-warms only after the model has sat unused for more than ten minutes", async () => {
+      await installEverything();
+      const { warmUpCalls, spawn } = createSpawn(transcribeScript(" Hi.\n"));
+      const harness = harnessFor(spawn);
+
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await warmUpFinished(harness);
+      expect(warmUpCalls).toHaveLength(2);
+
+      clockMs += TEN_MINUTES_MS;
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await expect(
+        harness.experimental_call("transcribe", TRANSCRIBE_INPUT),
+      ).resolves.toEqual({ ok: true, text: "Hi." });
+      await warmUpFinished(harness);
+      expect(warmUpCalls).toHaveLength(2);
+
+      clockMs += TEN_MINUTES_MS + 1;
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await warmUpFinished(harness);
+      expect(warmUpCalls).toHaveLength(4);
+      await harness.experimental_dispose();
+    });
+
+    it("answers a transcription without waiting for the warm-up that status started", async () => {
+      await installEverything();
+      const { calls, warmUpCalls, spawn } = createSpawn(
+        transcribeScript(" Ship it.\n"),
+        async (call, child) => {
+          if (basename(call.command) === "ffmpeg") {
+            await succeedWarmUp(call, child);
+          }
+        },
+      );
+      const harness = harnessFor(spawn);
+
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await expect(
+        harness.experimental_call("transcribe", TRANSCRIBE_INPUT),
+      ).resolves.toEqual({ ok: true, text: "Ship it." });
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+
+      expect(calls.map((call) => basename(call.command))).toEqual([
+        "ffmpeg",
+        "whisper-cli",
+      ]);
+      await vi.waitFor(() => expect(warmUpCalls).toHaveLength(2));
+      expect(harness.experimental_getRetainedWorkerLeaseCount()).toBe(1);
+      await harness.experimental_dispose();
+      expect(harness.experimental_getRetainedWorkerLeaseCount()).toBe(0);
+      await expect(readdir(tempDir)).resolves.toEqual([]);
+    });
+
+    it("warms a newly selected model while another model's warm-up is still running", async () => {
+      await installEverything();
+      await installModel("small.en");
+      const { warmUpCalls, spawn } = createSpawn(
+        (_call, child) => child.succeed(),
+        async (call, child) => {
+          if (basename(call.command) === "ffmpeg") {
+            await succeedWarmUp(call, child);
+          }
+        },
+      );
+      const harness = harnessFor(spawn);
+
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await harness.experimental_call("status", { warmUpModel: "small.en" });
+
+      await vi.waitFor(() => expect(warmUpCalls).toHaveLength(4));
+      const modelArgs = warmUpCalls
+        .filter((call) => basename(call.command) === "whisper-cli")
+        .map((call) => path.basename(call.args[1] ?? ""));
+      expect(modelArgs.sort()).toEqual([
+        "ggml-base.en.bin",
+        "ggml-small.en.bin",
+      ]);
+      expect(harness.experimental_getRetainedWorkerLeaseCount()).toBe(2);
+      await harness.experimental_dispose();
+    });
+
+    it("skips the warm-up when no model is named or the model or tools are missing", async () => {
+      await installTool("ffmpeg");
+      await installModel("base.en");
+      const { warmUpCalls, spawn } = createSpawn((_call, child) =>
+        child.succeed(),
+      );
+      const harness = harnessFor(spawn);
+
+      await harness.experimental_call("status", { warmUpModel: null });
+      await harness.experimental_call("status", { warmUpModel: "base.en" });
+      await warmUpFinished(harness);
+      await installTool("whisper-cli");
+      await harness.experimental_call("status", { warmUpModel: "small.en" });
+      await warmUpFinished(harness);
+
+      expect(warmUpCalls).toEqual([]);
+      await harness.experimental_dispose();
+    });
   });
 });
