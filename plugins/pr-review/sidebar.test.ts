@@ -27,7 +27,10 @@ describe("ticketGroups", () => {
   it("groups threads and unstarted PRs per project and ticket, with untagged PRs last", () => {
     const result: SidebarGroupsResult = {
       githubPanel: true,
-      tickets: [{ key: "ACME-21", summary: "Speed up the importer", status: null, url: "https://jira/ACME-21" }],
+      tickets: [
+        { key: "ACME-21", summary: "Speed up the importer", status: "In Progress", url: "https://jira/ACME-21" },
+        { key: "ACME-30", summary: null, status: null, url: "https://jira/ACME-30" },
+      ],
       threadTickets: [
         { threadId: "thr_a", ticketKey: "ACME-21" },
         { threadId: "thr_b", ticketKey: "ACME-21" },
@@ -58,9 +61,9 @@ describe("ticketGroups", () => {
         pulls: group.pulls.map((pull) => pull.number),
       })),
     ).toEqual([
-      { project: "proj_widgets", label: "ACME-21", tooltip: "Speed up the importer", threads: ["thr_a", "thr_b"], pulls: [8] },
-      { project: "proj_widgets", label: "ACME-30", tooltip: null, threads: [], pulls: [9] },
-      { project: "proj_web", label: "ACME-21", tooltip: "Speed up the importer", threads: ["thr_other_project"], pulls: [] },
+      { project: "proj_widgets", label: "ACME-21", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], pulls: [8] },
+      { project: "proj_widgets", label: "ACME-30", tooltip: "ACME-30 (loading title)", threads: [], pulls: [9] },
+      { project: "proj_web", label: "ACME-21", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], pulls: [] },
       { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], pulls: [7] },
     ]);
   });

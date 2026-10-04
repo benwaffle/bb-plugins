@@ -24,6 +24,7 @@ import type {
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
 import { ticketGroups } from "./sidebar";
+import { ticketTooltip } from "./tickets";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
 
@@ -167,7 +168,7 @@ function QueueRow({
           <button
             type="button"
             className={linkClass}
-            title={ticket?.summary ?? entry.ticketKey}
+            title={ticketTooltip(entry.ticketKey, ticket)}
             onClick={stopping(() => ticket !== undefined && openExternal(navigate, ticket.url))}
           >
             {entry.ticketKey}
@@ -255,10 +256,13 @@ function QueueTable({ children }: { children: ReactNode }) {
   );
 }
 
+function ticketsByKey(tickets: readonly Ticket[]): ReadonlyMap<string, Ticket> {
+  return new Map(tickets.map((ticket) => [ticket.key, ticket]));
+}
+
 function useReviewQueue() {
   const rpc = useRpc<typeof rpcContract>();
   const [queue, setQueue] = useState<Load<Queue>>({ status: "loading" });
-  const [tickets, setTickets] = useState<ReadonlyMap<string, Ticket>>(() => new Map());
 
   const load = useCallback(
     (refresh: boolean) => {
@@ -273,25 +277,10 @@ function useReviewQueue() {
   useEffect(() => load(false), [load]);
   useRealtime(REFS_CHANNEL, () => load(false));
 
-  const ticketKeys = useMemo(() => {
-    if (queue.status !== "ready") return [];
-    return [...new Set(queue.value.entries.flatMap((entry) => (entry.ticketKey === null ? [] : [entry.ticketKey])))];
-  }, [queue]);
-  const ticketKeyList = ticketKeys.join(",");
-
-  useEffect(() => {
-    if (ticketKeys.length === 0) return;
-    let cancelled = false;
-    rpc
-      .call("tickets", { keys: ticketKeys })
-      .then(({ tickets: loaded }) => {
-        if (!cancelled) setTickets(new Map(loaded.map((ticket) => [ticket.key, ticket])));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [rpc, ticketKeyList]);
+  const tickets = useMemo(
+    () => ticketsByKey(queue.status === "ready" ? queue.value.tickets : []),
+    [queue],
+  );
 
   const { starting, review } = useStartReview(queue.status === "ready" && queue.value.githubPanel);
 
@@ -587,9 +576,8 @@ function useThreadRefs(threadId: string): Load<Refs> {
   }, [rpc, threadId]);
   useEffect(load, [load]);
   useRealtime(REFS_CHANNEL, (payload) => {
-    if (typeof payload === "object" && payload !== null && "threadId" in payload && payload.threadId === threadId) {
-      load();
-    }
+    if (typeof payload !== "object" || payload === null) return;
+    if (("threadId" in payload && payload.threadId === threadId) || "tickets" in payload) load();
   });
   return refs;
 }
@@ -601,13 +589,21 @@ function chipLabel(ref: ThreadRef): string {
   return ref.kind === "gh-issue" ? `issue ${number}` : `PR ${number}`;
 }
 
-function Chip({ threadRef, githubPanel }: { threadRef: ThreadRef; githubPanel: boolean }) {
+function Chip({
+  threadRef,
+  ticket,
+  githubPanel,
+}: {
+  threadRef: ThreadRef;
+  ticket: Ticket | undefined;
+  githubPanel: boolean;
+}) {
   const navigate = useBbNavigate();
   const primary = threadRef.source === "review-target" || threadRef.source === "environment";
   return (
     <button
       type="button"
-      title={threadRef.title ?? threadRef.key}
+      title={threadRef.kind === "jira" ? ticketTooltip(threadRef.key, ticket) : (threadRef.title ?? threadRef.key)}
       onClick={() =>
         threadRef.kind === "gh-pr"
           ? openPull(navigate, githubPanel, threadRef.key, threadRef.url)
@@ -687,6 +683,7 @@ function ThreadRefsHeader({ threadId, isCompactViewport }: PluginThreadHeaderAct
   const refs = useThreadRefs(threadId);
   if (refs.status !== "ready") return null;
   const { worktree, githubPanel } = refs.value;
+  const tickets = ticketsByKey(refs.value.tickets);
   const chips = isCompactViewport
     ? refs.value.refs.filter((ref) => ref.kind === "jira" || ref.source === "review-target")
     : refs.value.refs;
@@ -697,7 +694,12 @@ function ThreadRefsHeader({ threadId, isCompactViewport }: PluginThreadHeaderAct
   return (
     <div className="flex max-w-[48rem] items-center gap-1 overflow-hidden">
       {chips.map((ref) => (
-        <Chip key={`${ref.kind}:${ref.key}`} threadRef={ref} githubPanel={githubPanel} />
+        <Chip
+          key={`${ref.kind}:${ref.key}`}
+          threadRef={ref}
+          ticket={ref.kind === "jira" ? tickets.get(ref.key) : undefined}
+          githubPanel={githubPanel}
+        />
       ))}
       {reviewable ? <RunReviewButton threadId={threadId} /> : null}
       {worktree === null || isCompactViewport ? null : <WorktreeButtons threadId={threadId} worktree={worktree} />}

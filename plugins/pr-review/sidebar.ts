@@ -1,4 +1,5 @@
 import type { QueueEntry, SidebarGroupsResult } from "./contract.js";
+import { ticketTooltip } from "./tickets.js";
 
 export const NO_TICKET_LABEL = "No ticket";
 
@@ -15,7 +16,7 @@ export function ticketGroups(
   result: SidebarGroupsResult,
   projectIdByThreadId: ReadonlyMap<string, string>,
 ): TicketGroup[] {
-  const summaries = new Map(result.tickets.map((ticket) => [ticket.key, ticket.summary]));
+  const tickets = new Map(result.tickets.map((ticket) => [ticket.key, ticket]));
   const groups = new Map<string, TicketGroup>();
   const groupFor = (projectId: string, ticketKey: string | null): TicketGroup => {
     const key = `${projectId}:${ticketKey ?? ""}`;
@@ -25,7 +26,7 @@ export function ticketGroups(
         projectId,
         key,
         label: ticketKey ?? NO_TICKET_LABEL,
-        tooltip: ticketKey === null ? null : (summaries.get(ticketKey) ?? null),
+        tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
         pulls: [],
       };

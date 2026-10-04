@@ -83,12 +83,14 @@ const queueResultSchema = z.object({
   fetchedAt: z.string(),
   githubPanel: z.boolean(),
   entries: z.array(queueEntrySchema),
+  tickets: z.array(ticketSchema),
   errors: z.array(z.object({ repo: z.string(), message: z.string() })),
 });
 export type QueueResult = z.infer<typeof queueResultSchema>;
 
 const refsResultSchema = z.object({
   refs: z.array(refSchema),
+  tickets: z.array(ticketSchema),
   worktree: z.object({ path: z.string(), isLocal: z.boolean() }).nullable(),
   githubPanel: z.boolean(),
 });
@@ -124,10 +126,6 @@ export const rpcContract = defineRpcContract({
   sidebarGroups: {
     input: z.object({}).strict(),
     output: sidebarGroupsResultSchema,
-  },
-  tickets: {
-    input: z.object({ keys: z.array(z.string().min(1)).max(100) }).strict(),
-    output: z.object({ tickets: z.array(ticketSchema) }),
   },
   startReview: {
     input: z.object({ repo: repoSchema, number: z.number().int().positive() }).strict(),
