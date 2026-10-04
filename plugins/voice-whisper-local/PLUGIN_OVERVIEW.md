@@ -18,10 +18,10 @@ Set it up once:
 
 `bb whisper prepare` also selects the model it downloads; the plugin's "Whisper model" setting holds that choice and defaults to `base.en`.
 
-`base.en` transcribes a ten-second clip in well under a second on Apple Silicon. `small.en` is more accurate and a few seconds slower. bb allows ten seconds per transcription, so larger models suit short recordings only.
+`base.en` transcribes a ten-second clip in well under a second on Apple Silicon. `small.en` is more accurate and a few seconds slower. The plugin allows nine seconds per transcription, under bb's ten-second limit, so larger models suit short recordings only.
 
 Add `--json` to any command for machine-readable output, and `--host <id-or-name>` to target a machine other than the primary host.
 
 ## Requirements
 
-`whisper-cli` and `ffmpeg` must be on the host's `PATH` or in a Homebrew bin directory. The first run of a freshly built whisper.cpp compiles GPU shaders, which can take fifteen seconds or more; `bb whisper prepare` absorbs that so voice input does not time out.
+`whisper-cli` and `ffmpeg` must be on the host's `PATH` or in a Homebrew bin directory. The first run of a freshly built whisper.cpp compiles GPU shaders, which can take fifteen seconds or more; `bb whisper prepare` absorbs that so voice input does not time out. The host also warms the selected model in the background when its worker starts and after ten idle minutes, since whisper.cpp starts cold again after the machine sleeps.

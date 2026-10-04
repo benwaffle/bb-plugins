@@ -24,6 +24,10 @@ const installedModelSchema = z
 
 export type InstalledModel = z.infer<typeof installedModelSchema>;
 
+export const statusInputSchema = z
+  .object({ warmUpModel: whisperModelNameSchema.nullable() })
+  .strict();
+
 export const whisperStatusSchema = z
   .object({
     whisperCli: z.string().nullable(),
@@ -85,7 +89,7 @@ export const whisperHostContract = defineRpcContract({
     output: transcribeOutputSchema,
   },
   status: {
-    input: z.null(),
+    input: statusInputSchema,
     output: whisperStatusSchema,
   },
   prepareModel: {

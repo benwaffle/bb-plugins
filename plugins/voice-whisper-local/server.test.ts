@@ -2,7 +2,7 @@ import {
   createFakePluginHost,
   makeHostResponse,
 } from "@get-bb/plugin-sdk/testing";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "./server.js";
 
 type FakePluginHostOptions = NonNullable<
@@ -127,7 +127,7 @@ describe("whisper AI service", () => {
           mimeType: "audio/webm",
           filename: "voice-input.webm",
           prompt: "bb, useEffect",
-          timeoutMs: 10_000,
+          timeoutMs: 8_000,
         },
       },
     ]);
@@ -165,12 +165,81 @@ describe("whisper AI service", () => {
     ).rejects.toThrow('Whisper model "base.en" is not downloaded');
   });
 
+  describe("time limit", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("gives up at 9s, before bb's own 10s voice limit, and blames the cold start", async () => {
+      vi.useFakeTimers();
+      let hostSignal: AbortSignal | undefined;
+      const host = createHost({
+        respond: ({ signal }) => {
+          hostSignal = signal;
+          return new Promise(() => {});
+        },
+      });
+      await plugin(host.bb);
+
+      const transcription = registeredService(host).transcribe?.(recording(), {
+        signal: new AbortController().signal,
+        hint: null,
+      });
+      const outcome = expect(transcription).rejects.toThrow(
+        "Local whisper did not finish within 9.0s. The first transcription after the machine has been idle or asleep is slow",
+      );
+      await vi.advanceTimersByTimeAsync(8_999);
+      expect(hostSignal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await outcome;
+      expect(hostSignal?.aborted).toBe(true);
+    });
+
+    it("explains a host-side timeout the same way", async () => {
+      const host = createHost({
+        respond: () => ({
+          ok: false,
+          code: "timeout",
+          message: "whisper-cli did not finish within 8000ms",
+        }),
+      });
+      await plugin(host.bb);
+
+      await expect(
+        registeredService(host).transcribe?.(recording(), {
+          signal: new AbortController().signal,
+          hint: null,
+        }),
+      ).rejects.toThrow(/whisper\.cpp loads the model; it is warming up now/);
+    });
+
+    it("passes the caller's cancellation through unchanged", async () => {
+      const controller = new AbortController();
+      const host = createHost({
+        respond: ({ signal }) => {
+          controller.abort();
+          return Promise.reject(signal?.reason);
+        },
+      });
+      await plugin(host.bb);
+
+      const error = await registeredService(host)
+        .transcribe?.(recording(), { signal: controller.signal, hint: null })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toContain("Local whisper");
+    });
+  });
+
   it("reports ready only when the tools and the selected model are on the primary host", async () => {
     const ready = createHost({ respond: () => STATUS });
     await plugin(ready.bb);
     await expect(registeredService(ready).status?.()).resolves.toEqual({
       ready: true,
     });
+    expect(ready.harness.experimental_hostRpcCalls).toMatchObject([
+      { method: "status", input: { warmUpModel: "base.en" } },
+    ]);
 
     const missingModel = createHost({
       settings: { model: "small.en" },
@@ -232,7 +301,11 @@ describe("whisper CLI", () => {
       "bb settings ai-services set voice whisper",
     );
     expect(host.harness.experimental_hostRpcCalls).toMatchObject([
-      { method: "status", hostId: "host-primary" },
+      {
+        method: "status",
+        hostId: "host-primary",
+        input: { warmUpModel: null },
+      },
     ]);
   });
 

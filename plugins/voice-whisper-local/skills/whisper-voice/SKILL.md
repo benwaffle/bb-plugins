@@ -45,6 +45,11 @@ enrolled machine.
   `bb whisper prepare <model>`; `bb whisper status` shows the selected model.
 - No microphone, or whisper shows as not ready in Settings → AI services: run
   `bb whisper status` on the primary host and fix what it reports.
-- Transcription timed out: bb allows ten seconds per recording. Use a smaller
-  model such as `base.en`, or run `bb whisper prepare` again after upgrading
-  whisper.cpp so shader compilation happens outside a recording.
+- "Local whisper did not finish within 9.0s": the plugin stops at nine
+  seconds so its message beats bb's ten-second limit. The first recording
+  after the machine has been idle or asleep can hit it while whisper.cpp
+  reloads the model. The host warms the model in the background when its
+  worker starts and when the model has gone unused for ten minutes, so retry
+  after a few seconds. If every recording times out, use a smaller model such
+  as `base.en`, or run `bb whisper prepare` again after upgrading whisper.cpp
+  so shader compilation happens outside a recording.

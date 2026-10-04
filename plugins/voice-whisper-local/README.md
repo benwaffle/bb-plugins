@@ -37,12 +37,16 @@ than the primary host.
 Model names follow whisper.cpp: `tiny.en`, `base.en`, `small.en`, `medium.en`,
 `large-v3-turbo`, and so on. Names ending in `.en` are English-only; the others
 detect the spoken language. `base.en` transcribes a ten-second clip in well
-under a second on Apple Silicon. bb allows ten seconds per transcription, so
-larger models suit short recordings only.
+under a second on Apple Silicon. The plugin allows nine seconds per
+transcription, under bb's ten-second limit, so larger models suit short
+recordings only.
 
 The first run of a freshly built whisper.cpp compiles GPU shaders, which can
 take fifteen seconds or more. `bb whisper prepare` absorbs that cost so voice
-input does not time out.
+input does not time out. After the machine idles or sleeps, whisper.cpp starts
+cold again. The host transcribes one second of silence in the background when
+its worker starts and whenever the selected model has gone unused for ten
+minutes, so the next recording runs warm.
 
 ## Develop
 

@@ -14,8 +14,11 @@ const USAGE = `Usage: bb ${CLI_NAME} <status|prepare <model>> [--host <id-or-nam
 const PREPARE_TIMEOUT_MS = 30 * 60_000;
 const STATUS_TIMEOUT_MS = 30_000;
 const MEGABYTE = 1024 * 1024;
-const TRANSCRIBE_TIMEOUT_MS = 10_000;
+// bb fails a voice transcription after 10s; finishing first lets the
+// cold-start explanation below reach the user instead of a bare 504.
+const TRANSCRIBE_TIMEOUT_MS = 8_000;
 const HOST_CALL_GRACE_MS = 1_000;
+const TRANSCRIBE_LIMIT_MS = TRANSCRIBE_TIMEOUT_MS + HOST_CALL_GRACE_MS;
 
 interface ParsedArgv {
   readonly command: string | null;
@@ -150,6 +153,49 @@ function formatPrepared(args: {
   return lines.join("\n");
 }
 
+function coldStartMessage(): string {
+  return `Local whisper did not finish within ${formatSeconds(TRANSCRIBE_LIMIT_MS)}. The first transcription after the machine has been idle or asleep is slow while whisper.cpp loads the model; it is warming up now, so try again in a few seconds.`;
+}
+
+class TranscribeDeadlineError extends Error {
+  constructor() {
+    super(coldStartMessage());
+    this.name = "TranscribeDeadlineError";
+  }
+}
+
+/**
+ * Runs `work` with a signal that aborts at `limitMs` or when `signal` aborts,
+ * and rejects with TranscribeDeadlineError at the limit even if `work` ignores
+ * its signal.
+ */
+async function withTranscribeDeadline<T>(
+  limitMs: number,
+  signal: AbortSignal,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const deadline = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      deadline.abort();
+      reject(new TranscribeDeadlineError());
+    }, limitMs);
+  });
+  try {
+    return await Promise.race([
+      work(AbortSignal.any([signal, deadline.signal])),
+      expired,
+    ]);
+  } catch (error) {
+    throw deadline.signal.aborted && !signal.aborted
+      ? new TranscribeDeadlineError()
+      : error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function readHostId(bb: BbPluginApi): Promise<string> {
   const { primaryHostId } = await bb.sdk.system.config();
   if (primaryHostId === null) {
@@ -189,46 +235,55 @@ export default function plugin(bb: BbPluginApi): void {
   bb.experimental_aiServices.register({
     id: WHISPER_SERVICE_ID,
     displayName: "Local whisper.cpp",
-    async transcribe(audio, { signal, hint }) {
-      const [hostId, { model }] = await Promise.all([
-        readHostId(bb),
-        settings.get(),
-      ]);
-      const result = await host.call(
-        "transcribe",
-        {
-          model,
-          audioBase64: Buffer.from(await audio.arrayBuffer()).toString(
-            "base64",
-          ),
-          mimeType: audio.type || "application/octet-stream",
-          filename: audio.name || "voice-input",
-          prompt: hint,
-          timeoutMs: TRANSCRIBE_TIMEOUT_MS,
-        },
-        {
-          hostId,
-          signal,
-          timeoutMs: TRANSCRIBE_TIMEOUT_MS + HOST_CALL_GRACE_MS,
+    transcribe(audio, { signal, hint }) {
+      return withTranscribeDeadline(
+        TRANSCRIBE_LIMIT_MS,
+        signal,
+        async (callSignal) => {
+          const [hostId, { model }] = await Promise.all([
+            readHostId(bb),
+            settings.get(),
+          ]);
+          const result = await host.call(
+            "transcribe",
+            {
+              model,
+              audioBase64: Buffer.from(await audio.arrayBuffer()).toString(
+                "base64",
+              ),
+              mimeType: audio.type || "application/octet-stream",
+              filename: audio.name || "voice-input",
+              prompt: hint,
+              timeoutMs: TRANSCRIBE_TIMEOUT_MS,
+            },
+            {
+              hostId,
+              signal: callSignal,
+              timeoutMs: TRANSCRIBE_LIMIT_MS,
+            },
+          );
+          if (!result.ok) {
+            throw new Error(
+              result.code === "timeout" ? coldStartMessage() : result.message,
+            );
+          }
+          return result.text;
         },
       );
-      if (!result.ok) {
-        throw new Error(result.message);
-      }
-      return result.text;
     },
     async status(): Promise<PluginAiServiceStatus> {
-      const { primaryHostId } = await bb.sdk.system.config();
+      const [{ primaryHostId }, { model }] = await Promise.all([
+        bb.sdk.system.config(),
+        settings.get(),
+      ]);
       if (primaryHostId === null) {
         return { ready: false, message: "No primary machine is connected" };
       }
-      const [whisper, { model }] = await Promise.all([
-        host.call("status", null, {
-          hostId: primaryHostId,
-          timeoutMs: STATUS_TIMEOUT_MS,
-        }),
-        settings.get(),
-      ]);
+      const whisper = await host.call(
+        "status",
+        { warmUpModel: model },
+        { hostId: primaryHostId, timeoutMs: STATUS_TIMEOUT_MS },
+      );
       if (whisper.whisperCli === null || whisper.ffmpeg === null) {
         return {
           ready: false,
@@ -309,7 +364,7 @@ export default function plugin(bb: BbPluginApi): void {
         const selection = await voiceSelection();
         if (parsed.command === "status" && parsed.positionals.length === 0) {
           const [result, { model }] = await Promise.all([
-            host.call("status", null, {
+            host.call("status", { warmUpModel: null }, {
               hostId: target.id,
               timeoutMs: STATUS_TIMEOUT_MS,
               ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
