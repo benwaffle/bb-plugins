@@ -112,7 +112,7 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
       const keys = args.slice(3, args.indexOf("-o"));
       return twgWorkItemGet(keys, twg.jira);
     }
-    if (line.startsWith("gh pr checkout") || command === "open") return "";
+    if (line.startsWith("gh pr checkout")) return "";
     if (line === "git rev-parse --abbrev-ref HEAD") return "bob/catalog-cache\n";
     throw new Error(`unexpected command: ${line}`);
   };
@@ -122,7 +122,7 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
 async function load(nodes = OPEN_PULL_NODES) {
   const runner = fakeRunner(nodes);
   const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
-  const plugin = createPlugin({ run: runner.run, platform: "darwin", pollMs: 1, now: () => clock.now });
+  const plugin = createPlugin({ run: runner.run, pollMs: 1, now: () => clock.now });
   const host = createFakePluginHost({ pluginId: "pr-review" });
   const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
   const sdk = host.harness.sdk;
@@ -235,7 +235,9 @@ describe("startReview", () => {
     });
     expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
 
-    const refs = (await harness.callRpc("threadRefs", { threadId: "thr_1" })) as {
+    const cli = await harness.runCli(["refs", "thr_1", "--json"]);
+    expect(cli.exitCode).toBe(0);
+    const refs = JSON.parse(cli.stdout) as {
       refs: Array<{ kind: string; key: string; source: string }>;
       worktree: unknown;
     };
@@ -248,15 +250,16 @@ describe("startReview", () => {
         `sibling gh-pr ${REPO}#599`,
       ]),
     );
-    expect(refs.worktree).toEqual({ path: "/worktrees/widgets-596", isLocal: true });
+    expect(refs.worktree).toEqual({ path: "/worktrees/widgets-596" });
   });
 });
 
-describe("runReview", () => {
-  it("sends the review command to the PR's review thread", async () => {
+describe("review", () => {
+  it("opens the PR's review thread and sends it the review command", async () => {
     const { harness } = await load();
-    await harness.callRpc("startReview", { repo: REPO, number: 596 });
-    expect(await harness.callRpc("runReview", { threadId: "thr_1" })).toEqual({ delivery: "sent" });
+    const result = await harness.runCli(["review", "596"]);
+    expect(result).toMatchObject({ exitCode: 0, stdout: "sent\tthr_1\n" });
+    expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
     expect(harness.sdk.callsTo("threads.send")).toEqual([
       [
         {
@@ -266,19 +269,6 @@ describe("runReview", () => {
         },
       ],
     ]);
-  });
-
-  it("opens the thread and runs the review from the CLI", async () => {
-    const { harness } = await load();
-    const result = await harness.runCli(["review", "596"]);
-    expect(result).toMatchObject({ exitCode: 0, stdout: "sent\tthr_1\n" });
-    expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
-    expect(harness.sdk.callsTo("threads.send")).toHaveLength(1);
-  });
-
-  it("refuses a thread without a PR ref", async () => {
-    const { harness } = await load();
-    await expect(harness.callRpc("runReview", { threadId: "thr_none" })).rejects.toThrow(/no PR to review/);
   });
 });
 
@@ -339,9 +329,9 @@ describe("sidebarGroups", () => {
   });
 });
 
-describe("related threads and editors", () => {
-  it("lists other threads sharing the ticket and opens the worktree in GoLand", async () => {
-    const { harness, runner, bb } = await load();
+describe("related threads", () => {
+  it("lists other threads sharing the ticket", async () => {
+    const { harness, bb } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
     store.record("thr_other", [
@@ -364,13 +354,6 @@ describe("related threads and editors", () => {
     expect(related.threads).toEqual([
       expect.objectContaining({ threadId: "thr_other", title: "Implement ACME-51", firstMessage: "Review context" }),
     ]);
-
-    expect(await harness.callRpc("openWorktree", { threadId: "thr_1", editor: "goland" })).toEqual({
-      opened: true,
-      path: "/worktrees/widgets-596",
-      error: null,
-    });
-    expect(runner.calls.at(-1)).toMatchObject({ command: "open", args: ["-a", "GoLand", "/worktrees/widgets-596"] });
   });
 });
 
@@ -449,12 +432,12 @@ describe("ticket summaries", () => {
     expect(twgCalls(runner)).toHaveLength(3);
   });
 
-  it("gives the sidebar groups and the thread header the ticket of each review thread", async () => {
+  it("gives the sidebar groups and the refs CLI the ticket of each review thread", async () => {
     const { harness, runner } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const groups = (await harness.callRpc("sidebarGroups", {})) as QueueTickets;
     expect(groups.tickets).toEqual([expect.objectContaining({ key: "ACME-51", summary: "Cache the widget catalog" })]);
-    const refs = (await harness.callRpc("threadRefs", { threadId: "thr_1" })) as QueueTickets;
+    const refs = JSON.parse((await harness.runCli(["refs", "thr_1", "--json"])).stdout) as QueueTickets;
     expect(refs.tickets).toEqual([
       expect.objectContaining({ key: "ACME-51", summary: "Cache the widget catalog", status: "In Progress" }),
     ]);

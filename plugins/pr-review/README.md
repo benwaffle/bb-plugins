@@ -2,9 +2,9 @@
 
 A review queue for open GitHub pull requests. A Review button opens a review
 thread in a worktree on the PR's head branch; the review itself runs when you
-ask for it. Threads get chips for
-their PR, Jira ticket, linked issues, and sibling PRs. Diffs, checks, and
-comments stay in bb's built-in GitHub plugin, which this plugin links to.
+ask for it. The plugin records the PR, Jira ticket, linked issues, and sibling
+PRs of each thread. Diffs, checks, and comments stay in bb's built-in GitHub
+plugin, which this plugin links to.
 
 ## Install
 
@@ -91,7 +91,7 @@ worktree finds the PR (up to 30 seconds after checkout). The GitHub plugin's
 **GitHub PR** tab reads that lookup once when it opens, so it shows the PR's
 diff and checks instead of a PR picker.
 
-**Run TNCQR** in the thread header, or `bb pr-review review <n>`, sends
+`bb pr-review review <n>` sends
 `/thermo-nuclear-code-quality-review review pr <n>` to the thread. When the
 agent is busy, the message is queued.
 
@@ -103,18 +103,6 @@ highlighted, is in the thread panel's new-tab launcher. Docking needs a bb
 build with docked thread panels (`toThread`'s `experimental_dockedPanels`).
 Older builds, or bb without the GitHub plugin, open the thread with no docked
 column.
-
-## Thread header
-
-Threads with refs show chips in the header: the PR, the ticket (hover for its
-summary and status), issues from `Fixes`/`Closes`/`Resolves`/`Refs`/`Part of #n`, other
-PRs mentioned as a bare `#n` or PR URL, and sibling PRs on the same ticket.
-For a thread that the plugin did not start, the refs come from the PR of the
-thread's branch the first time the header loads.
-
-**GoLand** and **VS Code** open the thread's workspace with `open -a` on
-macOS, or the `goland`/`code` command elsewhere. When the workspace is on
-another machine, a **Copy path** button is shown instead.
 
 ## Related threads
 
@@ -149,6 +137,13 @@ with `-` for no ticket. `start` prints `started` or `existing`
 and the thread id. `review` opens the thread if needed, sends the review
 command, and prints `sent` or `queued` and the thread id. A bare number uses
 the first configured repository.
+
+`refs` prints one `kind key source title url` line per ref and the workspace
+path. A thread's refs are its PR, its ticket, issues from
+`Fixes`/`Closes`/`Resolves`/`Refs`/`Part of #n`, other PRs mentioned as a bare
+`#n` or PR URL, and sibling PRs on the same ticket. For a thread that the
+plugin did not start, the refs come from the PR of the thread's branch the
+first time `refs` reads them.
 
 ## Storage
 

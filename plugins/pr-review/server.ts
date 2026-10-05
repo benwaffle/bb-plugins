@@ -128,14 +128,12 @@ export function contextPrompt(context: ReviewContext): string {
 
 export interface PluginDeps {
   run: Runner;
-  platform: NodeJS.Platform;
   pollMs: number;
   now: () => number;
 }
 
 const defaultDeps: PluginDeps = {
   run: runCommand,
-  platform: process.platform,
   pollMs: ENVIRONMENT_POLL_MS,
   now: Date.now,
 };
@@ -623,16 +621,11 @@ export function createPlugin(deps: PluginDeps) {
       return { threadId: thread.id, created: true };
     }
 
-    async function runReview(threadId: string): Promise<{ delivery: "sent" | "queued" }> {
-      const target = store
-        .forThread(threadId)
-        .find((ref) => ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment"));
-      const pull = target === undefined ? null : parseRepoKey(target.key);
-      if (pull === null) throw new Error(`${threadId} has no PR to review`);
+    async function runReview(threadId: string, number: number): Promise<{ delivery: "sent" | "queued" }> {
       const result = await bb.sdk.threads.send({
         threadId,
         mode: "auto",
-        input: [{ type: "text", text: reviewCommand(pull.number), mentions: [] }],
+        input: [{ type: "text", text: reviewCommand(number), mentions: [] }],
       });
       bb.realtime.publish(REFS_CHANNEL, { threadId });
       return { delivery: result.delivery };
@@ -658,7 +651,7 @@ export function createPlugin(deps: PluginDeps) {
     async function threadRefs(threadId: string) {
       const thread = await liveThread(threadId);
       let refs = store.forThread(threadId);
-      let worktree: { path: string; isLocal: boolean } | null = null;
+      let worktree: { path: string } | null = null;
       if (thread !== null && thread.environmentId !== null) {
         if (refs.length === 0) {
           refs = await refsFromEnvironment(threadId, thread.environmentId).catch((error: unknown) => {
@@ -669,16 +662,12 @@ export function createPlugin(deps: PluginDeps) {
         const environment = await bb.sdk.environments
           .get({ environmentId: thread.environmentId })
           .catch(() => null);
-        if (environment !== null && environment.path !== null) {
-          const { primaryHostId } = await bb.sdk.system.config();
-          worktree = { path: environment.path, isLocal: environment.hostId === primaryHostId };
-        }
+        if (environment !== null && environment.path !== null) worktree = { path: environment.path };
       }
       return {
         refs,
         tickets: await tickets(refs.map((ref) => (ref.kind === "jira" ? ref.key : null))),
         worktree,
-        githubPanel: await githubPanel(),
       };
     }
 
@@ -720,32 +709,11 @@ export function createPlugin(deps: PluginDeps) {
       return { tickets, threads };
     }
 
-    async function openWorktree(threadId: string, editor: "goland" | "vscode") {
-      const { worktree } = await threadRefs(threadId);
-      if (worktree === null) return { opened: false, path: null, error: "This thread has no workspace path." };
-      if (!worktree.isLocal) {
-        return { opened: false, path: worktree.path, error: "The workspace is on another machine." };
-      }
-      const command =
-        deps.platform === "darwin"
-          ? { file: "open", args: ["-a", editor === "goland" ? "GoLand" : "Visual Studio Code", worktree.path] }
-          : { file: editor === "goland" ? "goland" : "code", args: [worktree.path] };
-      try {
-        await deps.run(command.file, command.args, { timeoutMs: 15_000 });
-        return { opened: true, path: worktree.path, error: null };
-      } catch (error) {
-        return { opened: false, path: worktree.path, error: errorMessage(error) };
-      }
-    }
-
     bb.rpc.register(rpcContract, {
       reviewQueue: ({ refresh }) => reviewQueue(refresh),
       sidebarGroups: () => sidebarGroups(),
       startReview: ({ repo, number }) => startReview(repo, number),
-      threadRefs: ({ threadId }) => threadRefs(threadId),
       relatedThreads: ({ threadId }) => relatedThreads(threadId),
-      runReview: ({ threadId }) => runReview(threadId),
-      openWorktree: ({ threadId, editor }) => openWorktree(threadId, editor),
     });
 
     const jsonOption = { json: { type: "boolean", description: "Print the result as JSON" } } as const;
@@ -834,7 +802,7 @@ export function createPlugin(deps: PluginDeps) {
               const { repos } = await config();
               const { repo, number } = parsePullArgument(input.positionals.pull, repos[0]);
               const { threadId } = await startReview(repo, number);
-              const { delivery } = await runReview(threadId);
+              const { delivery } = await runReview(threadId, number);
               return {
                 exitCode: 0,
                 stdout: input.options.json
