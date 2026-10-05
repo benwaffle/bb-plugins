@@ -11,7 +11,7 @@ interface Call {
   cwd: string | undefined;
 }
 
-function graphqlNode(number: number, title: string, body: string) {
+function graphqlNode(number: number, title: string, body: string, baseRefName = "main") {
   return {
     number,
     title,
@@ -20,6 +20,8 @@ function graphqlNode(number: number, title: string, body: string) {
     isDraft: false,
     headRefName: `branch-${number}`,
     headRefOid: `oid-${number}`,
+    baseRefName,
+    isCrossRepository: false,
     additions: 5,
     deletions: 1,
     changedFiles: 2,
@@ -38,7 +40,7 @@ function graphqlNode(number: number, title: string, body: string) {
 
 const OPEN_PULL_NODES = [
   graphqlNode(596, "CORE-51: Track the private identity the S-CSCF registered", "Fixes #12\nBuilds on #590"),
-  graphqlNode(599, "De-register the old IMS identity", "CORE-51\n\nFollow-up."),
+  graphqlNode(599, "De-register the old IMS identity", "CORE-51\n\nFollow-up.", "branch-596"),
   graphqlNode(590, "Run the review workflow", ""),
 ];
 
@@ -284,6 +286,9 @@ describe("reviewQueue", () => {
         ticketKey: string | null;
         me: string;
         authorAvatarUrl: string | null;
+        parentNumber: number | null;
+        depth: number;
+        childNumbers: number[];
         agent: { state: string };
       }>;
     };
@@ -293,6 +298,13 @@ describe("reviewQueue", () => {
       [590, null, "requested", "none"],
       [596, "CORE-51", "requested", "opened"],
       [599, "CORE-51", "requested", "none"],
+    ]);
+    expect(
+      queue.entries.map((entry) => [entry.number, entry.parentNumber, entry.depth, entry.childNumbers]),
+    ).toEqual([
+      [590, null, 0, []],
+      [596, null, 0, [599]],
+      [599, 596, 1, []],
     ]);
     expect(queue.entries[0]?.authorAvatarUrl).toBe("https://avatars.githubusercontent.com/u/1?s=32");
   });

@@ -38,12 +38,19 @@ waiting on merge** section. Merged and closed PRs are not listed. Draft PRs
 come after all ready PRs, in the same group order, and show in muted text with
 a **Draft** badge. Inside each group, the oldest number is first.
 
+A PR is stacked when its base branch is the head branch of another open PR in
+the same repository, such as #553 targeting #552's branch. A stacked PR shows
+**on #552** after its number. When a stacked PR is in the same group as its
+base PR, it comes directly after it, with the base PR's other dependents in
+number order. Otherwise it stays in its own group. When the base PR merges or
+closes, the stacked PR is no longer marked.
+
 A review request counts as yours if it names you, or if it names one of your
 teams and you have not reviewed yet. Columns:
 
 | Column | Shows |
 | --- | --- |
-| PR | Number, title, and the author with their GitHub avatar. |
+| PR | Number, **on #n** for a stacked PR, title, and the author with their GitHub avatar. |
 | Ticket | Jira key from a `CORE-n:` title prefix, or else a bare `CORE-n` line or `/browse/CORE-n` link in the body. Hover for `CORE-n: <summary> (<status>)`. |
 | Size | Additions, deletions, and changed files. |
 | Reviews | The latest review state and avatar of every human reviewer other than you. |
@@ -63,11 +70,17 @@ shows the ticket key and summary, or only the key until the summary is read,
 and truncates in a narrow sidebar. Hover the ticket row for its summary and
 status. An open PR without a review thread is a muted row under its
 ticket, with the author and a **Start** button; PRs without a ticket are under
-**No ticket**. Click the row, or **Start**, to open the PR's review thread; one
-is started when there is none. PRs you approved at their current head are not
+**No ticket**. Under a ticket, stacked PRs come first, each base PR followed by
+the PRs stacked on it, then the other PRs. A stacked PR's row starts with a
+tree glyph per stack level (`└ #553`, then `  └ #564`) and its description
+says `stacked on #552`. Click the row, or **Start**, to open the PR's review
+thread; one is started when there is none. PRs you approved at their current head are not
 listed. Threads keep their own rows, so pinning, archiving, renaming, and
 dragging work as usual. A thread's ticket is its PR's ticket, or else the
 first Jira ref recorded for it. Threads without a ticket are not grouped.
+bb sorts the review threads under a ticket by its own thread order and shows
+them before the PR rows, so a thread's position and title do not show its
+stack.
 
 The groups refresh when a review thread starts and once a minute. This needs
 a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds

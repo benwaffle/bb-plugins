@@ -19,7 +19,9 @@ import {
 import {
   agentState,
   classifyPull,
+  pullKey,
   sortQueue,
+  stackLinks,
   type PullSnapshot,
   type Viewer,
 } from "./queue.js";
@@ -68,10 +70,6 @@ function distinct(values: Iterable<string | null>): string[] {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function pullKey(repo: string, number: number): string {
-  return `${repo}#${number}`;
 }
 
 function shortRepo(repo: string): string {
@@ -300,7 +298,11 @@ export function createPlugin(deps: PluginDeps) {
         )
       ).flat();
       const threads = store.threadsForPulls(pulls.map((pull) => pullKey(pull.repo, pull.number)));
-      const sorted = sortQueue(pulls.map((pull) => ({ pull, classified: classifyPull(pull, me) })));
+      const links = stackLinks(pulls);
+      const sorted = sortQueue(
+        pulls.map((pull) => ({ pull, classified: classifyPull(pull, me) })),
+        links,
+      );
       const entries = await Promise.all(
         sorted.map(async ({ pull, classified }): Promise<QueueEntry> => ({
           repo: pull.repo,
@@ -311,6 +313,8 @@ export function createPlugin(deps: PluginDeps) {
           author: pull.author,
           authorAvatarUrl: pull.authorAvatarUrl,
           headRefName: pull.headRefName,
+          baseRefName: pull.baseRefName,
+          ...links.get(pullKey(pull.repo, pull.number))!,
           ticketKey: ticketKey(pull, projectKeys)?.key ?? null,
           additions: pull.additions,
           deletions: pull.deletions,
