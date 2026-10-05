@@ -104,11 +104,17 @@ describe("sortQueue", () => {
     ]);
   });
 
-  it("puts drafts after ready PRs in a bucket, then oldest number first", () => {
-    const draft = pull(1, { requestedUsers: ["benwaffle"], isDraft: true });
+  it("puts drafts after every ready PR, in priority order, ahead of approved PRs", () => {
+    const staleDraft = pull(2, { latestReviews: [review("benwaffle", "APPROVED", "old")], isDraft: true });
+    const requestedDraft = pull(1, { requestedUsers: ["benwaffle"], isDraft: true });
+    const mineDraft = pull(4, { author: "benwaffle", isDraft: true });
     const newer = pull(30, { requestedUsers: ["benwaffle"] });
     const older = pull(25, { requestedUsers: ["benwaffle"] });
-    expect(order([draft, newer, older])).toEqual([25, 30, 1]);
+    const mine = pull(3, { author: "benwaffle" });
+    const approved = pull(6, { latestReviews: [review("benwaffle", "APPROVED")] });
+    expect(order([mineDraft, approved, requestedDraft, staleDraft, mine, newer, older])).toEqual([
+      25, 30, 3, 2, 1, 4, 6,
+    ]);
   });
 });
 

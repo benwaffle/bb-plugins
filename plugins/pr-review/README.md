@@ -34,9 +34,9 @@ repositories in this order:
 5. Everything else, including your own PRs.
 
 PRs you approved at their current head go into a collapsed **Approved,
-waiting on merge** section. Merged and closed PRs are not listed. Inside each
-group, ready PRs come before drafts, then oldest number first. Drafts show in
-muted text with a **Draft** badge.
+waiting on merge** section. Merged and closed PRs are not listed. Draft PRs
+come after all ready PRs, in the same group order, and show in muted text with
+a **Draft** badge. Inside each group, the oldest number is first.
 
 A review request counts as yours if it names you, or if it names one of your
 teams and you have not reviewed yet. Columns:
