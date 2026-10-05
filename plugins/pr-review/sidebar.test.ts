@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
-import { ticketGroups } from "./sidebar";
+import { stackFirst, stackPrefix, ticketGroups } from "./sidebar";
 
-function entry(number: number, ticketKey: string | null): QueueEntry {
+function entry(
+  number: number,
+  ticketKey: string | null,
+  stack: Pick<QueueEntry, "parentNumber" | "depth" | "childNumbers"> = { parentNumber: null, depth: 0, childNumbers: [] },
+): QueueEntry {
   return {
     repo: "acme/widgets",
     number,
@@ -12,6 +16,8 @@ function entry(number: number, ticketKey: string | null): QueueEntry {
     author: "ana",
     authorAvatarUrl: null,
     headRefName: `branch-${number}`,
+    baseRefName: stack.parentNumber === null ? "main" : `branch-${stack.parentNumber}`,
+    ...stack,
     ticketKey,
     additions: 1,
     deletions: 1,
@@ -66,5 +72,32 @@ describe("ticketGroups", () => {
       { project: "proj_web", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], pulls: [] },
       { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], pulls: [7] },
     ]);
+  });
+});
+
+describe("stackFirst", () => {
+  it("puts each stack first, base PR then dependents, then PRs not in a stack", () => {
+    const pulls = [
+      entry(560, "ACME-21"),
+      entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] }),
+      entry(570, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] }),
+      entry(552, "ACME-21", { parentNumber: null, depth: 0, childNumbers: [553, 570] }),
+      entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [564] }),
+      entry(540, "ACME-21"),
+    ];
+    expect(stackFirst(pulls).map((pull) => pull.number)).toEqual([552, 570, 553, 564, 560, 540]);
+  });
+
+  it("keeps a dependent whose base PR has a review thread with the stacks", () => {
+    const pulls = [entry(560, "ACME-21"), entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] })];
+    expect(stackFirst(pulls).map((pull) => pull.number)).toEqual([553, 560]);
+  });
+});
+
+describe("stackPrefix", () => {
+  it("indents a tree glyph with non-breaking spaces per stack level", () => {
+    expect(stackPrefix(0)).toBe("");
+    expect(stackPrefix(1)).toBe("└ ");
+    expect(stackPrefix(2)).toBe("\u00a0\u00a0└ ");
   });
 });

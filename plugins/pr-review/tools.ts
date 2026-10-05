@@ -65,7 +65,7 @@ export const OPEN_PULLS_QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
-        number title body url isDraft headRefName headRefOid additions deletions changedFiles updatedAt
+        number title body url isDraft headRefName headRefOid baseRefName isCrossRepository additions deletions changedFiles updatedAt
         author { login avatarUrl(size: 32) }
         reviewRequests(first: 30) {
           nodes { requestedReviewer { __typename ... on User { login } ... on Team { combinedSlug } } }
@@ -95,6 +95,8 @@ const openPullsSchema = z.object({
             isDraft: z.boolean(),
             headRefName: z.string(),
             headRefOid: z.string(),
+            baseRefName: z.string(),
+            isCrossRepository: z.boolean(),
             additions: z.number(),
             deletions: z.number(),
             changedFiles: z.number(),
@@ -149,6 +151,8 @@ export function parseOpenPulls(repo: string, raw: string): PullSnapshot[] {
       authorAvatarUrl: node.author?.avatarUrl ?? null,
       headRefName: node.headRefName,
       headRefOid: node.headRefOid,
+      baseRefName: node.baseRefName,
+      isCrossRepository: node.isCrossRepository,
       additions: node.additions,
       deletions: node.deletions,
       changedFiles: node.changedFiles,

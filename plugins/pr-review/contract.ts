@@ -39,6 +39,13 @@ export const queueEntrySchema = z.object({
   author: z.string(),
   authorAvatarUrl: z.string().nullable(),
   headRefName: z.string(),
+  baseRefName: z.string(),
+  /** The open PR in the same repository whose head branch this PR targets. */
+  parentNumber: z.number().int().positive().nullable(),
+  /** 0 for a PR that is not stacked on another open PR. */
+  depth: z.number().int().nonnegative(),
+  /** Open PRs stacked directly on this one, lowest number first. */
+  childNumbers: z.array(z.number().int().positive()),
   ticketKey: z.string().nullable(),
   additions: z.number().int(),
   deletions: z.number().int(),

@@ -25,7 +25,10 @@ bb pr-review related <threadId> [--json]
   `owner/repo#n`, group, ticket key or `-`, `+adds/-dels`, your state, agent
   state, and title. Groups in order: `approval-stale` (you approved, then new
   commits came), `requested`, `requested-approved`, `commented`, `other`, and
-  `approved`. `--json` adds other reviewers and the review thread id.
+  `approved`. `--json` adds other reviewers, the review thread id, and the stack:
+  `baseRefName`, `parentNumber` (the open PR whose head branch is this PR's
+  base, or null), `depth` (0 when not stacked), and `childNumbers`. A stacked
+  PR follows its base PR directly when both are in the same group.
   `--refresh` skips the 30 second cache.
 - `groups` lists what bb's sidebar nests under ticket rows: tab-separated
   `ticket thread <threadId>` lines for threads with a Jira ticket, then

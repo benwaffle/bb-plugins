@@ -20,6 +20,8 @@ export interface PullSnapshot {
   authorAvatarUrl: string | null;
   headRefName: string;
   headRefOid: string;
+  baseRefName: string;
+  isCrossRepository: boolean;
   additions: number;
   deletions: number;
   changedFiles: number;
@@ -136,23 +138,136 @@ function bucketFor(me: MyState, otherApprovals: number): QueueBucket {
   }
 }
 
-export function compareQueueEntries(
-  left: { pull: PullSnapshot; classified: Classified },
-  right: { pull: PullSnapshot; classified: Classified },
-): number {
+export function pullKey(repo: string, number: number): string {
+  return `${repo}#${number}`;
+}
+
+export interface StackLink {
+  parentNumber: number | null;
+  depth: number;
+  childNumbers: number[];
+}
+
+/**
+ * Where each open PR sits in a stack, keyed by `owner/repo#n`. A PR's parent
+ * is the open PR in the same repository whose head branch is its base branch;
+ * a PR whose head is in a fork is never a parent. When several open PRs share
+ * that head branch, the lowest number is the parent. A PR whose base PR merged
+ * or closed is a root.
+ */
+export function stackLinks(
+  pulls: readonly Pick<PullSnapshot, "repo" | "number" | "headRefName" | "baseRefName" | "isCrossRepository">[],
+): Map<string, StackLink> {
+  const byHead = new Map<string, number>();
+  for (const pull of [...pulls].sort((left, right) => right.number - left.number)) {
+    if (!pull.isCrossRepository) byHead.set(`${pull.repo}\0${pull.headRefName}`, pull.number);
+  }
+  const parents = new Map<string, number>();
+  for (const pull of pulls) {
+    const parent = byHead.get(`${pull.repo}\0${pull.baseRefName}`);
+    if (parent !== undefined && parent !== pull.number) parents.set(pullKey(pull.repo, pull.number), parent);
+  }
+  // Two PRs can each target the other's head branch; cut such a cycle at the
+  // first of its PRs in `pulls`.
+  for (const pull of pulls) {
+    const key = pullKey(pull.repo, pull.number);
+    const seen = new Set([key]);
+    for (let parent = parents.get(key); parent !== undefined; ) {
+      const parentKey = pullKey(pull.repo, parent);
+      if (parentKey === key) parents.delete(key);
+      if (seen.has(parentKey)) break;
+      seen.add(parentKey);
+      parent = parents.get(parentKey);
+    }
+  }
+  const links = new Map<string, StackLink>();
+  for (const pull of pulls) {
+    const key = pullKey(pull.repo, pull.number);
+    let depth = 0;
+    for (let at = parents.get(key); at !== undefined; at = parents.get(pullKey(pull.repo, at))) depth++;
+    links.set(key, { parentNumber: parents.get(key) ?? null, depth, childNumbers: [] });
+  }
+  for (const pull of [...pulls].sort((left, right) => left.number - right.number)) {
+    const parent = parents.get(pullKey(pull.repo, pull.number));
+    if (parent !== undefined) links.get(pullKey(pull.repo, parent))?.childNumbers.push(pull.number);
+  }
+  return links;
+}
+
+/**
+ * `items` reordered so each item's stack dependents follow it directly, in
+ * their order in `items`. An item whose parent is not in `items` keeps its
+ * place. `parentKeyOf` must not form cycles, which `stackLinks` guarantees.
+ */
+export function stackOrder<T>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+  parentKeyOf: (item: T) => string | null,
+): T[] {
+  const present = new Set(items.map(keyOf));
+  const children = new Map<string, T[]>();
+  const roots: T[] = [];
+  for (const item of items) {
+    const parent = parentKeyOf(item);
+    if (parent === null || !present.has(parent)) {
+      roots.push(item);
+      continue;
+    }
+    const siblings = children.get(parent) ?? [];
+    siblings.push(item);
+    children.set(parent, siblings);
+  }
+  const ordered: T[] = [];
+  const visit = (item: T) => {
+    ordered.push(item);
+    for (const child of children.get(keyOf(item)) ?? []) visit(child);
+  };
+  for (const root of roots) visit(root);
+  return ordered;
+}
+
+type Ranked = { pull: PullSnapshot; classified: Classified };
+
+function comparePriority(left: Ranked, right: Ranked): number {
   return (
     Number(left.classified.bucket === "approved") - Number(right.classified.bucket === "approved") ||
     Number(left.pull.isDraft) - Number(right.pull.isDraft) ||
-    BUCKET_ORDER[left.classified.bucket] - BUCKET_ORDER[right.classified.bucket] ||
+    BUCKET_ORDER[left.classified.bucket] - BUCKET_ORDER[right.classified.bucket]
+  );
+}
+
+function compareQueueEntries(left: Ranked, right: Ranked): number {
+  return (
+    comparePriority(left, right) ||
     left.pull.repo.localeCompare(right.pull.repo) ||
     left.pull.number - right.pull.number
   );
 }
 
-export function sortQueue<T extends { pull: PullSnapshot; classified: Classified }>(
+/**
+ * Entries in review order. Inside a run of equal priority, a stacked PR
+ * follows its base PR directly.
+ */
+export function sortQueue<T extends Ranked>(
   entries: readonly T[],
+  links: ReadonlyMap<string, StackLink>,
 ): T[] {
-  return [...entries].sort(compareQueueEntries);
+  const runs: T[][] = [];
+  for (const entry of [...entries].sort(compareQueueEntries)) {
+    const run = runs.at(-1);
+    if (run !== undefined && comparePriority(run[0]!, entry) === 0) run.push(entry);
+    else runs.push([entry]);
+  }
+  return runs.flatMap((run) =>
+    stackOrder(
+      run,
+      ({ pull }) => pullKey(pull.repo, pull.number),
+      ({ pull }) => {
+        const parent = links.get(pullKey(pull.repo, pull.number))?.parentNumber ?? null;
+        return parent === null ? null : pullKey(pull.repo, parent);
+      },
+    ),
+  );
 }
 
 export type AgentState = "none" | "opened" | "reviewing" | "brief-ready" | "follow-ups";

@@ -20,7 +20,7 @@ import type {
   rpcContract,
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
-import { ticketGroups } from "./sidebar";
+import { stackPrefix, ticketGroups } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
@@ -114,6 +114,18 @@ function DraftBadge() {
   );
 }
 
+function StackBadge({ entry }: { entry: QueueEntry }) {
+  if (entry.parentNumber === null) return null;
+  return (
+    <span
+      className="inline-flex h-4 shrink-0 items-center rounded border border-border px-1 text-[10px] font-normal text-muted-foreground"
+      title={`Stacked on ${entry.repo}#${entry.parentNumber} (base branch ${entry.baseRefName})`}
+    >
+      on #{entry.parentNumber}
+    </span>
+  );
+}
+
 function QueueRow({
   entry,
   ticket,
@@ -150,9 +162,9 @@ function QueueRow({
       <td className="py-2 pr-3">
         <div className={`flex items-center gap-1.5 ${entry.isDraft ? "" : "font-medium"}`}>
           {entry.isDraft ? <DraftBadge /> : null}
-          <span>
-            #{entry.number} {entry.title}
-          </span>
+          <span className="shrink-0">#{entry.number}</span>
+          <StackBadge entry={entry} />
+          <span>{entry.title}</span>
         </div>
         <div className="text-xs text-muted-foreground">
           <User login={entry.author} url={entry.authorAvatarUrl} />
@@ -365,11 +377,20 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
       threadIds: group.threadIds,
       rows: group.pulls.map((entry) => {
         const key = `${entry.repo}#${entry.number}`;
+        const stackedOn = entry.parentNumber === null ? [] : [`stacked on #${entry.parentNumber}`];
+        const baseOf =
+          entry.childNumbers.length === 0 ? [] : [`base of ${entry.childNumbers.map((n) => `#${n}`).join(", ")}`];
         return {
           id: key,
-          title: `#${entry.number} ${entry.title}`,
-          description: entry.isDraft ? `${entry.author} · draft` : entry.author,
-          tooltip: `${key} · +${entry.additions} −${entry.deletions} · ${ME_LABELS[entry.me]}`,
+          title: `${stackPrefix(entry.depth)}#${entry.number} ${entry.title}`,
+          description: [...stackedOn, entry.author, ...(entry.isDraft ? ["draft"] : [])].join(" · "),
+          tooltip: [
+            key,
+            `+${entry.additions} −${entry.deletions}`,
+            ME_LABELS[entry.me],
+            ...stackedOn,
+            ...baseOf,
+          ].join(" · "),
           onSelect: () => review(entry),
           action: { label: starting === key ? "Starting…" : "Start", run: () => review(entry) },
         };
@@ -476,9 +497,9 @@ function QueueColumnRow({
           className={`flex items-center gap-1.5 text-sm ${entry.isDraft ? "text-muted-foreground" : "font-medium"}`}
         >
           {entry.isDraft ? <DraftBadge /> : null}
-          <span className="truncate">
-            #{entry.number} {entry.title}
-          </span>
+          <span className="shrink-0">#{entry.number}</span>
+          <StackBadge entry={entry} />
+          <span className="truncate">{entry.title}</span>
         </div>
         <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
           <User login={entry.author} url={entry.authorAvatarUrl} />

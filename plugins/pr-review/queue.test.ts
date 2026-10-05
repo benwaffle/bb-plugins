@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { agentState, classifyPull, sortQueue, type PullReview, type PullSnapshot } from "./queue.js";
+import {
+  agentState,
+  classifyPull,
+  sortQueue,
+  stackLinks,
+  type PullReview,
+  type PullSnapshot,
+} from "./queue.js";
 
 const ME = { login: "benwaffle", teams: ["acme/platform"] };
 const HEAD = "head-oid";
@@ -16,6 +23,8 @@ function pull(number: number, overrides: Partial<PullSnapshot> = {}): PullSnapsh
     authorAvatarUrl: null,
     headRefName: `branch-${number}`,
     headRefOid: HEAD,
+    baseRefName: "main",
+    isCrossRepository: false,
     additions: 10,
     deletions: 2,
     changedFiles: 1,
@@ -32,8 +41,19 @@ function review(login: string, state: PullReview["state"], commitOid: string = H
 }
 
 function order(pulls: PullSnapshot[]): number[] {
-  return sortQueue(pulls.map((entry) => ({ pull: entry, classified: classifyPull(entry, ME) }))).map(
-    (entry) => entry.pull.number,
+  return sortQueue(
+    pulls.map((entry) => ({ pull: entry, classified: classifyPull(entry, ME) })),
+    stackLinks(pulls),
+  ).map((entry) => entry.pull.number);
+}
+
+function on(base: number, number: number, overrides: Partial<PullSnapshot> = {}): PullSnapshot {
+  return pull(number, { baseRefName: `branch-${base}`, ...overrides });
+}
+
+function links(pulls: PullSnapshot[]): Record<string, [number | null, number, number[]]> {
+  return Object.fromEntries(
+    [...stackLinks(pulls)].map(([key, link]) => [key.slice(key.indexOf("#")), [link.parentNumber, link.depth, link.childNumbers]]),
   );
 }
 
@@ -88,7 +108,65 @@ describe("classifyPull", () => {
   });
 });
 
+describe("stackLinks", () => {
+  it("links a chain of three", () => {
+    expect(links([on(553, 564), pull(552), on(552, 553)])).toEqual({
+      "#552": [null, 0, [553]],
+      "#553": [552, 1, [564]],
+      "#564": [553, 2, []],
+    });
+  });
+
+  it("lists both children of a fork, lowest number first", () => {
+    expect(links([on(552, 570), pull(552), on(552, 553)])).toEqual({
+      "#552": [null, 0, [553, 570]],
+      "#553": [552, 1, []],
+      "#570": [552, 1, []],
+    });
+  });
+
+  it("makes a PR a root once its base PR is no longer open", () => {
+    expect(links([on(552, 553), on(553, 564)])).toEqual({
+      "#553": [null, 0, [564]],
+      "#564": [553, 1, []],
+    });
+  });
+
+  it("ignores a matching head branch in another repository or in a fork", () => {
+    expect(
+      links([
+        pull(552, { repo: "acme/web" }),
+        pull(560, { headRefName: "shared", isCrossRepository: true }),
+        on(552, 553),
+        pull(561, { baseRefName: "shared" }),
+      ]),
+    ).toEqual({
+      "#552": [null, 0, []],
+      "#560": [null, 0, []],
+      "#553": [null, 0, []],
+      "#561": [null, 0, []],
+    });
+  });
+
+  it("cuts a cycle of PRs that target each other's head branch", () => {
+    expect(links([on(2, 1), on(1, 2)])).toEqual({ "#1": [null, 0, [2]], "#2": [1, 1, []] });
+  });
+});
+
 describe("sortQueue", () => {
+  it("puts stacked PRs directly after their base PR inside a priority group", () => {
+    const requested = { requestedUsers: ["benwaffle"] };
+    expect(
+      order([pull(552, requested), on(552, 553, requested), pull(560, requested), on(553, 564, requested), on(552, 570, requested)]),
+    ).toEqual([552, 553, 564, 570, 560]);
+  });
+
+  it("leaves a stacked PR in its own priority group", () => {
+    const base = pull(552, { requestedUsers: ["benwaffle"] });
+    const dependent = on(552, 553, { author: "benwaffle" });
+    expect(order([dependent, pull(554, { requestedUsers: ["benwaffle"] }), base])).toEqual([552, 554, 553]);
+  });
+
   it("orders stale approvals, then requested without approvals, requested with approvals, commented, rest, approved", () => {
     const requestedApproved = pull(10, {
       requestedUsers: ["benwaffle"],
