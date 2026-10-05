@@ -4,13 +4,17 @@ import { ticketTooltip } from "./tickets.js";
 
 export const NO_TICKET_LABEL = "No ticket";
 
+export type TicketGroupItem =
+  | { kind: "pull"; entry: QueueEntry }
+  | { kind: "thread"; threadId: string; entry: QueueEntry | null };
+
 export interface TicketGroup {
   projectId: string;
   key: string;
   label: string;
   tooltip: string | null;
   threadIds: string[];
-  pulls: QueueEntry[];
+  items: TicketGroupItem[];
 }
 
 /**
@@ -20,6 +24,21 @@ export interface TicketGroup {
  */
 export function stackPrefix(depth: number): string {
   return depth === 0 ? "" : `${"\u00a0\u00a0".repeat(depth - 1)}└ `;
+}
+
+export interface StackedThreadRow {
+  threadId: string;
+  depth?: number;
+  description?: string;
+}
+
+/**
+ * A review thread's sidebar entry: the stack depth and "stacked on #N" of
+ * its PR, absent when the PR is a stack base, not stacked, or not queued.
+ */
+export function stackedThreadRow(threadId: string, entry: QueueEntry | null): StackedThreadRow {
+  if (entry === null || entry.parentNumber === null) return { threadId };
+  return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}` };
 }
 
 function isStacked(entry: QueueEntry): boolean {
@@ -37,6 +56,21 @@ export function stackFirst(pulls: readonly QueueEntry[]): QueueEntry[] {
     (entry) => (entry.parentNumber === null ? null : pullKey(entry.repo, entry.parentNumber)),
   );
   return [...ordered.filter(isStacked), ...ordered.filter((entry) => !isStacked(entry))];
+}
+
+/**
+ * Unstarted PRs and review threads in one stack-first order, so a dependent
+ * follows its base PR whether either has a thread. Threads whose PR is not in
+ * the queue come last.
+ */
+function stackFirstItems(items: readonly TicketGroupItem[]): TicketGroupItem[] {
+  const byEntry = new Map<QueueEntry, TicketGroupItem>();
+  const unknown: TicketGroupItem[] = [];
+  for (const item of items) {
+    if (item.entry === null) unknown.push(item);
+    else byEntry.set(item.entry, item);
+  }
+  return [...stackFirst([...byEntry.keys()]).flatMap((entry) => byEntry.get(entry) ?? []), ...unknown];
 }
 
 export function ticketGroups(
@@ -60,20 +94,24 @@ export function ticketGroups(
         label: labelFor(ticketKey),
         tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
-        pulls: [],
+        items: [],
       };
       groups.set(key, group);
     }
     return group;
   };
+  const pullByThreadId = new Map(result.threadPulls.map(({ threadId, entry }) => [threadId, entry]));
   for (const { projectId, entry } of result.pulls) {
-    groupFor(projectId, entry.ticketKey).pulls.push(entry);
+    groupFor(projectId, entry.ticketKey).items.push({ kind: "pull", entry });
   }
   for (const { threadId, ticketKey } of result.threadTickets) {
     const projectId = projectIdByThreadId.get(threadId);
-    if (projectId !== undefined) groupFor(projectId, ticketKey).threadIds.push(threadId);
+    if (projectId === undefined) continue;
+    const group = groupFor(projectId, ticketKey);
+    group.threadIds.push(threadId);
+    group.items.push({ kind: "thread", threadId, entry: pullByThreadId.get(threadId) ?? null });
   }
-  for (const group of groups.values()) group.pulls = stackFirst(group.pulls);
+  for (const group of groups.values()) group.items = stackFirstItems(group.items);
   return [...groups.values()].sort(
     (left, right) => Number(left.label === NO_TICKET_LABEL) - Number(right.label === NO_TICKET_LABEL),
   );
