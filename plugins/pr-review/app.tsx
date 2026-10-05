@@ -20,7 +20,7 @@ import type {
   rpcContract,
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
-import { stackPrefix, ticketGroups } from "./sidebar";
+import { stackedThreadRow, stackPrefix, ticketGroups } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
@@ -328,13 +328,25 @@ interface SidebarThreadGroupRow {
   action?: { label: string; run(): void };
 }
 
+/**
+ * A thread row the host decorates with a stack glyph and description. bb
+ * builds without these drop the entry and ignore `keepOrder`, so every
+ * thread is also listed in `threadIds`.
+ */
+interface SidebarThreadGroupThreadRow {
+  threadId: string;
+  depth?: number;
+  description?: string;
+}
+
 interface SidebarThreadGroup {
   projectId: string;
   key: string;
   label: string;
   tooltip?: string;
   threadIds: readonly string[];
-  rows: readonly SidebarThreadGroupRow[];
+  rows: readonly (SidebarThreadGroupRow | SidebarThreadGroupThreadRow)[];
+  keepOrder?: boolean;
 }
 
 type SidebarThreadGroupsSlot = (registration: {
@@ -375,7 +387,9 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
       label: group.label,
       ...(group.tooltip === null ? {} : { tooltip: group.tooltip }),
       threadIds: group.threadIds,
-      rows: group.pulls.map((entry) => {
+      rows: group.items.map((item): SidebarThreadGroupRow | SidebarThreadGroupThreadRow => {
+        if (item.kind === "thread") return stackedThreadRow(item.threadId, item.entry);
+        const { entry } = item;
         const key = `${entry.repo}#${entry.number}`;
         const stackedOn = entry.parentNumber === null ? [] : [`stacked on #${entry.parentNumber}`];
         const baseOf =
@@ -395,6 +409,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
           action: { label: starting === key ? "Starting…" : "Start", run: () => review(entry) },
         };
       }),
+      keepOrder: true,
     }));
   }, [projectIdByThreadId, result, review, starting]);
 }

@@ -458,6 +458,9 @@ export function createPlugin(deps: PluginDeps) {
         tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
         threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
         pulls,
+        threadPulls: queue.entries.flatMap((entry) =>
+          entry.agent.threadId === null ? [] : [{ threadId: entry.agent.threadId, entry }],
+        ),
       };
     }
 

@@ -78,9 +78,13 @@ thread; one is started when there is none. PRs you approved at their current hea
 listed. Threads keep their own rows, so pinning, archiving, renaming, and
 dragging work as usual. A thread's ticket is its PR's ticket, or else the
 first Jira ref recorded for it. Threads without a ticket are not grouped.
-bb sorts the review threads under a ticket by its own thread order and shows
-them before the PR rows, so a thread's position and title do not show its
-stack.
+On bb builds whose sidebar groups take thread decorations and `keepOrder`,
+review threads follow the same stack-first order as PR rows, so a stacked PR's
+thread sits right after its base PR's row or thread, with the tree glyph and
+`stacked on #552` after its title; threads whose PR is not in the queue come
+last. Older bb builds sort the review threads by their own thread order and
+show them before the PR rows, so a thread's position and title do not show its
+stack there.
 
 The groups refresh when a review thread starts and once a minute. This needs
 a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds

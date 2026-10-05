@@ -114,6 +114,7 @@ const sidebarGroupsResultSchema = z.object({
   tickets: z.array(ticketSchema),
   threadTickets: z.array(z.object({ threadId: threadIdSchema, ticketKey: z.string() })),
   pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),
+  threadPulls: z.array(z.object({ threadId: threadIdSchema, entry: queueEntrySchema })),
 });
 export type SidebarGroupsResult = z.infer<typeof sidebarGroupsResultSchema>;
 

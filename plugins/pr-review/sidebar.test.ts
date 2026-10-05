@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
-import { stackFirst, stackPrefix, ticketGroups } from "./sidebar";
+import { stackedThreadRow, stackFirst, stackPrefix, ticketGroups, type TicketGroupItem } from "./sidebar";
+
+function itemLabel(item: TicketGroupItem): string {
+  return item.kind === "thread" ? item.threadId : `#${item.entry.number}`;
+}
 
 function entry(
   number: number,
@@ -48,6 +52,7 @@ describe("ticketGroups", () => {
         { projectId: "proj_widgets", entry: entry(8, "ACME-21") },
         { projectId: "proj_widgets", entry: entry(9, "ACME-30") },
       ],
+      threadPulls: [],
     };
     const groups = ticketGroups(
       result,
@@ -64,13 +69,58 @@ describe("ticketGroups", () => {
         label: group.label,
         tooltip: group.tooltip,
         threads: group.threadIds,
-        pulls: group.pulls.map((pull) => pull.number),
+        items: group.items.map(itemLabel),
       })),
     ).toEqual([
-      { project: "proj_widgets", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], pulls: [8] },
-      { project: "proj_widgets", label: "ACME-30", tooltip: "ACME-30 (loading title)", threads: [], pulls: [9] },
-      { project: "proj_web", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], pulls: [] },
-      { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], pulls: [7] },
+      { project: "proj_widgets", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], items: ["#8", "thr_a", "thr_b"] },
+      { project: "proj_widgets", label: "ACME-30", tooltip: "ACME-30 (loading title)", threads: [], items: ["#9"] },
+      { project: "proj_web", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], items: ["thr_other_project"] },
+      { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], items: ["#7"] },
+    ]);
+  });
+
+  it("orders review threads and unstarted PRs together, stacks first, with unqueued threads last", () => {
+    const withThread = (pull: QueueEntry, threadId: string): QueueEntry => ({
+      ...pull,
+      agent: { state: "reviewing", threadId },
+    });
+    const base = withThread(entry(552, "ACME-21", { parentNumber: null, depth: 0, childNumbers: [553, 570] }), "thr_552");
+    const top = withThread(entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] }), "thr_564");
+    const result: SidebarGroupsResult = {
+      githubPanel: true,
+      tickets: [],
+      threadTickets: [
+        { threadId: "thr_old", ticketKey: "ACME-21" },
+        { threadId: "thr_564", ticketKey: "ACME-21" },
+        { threadId: "thr_552", ticketKey: "ACME-21" },
+      ],
+      pulls: [
+        { projectId: "proj_widgets", entry: entry(560, "ACME-21") },
+        { projectId: "proj_widgets", entry: entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [564] }) },
+        { projectId: "proj_widgets", entry: entry(570, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] }) },
+      ],
+      threadPulls: [
+        { threadId: "thr_552", entry: base },
+        { threadId: "thr_564", entry: top },
+      ],
+    };
+    const [group] = ticketGroups(
+      result,
+      new Map([
+        ["thr_old", "proj_widgets"],
+        ["thr_552", "proj_widgets"],
+        ["thr_564", "proj_widgets"],
+      ]),
+    );
+
+    expect(group?.threadIds).toEqual(["thr_old", "thr_564", "thr_552"]);
+    expect(group?.items.map(itemLabel)).toEqual(["thr_552", "#553", "thr_564", "#570", "#560", "thr_old"]);
+    expect(
+      group?.items.flatMap((item) => (item.kind === "thread" ? [stackedThreadRow(item.threadId, item.entry)] : [])),
+    ).toEqual([
+      { threadId: "thr_552" },
+      { threadId: "thr_564", depth: 2, description: "stacked on #553" },
+      { threadId: "thr_old" },
     ]);
   });
 });
