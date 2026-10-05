@@ -61,9 +61,9 @@ describe("ticketGroups", () => {
         pulls: group.pulls.map((pull) => pull.number),
       })),
     ).toEqual([
-      { project: "proj_widgets", label: "ACME-21", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], pulls: [8] },
+      { project: "proj_widgets", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], pulls: [8] },
       { project: "proj_widgets", label: "ACME-30", tooltip: "ACME-30 (loading title)", threads: [], pulls: [9] },
-      { project: "proj_web", label: "ACME-21", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], pulls: [] },
+      { project: "proj_web", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], pulls: [] },
       { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], pulls: [7] },
     ]);
   });
