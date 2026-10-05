@@ -141,8 +141,9 @@ export function compareQueueEntries(
   right: { pull: PullSnapshot; classified: Classified },
 ): number {
   return (
-    BUCKET_ORDER[left.classified.bucket] - BUCKET_ORDER[right.classified.bucket] ||
+    Number(left.classified.bucket === "approved") - Number(right.classified.bucket === "approved") ||
     Number(left.pull.isDraft) - Number(right.pull.isDraft) ||
+    BUCKET_ORDER[left.classified.bucket] - BUCKET_ORDER[right.classified.bucket] ||
     left.pull.repo.localeCompare(right.pull.repo) ||
     left.pull.number - right.pull.number
   );
