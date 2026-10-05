@@ -88,14 +88,6 @@ const queueResultSchema = z.object({
 });
 export type QueueResult = z.infer<typeof queueResultSchema>;
 
-const refsResultSchema = z.object({
-  refs: z.array(refSchema),
-  tickets: z.array(ticketSchema),
-  worktree: z.object({ path: z.string(), isLocal: z.boolean() }).nullable(),
-  githubPanel: z.boolean(),
-});
-export type RefsResult = z.infer<typeof refsResultSchema>;
-
 const relatedResultSchema = z.object({
   tickets: z.array(z.string()),
   threads: z.array(
@@ -131,26 +123,8 @@ export const rpcContract = defineRpcContract({
     input: z.object({ repo: repoSchema, number: z.number().int().positive() }).strict(),
     output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
   },
-  threadRefs: {
-    input: z.object({ threadId: threadIdSchema }).strict(),
-    output: refsResultSchema,
-  },
   relatedThreads: {
     input: z.object({ threadId: threadIdSchema }).strict(),
     output: relatedResultSchema,
-  },
-  runReview: {
-    input: z.object({ threadId: threadIdSchema }).strict(),
-    output: z.object({ delivery: z.enum(["sent", "queued"]) }),
-  },
-  openWorktree: {
-    input: z
-      .object({ threadId: threadIdSchema, editor: z.enum(["goland", "vscode"]) })
-      .strict(),
-    output: z.object({
-      opened: z.boolean(),
-      path: z.string().nullable(),
-      error: z.string().nullable(),
-    }),
   },
 });

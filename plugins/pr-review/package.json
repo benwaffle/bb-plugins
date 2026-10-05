@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and PR, ticket, and issue chips on threads.",
+  "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and the PR, ticket, and issue refs of each thread.",
   "license": "MIT",
   "author": "Ben Iofel",
   "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/pr-review#readme",
@@ -29,7 +29,7 @@
   },
   "bb": {
     "name": "PR review",
-    "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and PR, ticket, and issue chips on threads.",
+    "description": "A review queue for open GitHub PRs, agent review threads in PR worktrees, and the PR, ticket, and issue refs of each thread.",
     "branding": {
       "icon": "GitPullRequest"
     },

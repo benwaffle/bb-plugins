@@ -7,7 +7,6 @@ import {
   useRealtime,
   useRpc,
   type BbNavigate,
-  type PluginThreadHeaderActionProps,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
@@ -16,10 +15,8 @@ import type {
   QueueEntry,
   QueueResult as Queue,
   RelatedResult as Related,
-  RefsResult as Refs,
   SidebarGroupsResult,
   Ticket,
-  ThreadRef,
   rpcContract,
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
@@ -565,148 +562,6 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
   );
 }
 
-function useThreadRefs(threadId: string): Load<Refs> {
-  const rpc = useRpc<typeof rpcContract>();
-  const [refs, setRefs] = useState<Load<Refs>>({ status: "loading" });
-  const load = useCallback(() => {
-    rpc
-      .call("threadRefs", { threadId })
-      .then((value) => setRefs({ status: "ready", value }))
-      .catch((error: unknown) => setRefs({ status: "error", message: errorMessage(error) }));
-  }, [rpc, threadId]);
-  useEffect(load, [load]);
-  useRealtime(REFS_CHANNEL, (payload) => {
-    if (typeof payload !== "object" || payload === null) return;
-    if (("threadId" in payload && payload.threadId === threadId) || "tickets" in payload) load();
-  });
-  return refs;
-}
-
-function chipLabel(ref: ThreadRef): string {
-  if (ref.kind === "jira") return ref.key;
-  const number = ref.key.slice(ref.key.indexOf("#"));
-  if (ref.source === "sibling") return `sibling ${number}`;
-  return ref.kind === "gh-issue" ? `issue ${number}` : `PR ${number}`;
-}
-
-function Chip({
-  threadRef,
-  ticket,
-  githubPanel,
-}: {
-  threadRef: ThreadRef;
-  ticket: Ticket | undefined;
-  githubPanel: boolean;
-}) {
-  const navigate = useBbNavigate();
-  const primary = threadRef.source === "review-target" || threadRef.source === "environment";
-  return (
-    <button
-      type="button"
-      title={threadRef.kind === "jira" ? ticketTooltip(threadRef.key, ticket) : (threadRef.title ?? threadRef.key)}
-      onClick={() =>
-        threadRef.kind === "gh-pr"
-          ? openPull(navigate, githubPanel, threadRef.key, threadRef.url)
-          : openExternal(navigate, threadRef.url)
-      }
-      className={`inline-flex h-6 shrink-0 items-center rounded-full border px-2 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${
-        primary || threadRef.kind === "jira" ? "border-border font-medium" : "border-dashed border-border text-muted-foreground"
-      }`}
-    >
-      {chipLabel(threadRef)}
-    </button>
-  );
-}
-
-function WorktreeButtons({ threadId, worktree }: { threadId: string; worktree: NonNullable<Refs["worktree"]> }) {
-  const rpc = useRpc<typeof rpcContract>();
-  const copyPath = () => {
-    void navigator.clipboard
-      .writeText(worktree.path)
-      .then(() => toast.success("Workspace path copied"))
-      .catch(() => toast.error(worktree.path));
-  };
-  if (!worktree.isLocal) {
-    return (
-      <button type="button" className={buttonClass} title={worktree.path} onClick={copyPath}>
-        Copy path
-      </button>
-    );
-  }
-  const open = (editor: "goland" | "vscode") => {
-    rpc
-      .call("openWorktree", { threadId, editor })
-      .then((result) => {
-        if (!result.opened) toast.error(result.error ?? "Could not open the workspace");
-      })
-      .catch((error: unknown) => toast.error(errorMessage(error)));
-  };
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1">
-      <button type="button" className={buttonClass} title={worktree.path} onClick={() => open("goland")}>
-        GoLand
-      </button>
-      <button type="button" className={buttonClass} title={worktree.path} onClick={() => open("vscode")}>
-        VS Code
-      </button>
-    </span>
-  );
-}
-
-function RunReviewButton({ threadId }: { threadId: string }) {
-  const rpc = useRpc<typeof rpcContract>();
-  const [sending, setSending] = useState(false);
-  const run = () => {
-    setSending(true);
-    rpc
-      .call("runReview", { threadId })
-      .then(({ delivery }) => {
-        if (delivery === "queued") toast.success("Review queued after the current turn");
-      })
-      .catch((error: unknown) => toast.error(`Could not run the review: ${errorMessage(error)}`))
-      .finally(() => setSending(false));
-  };
-  return (
-    <button
-      type="button"
-      className={buttonClass}
-      disabled={sending}
-      title="Run the thermo-nuclear code quality review on this PR"
-      onClick={run}
-    >
-      {sending ? "Sending…" : "Run TNCQR"}
-    </button>
-  );
-}
-
-function ThreadRefsHeader({ threadId, isCompactViewport }: PluginThreadHeaderActionProps) {
-  const refs = useThreadRefs(threadId);
-  if (refs.status !== "ready") return null;
-  const { worktree, githubPanel } = refs.value;
-  const tickets = ticketsByKey(refs.value.tickets);
-  const chips = isCompactViewport
-    ? refs.value.refs.filter((ref) => ref.kind === "jira" || ref.source === "review-target")
-    : refs.value.refs;
-  const reviewable = refs.value.refs.some(
-    (ref) => ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment"),
-  );
-  if (chips.length === 0 && worktree === null) return null;
-  return (
-    <div className="flex max-w-[48rem] items-center gap-1 overflow-hidden">
-      {chips.map((ref) => (
-        <Chip
-          key={`${ref.kind}:${ref.key}`}
-          threadRef={ref}
-          ticket={ref.kind === "jira" ? tickets.get(ref.key) : undefined}
-          githubPanel={githubPanel}
-        />
-      ))}
-      {reviewable ? <RunReviewButton threadId={threadId} /> : null}
-      {worktree === null || isCompactViewport ? null : <WorktreeButtons threadId={threadId} worktree={worktree} />}
-    </div>
-  );
-}
-
 function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
@@ -771,11 +626,6 @@ export default definePluginApp((app) => {
     icon: "GitPullRequest",
     path: "queue",
     component: ReviewQueuePanel,
-  });
-  app.slots.experimental_threadHeaderAction({
-    id: "refs",
-    title: "PR and ticket refs",
-    component: ThreadRefsHeader,
   });
   app.slots.threadPanelAction({
     id: QUEUE_PANEL_ACTION_ID,
