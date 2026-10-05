@@ -18,6 +18,11 @@ export function ticketGroups(
 ): TicketGroup[] {
   const tickets = new Map(result.tickets.map((ticket) => [ticket.key, ticket]));
   const groups = new Map<string, TicketGroup>();
+  const labelFor = (ticketKey: string | null): string => {
+    if (ticketKey === null) return NO_TICKET_LABEL;
+    const summary = tickets.get(ticketKey)?.summary ?? null;
+    return summary === null ? ticketKey : `${ticketKey} ${summary}`;
+  };
   const groupFor = (projectId: string, ticketKey: string | null): TicketGroup => {
     const key = `${projectId}:${ticketKey ?? ""}`;
     let group = groups.get(key);
@@ -25,7 +30,7 @@ export function ticketGroups(
       group = {
         projectId,
         key,
-        label: ticketKey ?? NO_TICKET_LABEL,
+        label: labelFor(ticketKey),
         tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
         pulls: [],

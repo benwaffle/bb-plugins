@@ -57,9 +57,11 @@ GitHub plugin's panel (when that plugin is running) and on github.com.
 ## Sidebar
 
 In bb's thread list, organized **By project**, review threads are nested under
-their Jira ticket, such as **CORE-21**, when the ticket has at least two
-threads or an open PR that has no review thread yet. Hover the ticket row for
-its summary and status. An open PR without a review thread is a muted row under its
+their Jira ticket, such as **CORE-21 S6a backlog bug bash**, when the ticket
+has at least two threads or an open PR that has no review thread yet. The row
+shows the ticket key and summary, or only the key until the summary is read,
+and truncates in a narrow sidebar. Hover the ticket row for its summary and
+status. An open PR without a review thread is a muted row under its
 ticket, with the author and a **Start** button; PRs without a ticket are under
 **No ticket**. Click the row, or **Start**, to open the PR's review thread; one
 is started when there is none. PRs you approved at their current head are not
@@ -163,6 +165,7 @@ or `CORE-n`), `url`, `title`, and `source` (`review-target`, `environment`,
   skip that cache.
 - Ticket summaries are read with one `twg jira workitem get` call for all the
   keys in view and kept in the plugin's database. After an hour the cached
-  summary is shown while it is read again. Until a ticket is read, its tooltip
-  is `CORE-n (loading title)`. A ticket that `twg` cannot read keeps that
-  tooltip, and is tried again after five minutes.
+  summary is shown while it is read again. Until a ticket is read, its sidebar
+  row shows only `CORE-n` and its tooltip is `CORE-n (loading title)`. A
+  ticket that `twg` cannot read keeps that row and tooltip, and is tried again
+  after five minutes.
