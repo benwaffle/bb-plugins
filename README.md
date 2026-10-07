@@ -8,7 +8,6 @@ not add commits that have to be carried through every upstream sync.
 
 | Plugin | Directory | What it does |
 | --- | --- | --- |
-| `nav-shortcuts` | [plugins/nav-shortcuts](plugins/nav-shortcuts) | `Mod+[` and `Mod+]` go back and forward through bb's page history. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
