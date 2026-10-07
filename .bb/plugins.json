@@ -12,10 +12,6 @@
       "source": "./plugins/plugin-update-review"
     },
     {
-      "name": "nav-shortcuts",
-      "source": "./plugins/nav-shortcuts"
-    },
-    {
       "name": "project-emoji",
       "source": "./plugins/project-emoji"
     },
