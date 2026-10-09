@@ -65,7 +65,7 @@
     "check": "npm run types:check && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "zod": "^4.3.6"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.5.29",
