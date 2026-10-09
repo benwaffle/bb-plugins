@@ -92,6 +92,7 @@ const queueResultSchema = z.object({
   entries: z.array(queueEntrySchema),
   tickets: z.array(ticketSchema),
   errors: z.array(z.object({ repo: z.string(), message: z.string() })),
+  setup: z.array(z.string()),
 });
 export type QueueResult = z.infer<typeof queueResultSchema>;
 

@@ -121,11 +121,13 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
   return { calls, twg, run };
 }
 
-async function load(nodes = OPEN_PULL_NODES) {
+const SETTINGS = { repos: REPO, jiraProjectKeys: "ACME", jiraSite: "https://example.atlassian.net/" };
+
+async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = SETTINGS) {
   const runner = fakeRunner(nodes);
   const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
   const plugin = createPlugin({ run: runner.run, pollMs: 1, now: () => clock.now });
-  const host = createFakePluginHost({ pluginId: "pr-review" });
+  const host = createFakePluginHost({ pluginId: "pr-review", settings });
   const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
   const sdk = host.harness.sdk;
   sdk.stub("projects.list", async () => [
@@ -307,6 +309,27 @@ describe("reviewQueue", () => {
       [599, 596, 1, []],
     ]);
     expect(queue.entries[0]?.authorAvatarUrl).toBe("https://avatars.githubusercontent.com/u/1?s=32");
+  });
+
+  it("is empty with setup hints until the repositories and Jira settings are set", async () => {
+    const { harness, runner } = await load(OPEN_PULL_NODES, {});
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as { entries: unknown[]; setup: string[] };
+    expect(queue.entries).toEqual([]);
+    expect(queue.setup).toEqual([
+      expect.stringContaining('"Repositories"'),
+      expect.stringContaining('"Jira project keys" and "Jira site"'),
+    ]);
+    expect(runner.calls.some((call) => call.args.includes("graphql"))).toBe(false);
+  });
+
+  it("recognises no tickets while the Jira site is unset", async () => {
+    const { harness } = await load(OPEN_PULL_NODES, { repos: REPO, jiraProjectKeys: "ACME" });
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as {
+      entries: Array<{ ticketKey: string | null }>;
+      setup: string[];
+    };
+    expect(queue.entries.map((entry) => entry.ticketKey)).toEqual([null, null, null]);
+    expect(queue.setup).toEqual([expect.stringContaining('"Jira site"')]);
   });
 });
 

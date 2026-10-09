@@ -432,7 +432,7 @@ function ReviewQueuePanel() {
     );
   }
 
-  const { entries, githubPanel, errors, viewer, fetchedAt } = queue.value;
+  const { entries, githubPanel, errors, setup, viewer, fetchedAt } = queue.value;
   const active = entries.filter((entry) => entry.bucket !== "approved");
   const approved = entries.filter((entry) => entry.bucket === "approved");
   const row = (entry: QueueEntry) => (
@@ -457,6 +457,11 @@ function ReviewQueuePanel() {
             Refresh
           </button>
         </div>
+        {setup.map((hint) => (
+          <p key={hint} className="text-sm text-muted-foreground">
+            {hint}
+          </p>
+        ))}
         {errors.map((error) => (
           <p key={error.repo} className="text-sm text-destructive">
             {error.repo}: {error.message}
@@ -549,7 +554,7 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
       </div>
     );
   }
-  const { entries, errors } = queue.value;
+  const { entries, errors, setup } = queue.value;
   const active = entries.filter((entry) => entry.bucket !== "approved");
   const approved = entries.filter((entry) => entry.bucket === "approved");
   const row = (entry: QueueEntry) => (
@@ -570,6 +575,11 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
         </button>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-1 pb-3">
+        {setup.map((hint) => (
+          <p key={hint} className="px-2 text-xs text-muted-foreground">
+            {hint}
+          </p>
+        ))}
         {errors.map((error) => (
           <p key={error.repo} className="px-2 text-xs text-destructive">
             {error.repo}: {error.message}

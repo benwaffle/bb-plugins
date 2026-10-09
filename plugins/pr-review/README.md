@@ -51,7 +51,7 @@ teams and you have not reviewed yet. Columns:
 | Column | Shows |
 | --- | --- |
 | PR | Number, **on #n** for a stacked PR, title, and the author with their GitHub avatar. |
-| Ticket | Jira key from a `ACME-n:` title prefix, or else a bare `ACME-n` line or `/browse/ACME-n` link in the body. Hover for `ACME-n: <summary> (<status>)`. |
+| Ticket | Jira key from an `ACME-n:` title prefix, or else a bare `ACME-n` line or `/browse/ACME-n` link in the body. Hover for `ACME-n: <summary> (<status>)`. |
 | Size | Additions, deletions, and changed files. |
 | Reviews | The latest review state and avatar of every human reviewer other than you. |
 | Me | `requested`, `commented`, `changes requested`, `approved`, `approved, new commits`, `author`, or `—`. |
@@ -130,12 +130,17 @@ threads that have the same ticket ref, with their title and first message.
 
 ## Settings
 
-| Setting | Default | Meaning |
+| Setting | Example | Meaning |
 | --- | --- | --- |
 | Repositories | `acme/widgets` | Comma-separated `owner/repo` list for the queue. |
 | Jira project keys | `ACME` | Keys recognised as tickets. |
 | Jira site | `https://example.atlassian.net` | Base URL for ticket links. |
 | Review project | none | Project that review threads start in when no project's remote matches. |
+
+Every setting is empty after install. Until Repositories is set, the queue is
+empty and shows a hint to set it. Tickets are recognised only when both Jira
+project keys and Jira site are set; until then the queue shows a hint for them,
+and PRs are not grouped by ticket.
 
 ## CLI
 
@@ -149,7 +154,8 @@ bb pr-review related <threadId> [--json]
 ```
 
 `queue` prints one tab-separated line per PR: `owner/repo#n`, group, ticket,
-size, your state, agent state, title. `groups` prints what the sidebar groups
+size, your state, agent state, title. Before them, it prints a `setup <hint>`
+line for each setting that still needs a value. `groups` prints what the sidebar groups
 come from: one `ACME-n thread <threadId>` line per thread with a ticket, and
 one `ACME-n pr owner/repo#n <title>` line per open PR without a review thread,
 with `-` for no ticket. `start` prints `started` or `existing`

@@ -6,7 +6,7 @@ description: "List the PR review queue, open the review thread for a PR, run its
 # PR review
 
 The pr-review plugin keeps a queue of open PRs in the configured repositories
-(default `acme/widgets`). It opens review threads in a worktree on the
+(the "Repositories" setting, empty until set). It opens review threads in a worktree on the
 PR's head branch and records which PR, Jira ticket, issues, and sibling
 PRs belong to each thread.
 
@@ -23,7 +23,8 @@ bb pr-review related <threadId> [--json]
 
 - `queue` lists open PRs in review order. Each tab-separated line has
   `owner/repo#n`, group, ticket key or `-`, `+adds/-dels`, your state, agent
-  state, and title. Groups in order: `approval-stale` (you approved, then new
+  state, and title. A `setup <hint>` line first means a plugin setting needs
+  a value; tell the user which. Groups in order: `approval-stale` (you approved, then new
   commits came), `requested`, `requested-approved`, `commented`, `other`, and
   `approved`. `--json` adds other reviewers, the review thread id, and the stack:
   `baseRefName`, `parentNumber` (the open PR whose head branch is this PR's
@@ -50,9 +51,10 @@ bb pr-review related <threadId> [--json]
 
 ## Parsing rules
 
-- Ticket: a `ACME-n:` title prefix, or else a line that is only `ACME-n`, or
+- Ticket: an `ACME-n:` title prefix, or else a line that is only `ACME-n`, or
   a `/browse/ACME-n` link in the body. Project keys come from the "Jira
-  project keys" setting.
+  project keys" setting, and tickets are recognised only when "Jira site" is
+  set too.
 - `Fixes`, `Closes`, `Resolves`, `Refs`, `Part of`, and `See` before `#n` mean
   an issue. A bare `#n` or a `/pull/` URL means another PR.
 - Text in code spans, code blocks, and HTML comments is ignored.

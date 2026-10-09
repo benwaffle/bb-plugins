@@ -60,6 +60,16 @@ interface Cached<T> {
   at: number;
 }
 
+const REPOS_SETUP_HINT =
+  'Set "Repositories" in the PR review plugin settings to the "owner/repo" list whose open PRs fill the queue.';
+const JIRA_SETUP_HINT =
+  'Set "Jira project keys" and "Jira site" in the PR review plugin settings to link PRs to Jira tickets.';
+
+/** What the queue shows until the plugin settings are filled in. */
+function setupHints(reposConfigured: boolean, jiraConfigured: boolean): string[] {
+  return [...(reposConfigured ? [] : [REPOS_SETUP_HINT]), ...(jiraConfigured ? [] : [JIRA_SETUP_HINT])];
+}
+
 function fresh<T>(entry: Cached<T> | undefined, ttlMs: number): entry is Cached<T> {
   return entry !== undefined && Date.now() - entry.at < ttlMs;
 }
@@ -146,20 +156,20 @@ export function createPlugin(deps: PluginDeps) {
       repos: {
         type: "string",
         label: "Repositories",
-        description: 'Comma-separated "owner/repo" list whose open PRs fill the review queue.',
-        default: "acme/widgets",
+        description: 'Comma-separated "owner/repo" list whose open PRs fill the review queue, such as "acme/widgets".',
+        default: "",
       },
-      jiraProjects: {
+      jiraProjectKeys: {
         type: "string",
         label: "Jira project keys",
-        description: 'Comma-separated Jira project keys recognised as tickets, such as "ACME".',
-        default: "ACME",
+        description: 'Comma-separated Jira project keys recognised as tickets, such as "ACME". Tickets also need the Jira site.',
+        default: "",
       },
-      jiraBaseUrl: {
+      jiraSite: {
         type: "string",
         label: "Jira site",
-        description: "Base URL that ticket links open, without a trailing slash.",
-        default: "https://example.atlassian.net",
+        description: 'Base URL that ticket links open, such as "https://example.atlassian.net".',
+        default: "",
       },
       reviewProject: {
         type: "project",
@@ -186,11 +196,16 @@ export function createPlugin(deps: PluginDeps) {
 
     async function config() {
       const values = await settings.get();
+      const repos = parseRepoList(values.repos);
+      const jiraKeys = parseProjectKeys(values.jiraProjectKeys);
+      const jiraBaseUrl = values.jiraSite.trim().replace(/\/+$/, "");
+      const jiraConfigured = jiraKeys.length > 0 && jiraBaseUrl.length > 0;
       return {
-        repos: parseRepoList(values.repos),
-        projectKeys: parseProjectKeys(values.jiraProjects),
-        jiraBaseUrl: values.jiraBaseUrl.replace(/\/+$/, ""),
+        repos,
+        projectKeys: jiraConfigured ? jiraKeys : [],
+        jiraBaseUrl,
         reviewProject: values.reviewProject ?? null,
+        setup: setupHints(repos.length > 0, jiraConfigured),
       };
     }
 
@@ -282,7 +297,7 @@ export function createPlugin(deps: PluginDeps) {
     }
 
     async function reviewQueue(refresh: boolean) {
-      const { repos, projectKeys } = await config();
+      const { repos, projectKeys, setup } = await config();
       const me = await viewer();
       const errors: Array<{ repo: string; message: string }> = [];
       const pulls = (
@@ -332,6 +347,7 @@ export function createPlugin(deps: PluginDeps) {
         entries,
         tickets: await tickets(entries.map((entry) => entry.ticketKey)),
         errors,
+        setup,
       };
     }
 
@@ -730,7 +746,13 @@ export function createPlugin(deps: PluginDeps) {
       if (fromUrl !== null) return fromUrl;
       const fromKey = parseRepoKey(value);
       if (fromKey !== null) return fromKey;
-      if (/^\d+$/.test(value) && defaultRepo !== undefined) return { repo: defaultRepo, number: Number(value) };
+      if (/^\d+$/.test(value)) {
+        if (defaultRepo !== undefined) return { repo: defaultRepo, number: Number(value) };
+        throw new PluginCliError(`"${value}" needs a repository: no repositories are configured`, {
+          code: "invalid_pull",
+          hint: `${REPOS_SETUP_HINT} Or pass owner/repo#n or a PR URL.`,
+        });
+      }
       throw new PluginCliError(`"${value}" is not a PR number, owner/repo#n, or PR URL`, {
         code: "invalid_pull",
         hint: "For example `bb pr-review start 596` or `bb pr-review start acme/widgets#596`.",
@@ -763,7 +785,8 @@ export function createPlugin(deps: PluginDeps) {
                 ].join("\t"),
               );
               const errors = queue.errors.map((error) => `error\t${error.repo}\t${error.message}`);
-              return { exitCode: 0, stdout: [...lines, ...errors].map((line) => `${line}\n`).join("") };
+              const setup = queue.setup.map((hint) => `setup\t${hint}`);
+              return { exitCode: 0, stdout: [...setup, ...lines, ...errors].map((line) => `${line}\n`).join("") };
             },
           }),
           groups: cliCommand({
