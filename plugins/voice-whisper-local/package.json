@@ -66,6 +66,6 @@
     "bb-app": "0.44.0",
     "cron-parser": "^5.5.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.1"
+    "vitest": "^5.0.3"
   }
 }
