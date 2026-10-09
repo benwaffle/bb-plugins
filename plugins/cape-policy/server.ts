@@ -1,5 +1,6 @@
 import { cliCommand, defineCli, type BbPluginApi } from "@get-bb/plugin-sdk";
-import { REALTIME_CHANNEL, rpcContract, type PolicyStatus } from "./contract.js";
+import { REALTIME_CHANNEL } from "./channel.js";
+import { rpcContract, type PolicyStatus } from "./contract.js";
 import {
   CAPE_POLICY,
   applyPolicy,

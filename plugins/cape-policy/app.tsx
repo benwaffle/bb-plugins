@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { REALTIME_CHANNEL, type PolicyStatus, type rpcContract } from "./contract";
+import { REALTIME_CHANNEL } from "./channel";
+import type { PolicyStatus, rpcContract } from "./contract";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

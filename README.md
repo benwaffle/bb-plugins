@@ -52,7 +52,16 @@ bundled in the `bb-app` release the repository builds against, which
 npm install
 npm run check      # every plugin: types:check, typecheck, test, build
 npm run build      # every plugin: bb plugin build
+npm run check:isolated  # every plugin built as `bb plugin install git:...` does
 ```
+
+`bb plugin install git:...` runs `npm install --omit=dev` in the plugin's own
+directory, so `@get-bb/plugin-sdk` (a devDependency) is absent when bb bundles
+the frontend. Code reachable from the `bb.app` entry may use
+`@get-bb/plugin-sdk/app` but not the bare `@get-bb/plugin-sdk`, so `app.tsx`
+imports `contract.ts` type-only and takes shared runtime constants from
+`channel.ts`. The workspace install hides a mistake here;
+`npm run check:isolated` catches it.
 
 Plugin scripts shell out to the `bb` CLI from the `bb-app` devDependency, and
 run it as `env -u BB_CLI bb` so an installed bb desktop app does not take over

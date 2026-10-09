@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck, test, and build every plugin
         run: npm run check
 
+      - name: Build every plugin in isolation, as bb plugin install does
+        run: npm run check:isolated
+
       - name: Ensure checks leave tracked files clean
         run: git diff --exit-code
 

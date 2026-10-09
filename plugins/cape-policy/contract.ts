@@ -23,5 +23,3 @@ export const rpcContract = defineRpcContract({
   status: { input: z.null(), output: statusSchema },
   apply: { input: z.null(), output: statusSchema },
 });
-
-export const REALTIME_CHANNEL = "status";

@@ -45,6 +45,7 @@
     "policy.json",
     "server.ts",
     "app.tsx",
+    "channel.ts",
     "contract.ts",
     "policy.ts"
   ],
