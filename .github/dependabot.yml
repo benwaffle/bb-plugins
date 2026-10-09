@@ -12,8 +12,14 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps
-    # Major updates match no group, so each one opens its own PR.
+    # Dependabot puts each dependency in the first group it matches, so
+    # bb-sdk comes first. The bb SDK packages are 0.x, where a minor bump can
+    # break plugins, so they get a PR of their own for every update type and
+    # never auto-merge. Other major updates match no group, so each one opens
+    # its own PR.
     groups:
+      bb-sdk:
+        patterns: ["@get-bb/*", "bb-app"]
       development:
         dependency-type: development
         update-types: [minor, patch]

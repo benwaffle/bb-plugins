@@ -19,12 +19,30 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # The bb SDK packages are 0.x, where any bump can break plugins against
+      # the running bb, so a PR that touches one is always left for a human.
+      - id: bb-sdk
+        name: Check for bb SDK packages
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+        run: |
+          hold=false
+          IFS=',' read -ra names <<< "$DEPENDENCY_NAMES"
+          for name in "${names[@]}"; do
+            name="${name// /}"
+            case "$name" in
+              @get-bb/*|bb-app) hold=true ;;
+            esac
+          done
+          echo "hold=$hold" >> "$GITHUB_OUTPUT"
+
       # npm majors are left for a human; GitHub Actions majors auto-merge.
       - name: Enable auto-merge
         if: >-
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+          steps.bb-sdk.outputs.hold != 'true'
+          && (steps.metadata.outputs.update-type == 'version-update:semver-minor'
           || steps.metadata.outputs.update-type == 'version-update:semver-patch'
-          || steps.metadata.outputs.package-ecosystem == 'github_actions'
+          || steps.metadata.outputs.package-ecosystem == 'github_actions')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
