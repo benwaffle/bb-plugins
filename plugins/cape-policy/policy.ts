@@ -108,14 +108,31 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function accountState(sdk: Sdk, pluginId: string): Promise<string> {
-  const status = await sdk.plugins.callRpc({
+type SdkOutputSchema = Parameters<Sdk["plugins"]["callRpc"]>[0]["outputSchema"];
+
+/**
+ * Call another plugin's RPC. `callRpc` types `outputSchema` against the
+ * SDK's own zod, which is a different copy from this plugin's; checking one
+ * copy's schema type against the other's exhausts tsc's memory, so the schema
+ * crosses that boundary as `unknown`. At runtime the SDK only calls `parse`.
+ */
+async function callPluginRpc<T extends z.ZodType>(
+  sdk: Sdk,
+  pluginId: string,
+  method: string,
+  outputSchema: T,
+): Promise<z.infer<T>> {
+  const result: unknown = await sdk.plugins.callRpc({
     pluginId,
-    method: ACCOUNT_STATUS_METHOD,
+    method,
     input: null,
-    outputSchema: accountStatusSchema,
+    outputSchema: outputSchema as unknown as SdkOutputSchema,
   });
-  return status.state;
+  return result as z.infer<T>;
+}
+
+async function accountState(sdk: Sdk, pluginId: string): Promise<string> {
+  return (await callPluginRpc(sdk, pluginId, ACCOUNT_STATUS_METHOD, accountStatusSchema)).state;
 }
 
 async function observe(sdk: Sdk, policy: Policy, record: SignOutRecord): Promise<Observed> {
@@ -218,12 +235,7 @@ export async function readPolicy(sdk: Sdk, policy: Policy, record: SignOutRecord
 }
 
 async function signOut(sdk: Sdk, pluginId: string): Promise<void> {
-  const result = await sdk.plugins.callRpc({
-    pluginId,
-    method: ACCOUNT_SIGN_OUT_METHOD,
-    input: null,
-    outputSchema: signOutResultSchema,
-  });
+  const result = await callPluginRpc(sdk, pluginId, ACCOUNT_SIGN_OUT_METHOD, signOutResultSchema);
   // "failed" means getbb.app did not confirm the revocation; bb-account
   // still drops the credential locally, which the status check verifies.
   if (result.status.state !== "signed-out") {
