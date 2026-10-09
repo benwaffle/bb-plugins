@@ -7,7 +7,8 @@ import {
 import { REALTIME_CHANNEL } from "./channel.js";
 import { rpcContract, type EmojiAssignment } from "./contract.js";
 import { parseEmoji, type ProjectFacts } from "./emoji.js";
-import { createEmojiStore } from "./store.js";
+import { parseCssColor, projectAccentColor } from "./palette.js";
+import { createColorStore, createEmojiStore } from "./store.js";
 
 export { rpcContract };
 
@@ -44,12 +45,34 @@ function requireProject(projects: readonly ProjectFacts[], projectId: string): v
   }
 }
 
-function formatAssignment(assignment: EmojiAssignment, name: string): string {
-  return `${assignment.emoji}\t${assignment.source}\t${assignment.projectId}\t${name}`;
+const AUTO_COLOR = "auto";
+
+function requireColor(input: string): string {
+  const color = parseCssColor(input);
+  if (color === null) {
+    throw new PluginCliError(`"${input}" is not a CSS color`, {
+      code: "invalid_color",
+      hint: "Pass a CSS color such as `#7fb4ff` or `oklch(0.86 0.07 236)`, or `auto` for the automatic color.",
+    });
+  }
+  return color;
+}
+
+function formatAssignment(assignment: EmojiAssignment, color: string, name: string): string {
+  return `${assignment.emoji}\t${assignment.source}\t${color}\t${assignment.projectId}\t${name}`;
 }
 
 export default function plugin(bb: BbPluginApi): void {
+  bb.settings.define({
+    tint: {
+      type: "boolean",
+      label: "Tint project headers",
+      description: "Wash each project's sidebar header in its color. The name stays bold and colored either way.",
+      default: true,
+    },
+  });
   const store = createEmojiStore(bb.storage.kv);
+  const colors = createColorStore(bb.storage.kv);
 
   function announce(): void {
     bb.realtime.publish(REALTIME_CHANNEL, null);
@@ -71,9 +94,23 @@ export default function plugin(bb: BbPluginApi): void {
     return assignment;
   }
 
+  /** Pins a project's color, or drops the pin when `rawColor` is `auto`. */
+  async function setColor(projectId: string, rawColor: string): Promise<string | null> {
+    const color = rawColor.trim() === AUTO_COLOR ? null : requireColor(rawColor);
+    requireProject(await listProjectFacts(bb), projectId);
+    if (color === null) await colors.clear(projectId);
+    else await colors.set(projectId, color);
+    announce();
+    return color;
+  }
+
   bb.rpc.register(rpcContract, {
     async list() {
-      return { assignments: await store.resolve(await listProjectFacts(bb)) };
+      const [assignments, colorPins] = await Promise.all([
+        listProjectFacts(bb).then((projects) => store.resolve(projects)),
+        colors.list(),
+      ]);
+      return { assignments, colors: colorPins };
     },
     set({ projectId, emoji }) {
       return setManual(projectId, emoji);
@@ -98,18 +135,26 @@ export default function plugin(bb: BbPluginApi): void {
       summary: "Show or change the emoji beside each project in the sidebar",
       commands: {
         list: cliCommand({
-          summary: "List every project's emoji and whether it was set by hand or picked automatically",
+          summary:
+            "List every project's emoji, whether it was set by hand or picked automatically, and its color",
           options: jsonOption,
           async run(input) {
             const projects = await listProjectFacts(bb);
             const assignments = await store.resolve(projects);
+            const colorPins = await colors.list();
             if (input.options.json) {
-              return { exitCode: 0, stdout: `${JSON.stringify({ assignments })}\n` };
+              return {
+                exitCode: 0,
+                stdout: `${JSON.stringify({ assignments, colors: colorPins })}\n`,
+              };
             }
             const names = new Map(projects.map((project) => [project.id, project.name]));
-            const lines = assignments.map((assignment) =>
-              formatAssignment(assignment, names.get(assignment.projectId) ?? ""),
-            );
+            const pinned = new Map(colorPins.map((pin) => [pin.projectId, pin.color]));
+            const lines = assignments.map((assignment) => {
+              const name = names.get(assignment.projectId) ?? "";
+              const color = pinned.get(assignment.projectId) ?? projectAccentColor(name);
+              return formatAssignment(assignment, color, name);
+            });
             return { exitCode: 0, stdout: lines.length === 0 ? "" : `${lines.join("\n")}\n` };
           },
         }),
@@ -142,6 +187,30 @@ export default function plugin(bb: BbPluginApi): void {
               stdout: input.options.json
                 ? `${JSON.stringify(assignment)}\n`
                 : `${assignment.emoji} picked automatically for ${assignment.projectId}\n`,
+            };
+          },
+        }),
+        color: cliCommand({
+          summary: "Pin a project's sidebar color, or pass `auto` to go back to the automatic color",
+          positionals: [
+            projectIdPositional,
+            {
+              name: "color",
+              description: "A CSS color such as `#7fb4ff` or `oklch(0.86 0.07 236)`, or `auto`",
+              required: true,
+            },
+          ],
+          options: jsonOption,
+          async run(input) {
+            const { projectId } = input.positionals;
+            const color = await setColor(projectId, input.positionals.color);
+            return {
+              exitCode: 0,
+              stdout: input.options.json
+                ? `${JSON.stringify({ projectId, color })}\n`
+                : color === null
+                  ? `automatic color for ${projectId}\n`
+                  : `${color} pinned for ${projectId}\n`,
             };
           },
         }),

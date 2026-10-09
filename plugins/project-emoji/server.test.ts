@@ -53,6 +53,7 @@ const OTHER = { id: "proj_other", name: "qqq", createdAt: 3 };
 async function list(harness: Awaited<ReturnType<typeof load>>["harness"]) {
   return (await harness.callRpc("list")) as {
     assignments: { projectId: string; emoji: string; source: string }[];
+    colors: { projectId: string; color: string }[];
   };
 }
 
@@ -120,7 +121,7 @@ describe("project-emoji server", () => {
 
     const listed = await harness.runCli(["list"]);
     expect(listed.stdout).toBe(
-      "🐙\tauto\tproj_bb\tbb\n🚀\tmanual\tproj_abc\tzzz\n",
+      "🐙\tauto\toklch(0.86 0.07 200)\tproj_bb\tbb\n🚀\tmanual\toklch(0.86 0.07 56)\tproj_abc\tzzz\n",
     );
 
     const cleared = await harness.runCli(["clear", "proj_abc", "--json"]);
@@ -133,5 +134,41 @@ describe("project-emoji server", () => {
     const invalid = await harness.runCli(["set", "proj_abc", "nope"]);
     expect(invalid.exitCode).not.toBe(0);
     expect(invalid.stderr).toContain("not a single emoji");
+  });
+
+  it("pins a project's color, lists it, and goes back to automatic", async () => {
+    const { harness } = await load([BB, ABC]);
+
+    const pinned = await harness.runCli(["color", "proj_abc", "#7fb4ff"]);
+    expect(pinned).toMatchObject({ exitCode: 0, stdout: "#7fb4ff pinned for proj_abc\n" });
+    expect(harness.realtimeSignals.map((signal) => signal.channel)).toEqual(["changed"]);
+    expect((await list(harness)).colors).toEqual([{ projectId: "proj_abc", color: "#7fb4ff" }]);
+    expect((await harness.runCli(["list"])).stdout).toContain("🌻\tauto\t#7fb4ff\tproj_abc\tzzz\n");
+
+    const reloaded = await harness.reload(plugin);
+    expect((await list(reloaded.harness)).colors).toEqual([
+      { projectId: "proj_abc", color: "#7fb4ff" },
+    ]);
+
+    const auto = await reloaded.harness.runCli(["color", "proj_abc", "auto", "--json"]);
+    expect(JSON.parse(auto.stdout)).toEqual({ projectId: "proj_abc", color: null });
+    expect((await list(reloaded.harness)).colors).toEqual([]);
+  });
+
+  it("rejects colors that are not CSS colors and unknown projects", async () => {
+    const { harness } = await load([BB]);
+    const invalid = await harness.runCli(["color", "proj_bb", "red; display: none"]);
+    expect(invalid.exitCode).not.toBe(0);
+    expect(invalid.stderr).toContain("not a CSS color");
+    const missing = await harness.runCli(["color", "proj_missing", "tomato"]);
+    expect(missing.exitCode).not.toBe(0);
+    expect(missing.stderr).toContain("no project with id proj_missing");
+  });
+
+  it("defines the header tint setting, on by default", async () => {
+    const { harness } = await load([BB]);
+    expect(harness.registrations.settingsDescriptors).toMatchObject({
+      tint: { type: "boolean", default: true },
+    });
   });
 });

@@ -9,10 +9,20 @@ const assignmentSchema = z.object({
 
 export type EmojiAssignment = z.infer<typeof assignmentSchema>;
 
+const colorPinSchema = z.object({
+  projectId: z.string(),
+  color: z.string(),
+});
+
+export type ColorPin = z.infer<typeof colorPinSchema>;
+
 export const rpcContract = defineRpcContract({
   list: {
     input: z.null(),
-    output: z.object({ assignments: z.array(assignmentSchema) }),
+    output: z.object({
+      assignments: z.array(assignmentSchema),
+      colors: z.array(colorPinSchema),
+    }),
   },
   set: {
     input: z.object({ projectId: z.string().min(1), emoji: z.string() }).strict(),

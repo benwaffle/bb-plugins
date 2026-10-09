@@ -1,22 +1,105 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 import {
   definePluginApp,
   experimental_usePluginId,
   experimental_useSidebarThreads,
   useRealtime,
   useRpc,
+  useSettings,
+  type PluginAppSlots,
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { REALTIME_CHANNEL } from "./channel";
 import type { rpcContract } from "./contract";
-import { decorateProjectRows, removeDecorations } from "./decorate";
+import { BUTTON_CLASS, decorateProjectRows, removeDecorations } from "./decorate";
 import { parseEmoji, searchEmoji } from "./emoji";
+import { projectAccentColor } from "./palette";
 
 interface PickerTarget {
   readonly projectId: string;
   readonly anchor: HTMLElement;
+}
+
+/**
+ * `app.slots.experimental_sidebarProjectDecoration`, typed here because the
+ * pinned SDK predates it. Hosts without the slot leave it undefined.
+ */
+export interface SidebarProjectDecoration {
+  leading?: ReactNode;
+  accentColor?: string;
+  labelClassName?: string;
+  tint?: boolean;
+}
+
+export interface SidebarProjectDecorationRegistration {
+  id: string;
+  title: string;
+  useDecoration(projectId: string): SidebarProjectDecoration | null;
+}
+
+type SlotsWithProjectDecoration = PluginAppSlots & {
+  experimental_sidebarProjectDecoration?: (
+    registration: SidebarProjectDecorationRegistration,
+  ) => void;
+};
+
+interface SidebarState {
+  readonly emojiByProject: ReadonlyMap<string, string>;
+  readonly colorByProject: ReadonlyMap<string, string>;
+  readonly projectNames: ReadonlyMap<string, string>;
+  readonly picker: PickerTarget | null;
+}
+
+/**
+ * State the overlay loads and the decoration hooks read. The overlay and each
+ * project header render in separate React trees, so they share it through
+ * `useSyncExternalStore`.
+ */
+interface SidebarStore {
+  get(): SidebarState;
+  update(change: Partial<SidebarState>): void;
+  subscribe(listener: () => void): () => void;
+  openPicker(projectId: string, anchor: HTMLElement): void;
+}
+
+function createSidebarStore(): SidebarStore {
+  let state: SidebarState = {
+    emojiByProject: new Map(),
+    colorByProject: new Map(),
+    projectNames: new Map(),
+    picker: null,
+  };
+  const listeners = new Set<() => void>();
+  function update(change: Partial<SidebarState>): void {
+    state = { ...state, ...change };
+    for (const listener of listeners) listener();
+  }
+  return {
+    get: () => state,
+    update,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    openPicker(projectId, anchor) {
+      update({ picker: { projectId, anchor } });
+    },
+  };
+}
+
+function useSidebarState(store: SidebarStore): SidebarState {
+  return useSyncExternalStore(store.subscribe, store.get);
 }
 
 function errorMessage(error: unknown): string {
@@ -130,43 +213,85 @@ function EmojiCell({
   );
 }
 
-function ProjectEmojiOverlay() {
-  const rpc = useRpc<typeof rpcContract>();
+function stopEvent(event: SyntheticEvent): void {
+  event.stopPropagation();
+}
+
+function EmojiButton({
+  projectId,
+  emoji,
+  projectName,
+  onOpen,
+}: {
+  projectId: string;
+  emoji: string;
+  projectName: string | undefined;
+  onOpen: (projectId: string, anchor: HTMLElement) => void;
+}) {
+  const label = `Change icon for ${projectName ?? "project"}`;
+  return (
+    <button
+      type="button"
+      className={BUTTON_CLASS}
+      aria-label={label}
+      title={label}
+      onPointerDown={stopEvent}
+      onMouseDown={stopEvent}
+      onKeyDown={stopEvent}
+      onDoubleClick={stopEvent}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpen(projectId, event.currentTarget);
+      }}
+    >
+      {emoji}
+    </button>
+  );
+}
+
+export function useProjectDecoration(
+  store: SidebarStore,
+  projectId: string,
+): SidebarProjectDecoration | null {
+  const { emojiByProject, colorByProject, projectNames } = useSidebarState(store);
+  const tint = useSettings().values?.tint !== false;
+  const emoji = emojiByProject.get(projectId);
+  const projectName = projectNames.get(projectId);
+  const accentColor =
+    colorByProject.get(projectId) ??
+    (projectName === undefined ? undefined : projectAccentColor(projectName));
+  return useMemo(() => {
+    if (emoji === undefined && accentColor === undefined) return null;
+    return {
+      ...(emoji === undefined
+        ? {}
+        : {
+            leading: (
+              <EmojiButton
+                projectId={projectId}
+                emoji={emoji}
+                projectName={projectName}
+                onOpen={store.openPicker}
+              />
+            ),
+          }),
+      ...(accentColor === undefined ? {} : { accentColor, tint }),
+    };
+  }, [store, projectId, emoji, projectName, accentColor, tint]);
+}
+
+/**
+ * Inserts emoji buttons into the bundled sidebar's project rows, for hosts
+ * without `experimental_sidebarProjectDecoration`.
+ */
+function useDomDecorations(store: SidebarStore, enabled: boolean): void {
   const pluginId = experimental_usePluginId();
-  const { projects } = experimental_useSidebarThreads();
-  const [emojiByProject, setEmojiByProject] = useState<ReadonlyMap<string, string>>(
-    () => new Map(),
-  );
-  const [target, setTarget] = useState<PickerTarget | null>(null);
-
-  const projectNames = useMemo(
-    () => new Map(projects.map((project) => [project.id, project.name])),
-    [projects],
-  );
-  const projectKey = projects.map((project) => project.id).join("\n");
-
-  const refresh = useCallback(() => {
-    rpc
-      .call("list")
-      .then(({ assignments }) => {
-        setEmojiByProject(
-          new Map(assignments.map((assignment) => [assignment.projectId, assignment.emoji])),
-        );
-      })
-      .catch((error: unknown) => {
-        console.warn("project-emoji: could not load project icons", error);
-      });
-  }, [rpc]);
-
-  useEffect(refresh, [refresh, projectKey]);
-  useRealtime(REALTIME_CHANNEL, refresh);
-
-  const openPicker = useCallback((projectId: string, anchor: HTMLElement) => {
-    setTarget({ projectId, anchor });
-  }, []);
+  const { emojiByProject, projectNames } = useSidebarState(store);
 
   useEffect(() => {
-    const options = { pluginId, emojiByProject, projectNames, onOpen: openPicker };
+    if (!enabled) return;
+    const options = { pluginId, emojiByProject, projectNames, onOpen: store.openPicker };
     let frame: number | null = null;
     const schedule = () => {
       if (frame !== null) return;
@@ -182,43 +307,97 @@ function ProjectEmojiOverlay() {
       observer.disconnect();
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
-  }, [pluginId, emojiByProject, projectNames, openPicker]);
+  }, [enabled, pluginId, emojiByProject, projectNames, store]);
 
-  useEffect(() => () => removeDecorations(document), []);
+  useEffect(() => (enabled ? () => removeDecorations(document) : undefined), [enabled]);
+}
+
+/**
+ * Loads every project's emoji and color into the store and hosts the picker.
+ * With `domFallback`, it also draws the emoji buttons itself.
+ */
+function ProjectEmojiOverlay({ store, domFallback }: { store: SidebarStore; domFallback: boolean }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const { projects } = experimental_useSidebarThreads();
+  const { emojiByProject, projectNames, picker } = useSidebarState(store);
+
+  // Keyed on content: `projects` can change identity without changing, and
+  // every store update re-renders this component.
+  const projectKey = projects.map((project) => project.id).join("\n");
+  const projectNamesKey = projects.map((project) => `${project.id}\t${project.name}`).join("\n");
+  useEffect(() => {
+    store.update({
+      projectNames: new Map(projects.map((project) => [project.id, project.name])),
+    });
+  }, [store, projectNamesKey]);
+
+  const refresh = useCallback(() => {
+    rpc
+      .call("list")
+      .then(({ assignments, colors }) => {
+        store.update({
+          emojiByProject: new Map(
+            assignments.map((assignment) => [assignment.projectId, assignment.emoji]),
+          ),
+          colorByProject: new Map(colors.map((pin) => [pin.projectId, pin.color])),
+        });
+      })
+      .catch((error: unknown) => {
+        console.warn("project-emoji: could not load project icons", error);
+      });
+  }, [rpc, store]);
+
+  useEffect(refresh, [refresh, projectKey]);
+  useRealtime(REALTIME_CHANNEL, refresh);
+  useDomDecorations(store, domFallback);
+
+  const close = useCallback(() => store.update({ picker: null }), [store]);
 
   const apply = useCallback(
     (projectId: string, request: Promise<{ emoji: string }>) => {
-      setTarget(null);
+      close();
       request
         .then(({ emoji }) => {
-          setEmojiByProject((previous) => new Map(previous).set(projectId, emoji));
+          store.update({
+            emojiByProject: new Map(store.get().emojiByProject).set(projectId, emoji),
+          });
         })
         .catch((error: unknown) => {
           toast.error(`Could not change the project icon: ${errorMessage(error)}`);
         });
     },
-    [],
+    [store, close],
   );
 
-  if (target === null) return null;
+  if (picker === null) return null;
   return (
     <EmojiPicker
-      key={target.projectId}
-      target={target}
-      projectName={projectNames.get(target.projectId) ?? "project"}
-      current={emojiByProject.get(target.projectId)}
+      key={picker.projectId}
+      target={picker}
+      projectName={projectNames.get(picker.projectId) ?? "project"}
+      current={emojiByProject.get(picker.projectId)}
       onPick={(emoji) =>
-        apply(target.projectId, rpc.call("set", { projectId: target.projectId, emoji }))
+        apply(picker.projectId, rpc.call("set", { projectId: picker.projectId, emoji }))
       }
-      onReset={() => apply(target.projectId, rpc.call("reset", { projectId: target.projectId }))}
-      onClose={() => setTarget(null)}
+      onReset={() => apply(picker.projectId, rpc.call("reset", { projectId: picker.projectId }))}
+      onClose={close}
     />
   );
 }
 
 export default definePluginApp((app) => {
+  const store = createSidebarStore();
+  const slots: SlotsWithProjectDecoration = app.slots;
+  const hasDecorationSlot = slots.experimental_sidebarProjectDecoration !== undefined;
+  slots.experimental_sidebarProjectDecoration?.({
+    id: "project-emoji",
+    title: "Project emoji",
+    useDecoration: (projectId) => useProjectDecoration(store, projectId),
+  });
   app.slots.experimental_appOverlay({
     id: "project-emoji",
-    component: ProjectEmojiOverlay,
+    component: function ProjectEmojiAppOverlay() {
+      return <ProjectEmojiOverlay store={store} domFallback={!hasDecorationSlot} />;
+    },
   });
 });

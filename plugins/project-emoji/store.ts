@@ -1,5 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { EmojiAssignment } from "./contract.js";
+import type { ColorPin, EmojiAssignment } from "./contract.js";
 import { autoEmoji, type ProjectFacts } from "./emoji.js";
 
 type Kv = BbPluginApi["storage"]["kv"];
@@ -89,6 +89,39 @@ export function createEmojiStore(kv: Kv): EmojiStore {
       const stored = await readAll();
       await assignMissing([project], stored);
       return { projectId, ...stored.get(projectId)! };
+    },
+  };
+}
+
+const COLOR_PREFIX = "color:";
+
+export interface ColorStore {
+  list(): Promise<ColorPin[]>;
+  set(projectId: string, color: string): Promise<void>;
+  clear(projectId: string): Promise<void>;
+}
+
+export function createColorStore(kv: Kv): ColorStore {
+  return {
+    async list() {
+      const keys = await kv.list(COLOR_PREFIX);
+      const pins = await Promise.all(
+        keys.map(async (key) => {
+          const color = await kv.get<unknown>(key);
+          return typeof color === "string"
+            ? { projectId: key.slice(COLOR_PREFIX.length), color }
+            : null;
+        }),
+      );
+      return pins.filter((pin) => pin !== null);
+    },
+
+    async set(projectId, color) {
+      await kv.set(`${COLOR_PREFIX}${projectId}`, color);
+    },
+
+    async clear(projectId) {
+      await kv.delete(`${COLOR_PREFIX}${projectId}`);
     },
   };
 }

@@ -49,6 +49,7 @@
     "contract.ts",
     "decorate.ts",
     "emoji.ts",
+    "palette.ts",
     "store.ts",
     "components",
     "lib"
@@ -78,6 +79,8 @@
     "@radix-ui/react-popover": "^1.1.19",
     "@radix-ui/react-select": "^2.3.3",
     "@radix-ui/react-tooltip": "^1.2.12",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
