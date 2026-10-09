@@ -18,6 +18,10 @@
     {
       "name": "pr-review",
       "source": "./plugins/pr-review"
+    },
+    {
+      "name": "cape-policy",
+      "source": "./plugins/cape-policy"
     }
   ]
 }

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "signedOut": {
+    "pluginId": "bb-account",
+    "label": "bb account sign-in",
+    "reason": "Signing in links this machine to a getbb.app identity and credential. Cape keeps bb signed out; a sign-in is revoked and cleared."
+  },
+  "disabledPlugins": [
+    {
+      "pluginId": "bb-account",
+      "label": "bb account",
+      "reason": "The bb-account plugin owns sign-in and the `bb account` CLI; with it disabled, nothing in bb can sign in."
+    },
+    {
+      "pluginId": "bb-ai",
+      "label": "bb cloud AI",
+      "reason": "bb cloud AI sends thread content, diffs, and voice audio to getbb.app for titles, commit messages, and transcription."
+    },
+    {
+      "pluginId": "connect",
+      "label": "bb connect",
+      "reason": "bb connect relays remote access to this machine through a bb-hosted service."
+    }
+  ],
+  "generalSettings": [
+    {
+      "key": "telemetryEnabled",
+      "value": false,
+      "label": "Telemetry",
+      "reason": "Usage analytics leave the machine."
+    }
+  ]
+}

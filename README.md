@@ -8,6 +8,7 @@ not add commits that have to be carried through every upstream sync.
 
 | Plugin | Directory | What it does |
 | --- | --- | --- |
+| `cape-policy` | [plugins/cape-policy](plugins/cape-policy) | Enforces Cape security settings: bb account signed out, bb cloud AI and connect off, telemetry off. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
