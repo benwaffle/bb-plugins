@@ -13,7 +13,7 @@
     "check": "npm run check --workspaces"
   },
   "devDependencies": {
-    "bb-app": "0.44.0"
+    "bb-app": "0.45.0"
   },
   "engines": {
     "node": ">=22.19.0"
