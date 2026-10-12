@@ -69,6 +69,24 @@ once. You can also grant access in `about:addons` > bb for GitHub >
 Permissions. Chrome grants these permissions at install, so it does not show
 a prompt.
 
+## Manual test
+
+Save and test only checks the options page. It does not exercise the GitHub
+button, so test the click in both browsers after a change:
+
+1. Load the extension and set the server URL and token. In Firefox, run
+   `npx web-ext run --source-dir . --firefox /Applications/Firefox.app` from
+   this directory to get a fresh temporary profile.
+2. Open a pull request whose head branch no bb thread uses, such as
+   `https://github.com/cli/cli/pull/1`, and click the bb button. The button
+   must become clickable again and a menu must show
+   `No bb thread is working on <branch>.`
+3. Open a pull request that bb created and click the button. The bb desktop
+   app must switch to its thread.
+4. If the button stays pressed, open the page's Web Console for content
+   script errors. Open the Browser Console (Firefox) or the service worker
+   console (Chrome) for background errors.
+
 ## Server requirement
 
 The extension authenticates with the API token as a bearer header. The bb

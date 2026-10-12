@@ -75,7 +75,9 @@ function findButtonSlot() {
 function sendMessage(message) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError !== undefined) {
+      // Chrome leaves lastError undefined when there is no error; Firefox
+      // sets it to null.
+      if (chrome.runtime.lastError) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
       }

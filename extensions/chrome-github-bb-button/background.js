@@ -48,6 +48,11 @@ async function handleMessage(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  handleMessage(message).then(sendResponse);
+  handleMessage(message).then(sendResponse, (error) =>
+    sendResponse({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }),
+  );
   return true;
 });
