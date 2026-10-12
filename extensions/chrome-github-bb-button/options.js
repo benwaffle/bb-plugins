@@ -1,6 +1,7 @@
 import {
   describeError,
   loadSettings,
+  requestRequiredOrigins,
   saveSettings,
   testConnection,
 } from "./bb-client.js";
@@ -23,6 +24,9 @@ async function restore() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  // Firefox shows the permission prompt only while it is handling user input,
+  // so the request starts before the first await.
+  const granted = requestRequiredOrigins().catch(() => false);
   await saveSettings({
     serverUrl: serverUrlEl.value,
     apiToken: apiTokenEl.value,
@@ -31,6 +35,13 @@ form.addEventListener("submit", async (event) => {
   serverUrlEl.value = settings.serverUrl;
   if (settings.apiToken.length === 0) {
     setStatus("Saved, but the API token is empty.", { error: true });
+    return;
+  }
+  if (!(await granted)) {
+    setStatus(
+      "Saved, but the extension cannot reach bb or GitHub until you allow its site access.",
+      { error: true },
+    );
     return;
   }
   setStatus("Saved. Testing connection…");

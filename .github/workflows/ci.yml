@@ -48,7 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Validate Chrome extension manifests and scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Validate extension manifests and scripts
         run: |
           for manifest in extensions/*/manifest.json; do
             echo "Checking $manifest"
@@ -59,9 +63,25 @@ jobs:
               if (manifest.manifest_version !== 3) {
                 throw new Error(path + ': expected manifest_version 3');
               }
+              if (typeof manifest.browser_specific_settings?.gecko?.id !== 'string') {
+                throw new Error(path + ': expected browser_specific_settings.gecko.id for Firefox');
+              }
+              const background = manifest.background ?? {};
+              if (background.service_worker && !background.scripts) {
+                throw new Error(path + ': Firefox ignores background.service_worker; add background.scripts');
+              }
             " "$manifest"
           done
           for script in extensions/*/*.js; do
             echo "Parsing $script"
             node --check "$script"
+          done
+
+      - name: Lint extensions for Firefox
+        run: |
+          for dir in extensions/*/; do
+            echo "Linting $dir"
+            npx --yes web-ext@10.7.0 lint \
+              --source-dir "$dir" \
+              --no-config-discovery
           done

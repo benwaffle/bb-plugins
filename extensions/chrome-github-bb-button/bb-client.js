@@ -17,6 +17,24 @@ export async function saveSettings({ serverUrl, apiToken }) {
   });
 }
 
+// Firefox grants MV3 host permissions and content script matches only when
+// the user allows them, so the extension asks for them from the options page.
+export function requiredOrigins() {
+  const manifest = chrome.runtime.getManifest();
+  return [
+    ...manifest.host_permissions,
+    ...manifest.content_scripts.flatMap((script) => script.matches),
+  ];
+}
+
+export function hasRequiredOrigins() {
+  return chrome.permissions.contains({ origins: requiredOrigins() });
+}
+
+export function requestRequiredOrigins() {
+  return chrome.permissions.request({ origins: requiredOrigins() });
+}
+
 export function normalizeServerUrl(value) {
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
