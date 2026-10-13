@@ -20,10 +20,6 @@
       "source": "./plugins/pr-review"
     },
     {
-      "name": "cape-policy",
-      "source": "./plugins/cape-policy"
-    },
-    {
       "name": "claude-title",
       "source": "./plugins/claude-title"
     }

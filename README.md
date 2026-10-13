@@ -8,7 +8,6 @@ not add commits that have to be carried through every upstream sync.
 
 | Plugin | Directory | What it does |
 | --- | --- | --- |
-| `cape-policy` | [plugins/cape-policy](plugins/cape-policy) | Enforces Cape security settings: bb account signed out, bb cloud AI and connect off, telemetry off. |
 | `claude-title` | [plugins/claude-title](plugins/claude-title) | Thread titles and commit messages from your Claude Code login, with a small model. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
