@@ -45,6 +45,7 @@
     "PLUGIN_OVERVIEW.md",
     "contract.ts",
     "server.ts",
+    "retitle.ts",
     "host.ts"
   ],
   "scripts": {

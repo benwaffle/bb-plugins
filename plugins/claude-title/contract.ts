@@ -24,6 +24,8 @@ export const claudePathSchema = z
 
 export const maxTitleLengthSchema = z.number().int().min(10).max(BB_TITLE_WIDTH);
 
+export const retitleAfterTurnsSchema = z.number().int().min(0).max(1_000);
+
 /** `null` searches PATH and the usual install directories. */
 const claudePathInput = z.string().min(1).nullable();
 

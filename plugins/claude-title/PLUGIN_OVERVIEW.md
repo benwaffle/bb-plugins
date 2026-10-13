@@ -5,6 +5,8 @@ Name your bb threads and write commit messages with the Claude Code login you al
 - A `Claude Code` AI service that bb uses for thread titles and commit messages.
 - `bb claude-title status` shows whether `claude` is installed and logged in, how long the last reply took, and which service titles and commit messages use.
 - `bb claude-title test "<first message>"` shows the title a new thread with that message would get, and how long it took.
+- Titles for threads bb leaves unnamed. bb titles a thread only from a first message of five words or more, so a thread started with "demo bash cmds" keeps that text as its name. After such a thread's first turn, the plugin titles it from the first message and the first reply.
+- `bb claude-title retitle <threadId>` titles a thread again from its conversation so far.
 
 ## How it works
 
@@ -22,3 +24,4 @@ With bb cloud off or signed out, the Automatic choice for titles and commit mess
 - **Claude model**: the model or alias claude runs.
 - **claude path**: an absolute path to `claude`, when it is not on `PATH` or in `~/.local/bin`, `~/.claude/local`, or a Homebrew bin directory.
 - **Max title length**: the length the model is asked to keep titles under, up to bb's 48.
+- **Re-title after turns**: title a thread the plugin named once more after this many further turns. Off (0) by default. A title you typed is never replaced.

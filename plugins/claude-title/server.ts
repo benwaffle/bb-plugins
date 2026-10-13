@@ -7,12 +7,14 @@ import {
   claudeModelSchema,
   claudePathSchema,
   maxTitleLengthSchema,
+  retitleAfterTurnsSchema,
   type ClaudeStatus,
   type CompleteOutput,
 } from "./contract.js";
+import { createRetitler } from "./retitle.js";
 
 const CLI_NAME = "claude-title";
-const USAGE = `Usage: bb ${CLI_NAME} <status | test [--raw] "<prompt>"> [--json]`;
+const USAGE = `Usage: bb ${CLI_NAME} <status | test [--raw] "<prompt>" | retitle <threadId>> [--json]`;
 // bb abandons a title or commit message after 8s. claude gets 6.5s and the
 // host call half a second more, so a slow reply fails here with a reason
 // instead of as a bare bb timeout.
@@ -184,6 +186,14 @@ export default function plugin(bb: BbPluginApi): void {
       experimental_schema: maxTitleLengthSchema,
       default: BB_TITLE_WIDTH,
     },
+    retitleAfterTurns: {
+      type: "number",
+      label: "Re-title after turns",
+      description:
+        "After the plugin titles a thread from its first turn, title it once more from the conversation when this many more turns have finished. 0 turns this off. Titles you typed are never replaced.",
+      experimental_schema: retitleAfterTurnsSchema,
+      default: 0,
+    },
   });
 
   const host = bb.hosts.experimental_client({ contract: claudeHostContract });
@@ -200,14 +210,15 @@ export default function plugin(bb: BbPluginApi): void {
   async function runComplete(
     prompt: string,
     signal: AbortSignal | undefined,
+    timeoutMs = COMPLETE_TIMEOUT_MS,
   ): Promise<CompleteOutput> {
     const [hostId, values] = await Promise.all([readHostId(bb), hostSettings()]);
     return host.call(
       "complete",
-      { prompt, ...values, timeoutMs: COMPLETE_TIMEOUT_MS },
+      { prompt, ...values, timeoutMs },
       {
         hostId,
-        timeoutMs: COMPLETE_TIMEOUT_MS + HOST_CALL_GRACE_MS,
+        timeoutMs: timeoutMs + HOST_CALL_GRACE_MS,
         ...(signal === undefined ? {} : { signal }),
       },
     );
@@ -246,6 +257,17 @@ export default function plugin(bb: BbPluginApi): void {
     },
   });
 
+  const retitler = createRetitler({
+    bb,
+    complete: (prompt, timeoutMs, signal) => runComplete(prompt, signal, timeoutMs),
+    maxTitleLength: async () => (await settings.get()).maxTitleLength,
+    retitleAfterTurns: async () => (await settings.get()).retitleAfterTurns,
+    titlesRouteHere: async () =>
+      describeRouting(await bb.sdk.system.aiServices(), "thread-title", bb.pluginId)
+        .usesClaude,
+  });
+  bb.events.on("thread.idle", (payload) => retitler.onIdle(payload));
+
   bb.cli.register({
     name: CLI_NAME,
     summary: "Thread titles and commit messages from your Claude Code login",
@@ -261,6 +283,12 @@ export default function plugin(bb: BbPluginApi): void {
         summary:
           "Title a sample first message the way a new thread would, and time it; --raw sends the prompt as-is",
         usage: `bb ${CLI_NAME} test [--raw] "<prompt>" [--json]`,
+      },
+      {
+        name: "retitle",
+        summary:
+          "Title a thread from its conversation so far, replacing its current title",
+        usage: `bb ${CLI_NAME} retitle <threadId> [--json]`,
       },
     ],
     async run(argv, ctx) {
@@ -335,6 +363,14 @@ export default function plugin(bb: BbPluginApi): void {
                   totalMs,
                 })
               : `${result.text}\nclaude ${formatSeconds(result.durationMs)}, total ${formatSeconds(totalMs)}`,
+          };
+        }
+        if (parsed.command === "retitle" && parsed.positionals.length === 1) {
+          const [threadId = ""] = parsed.positionals;
+          const title = await retitler.retitle(threadId, ctx.signal);
+          return {
+            exitCode: 0,
+            stdout: parsed.json ? JSON.stringify({ threadId, title }) : title,
           };
         }
         return { exitCode: 1, stderr: USAGE };
