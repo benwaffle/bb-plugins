@@ -270,23 +270,31 @@ export function sortQueue<T extends Ranked>(
   );
 }
 
-export type AgentState = "none" | "opened" | "reviewing" | "brief-ready" | "follow-ups";
+export type AgentState = "none" | "opened" | "reviewing" | "reviewed" | "follow-ups";
+
+export interface UserMessage {
+  createdAt: number;
+  text: string;
+}
+
+/** Whether a user message sends `reviewCommand` on any of its lines. */
+export function isReviewMessage(text: string, reviewCommand: string): boolean {
+  return text.split("\n").some((line) => line.trim().startsWith(reviewCommand));
+}
 
 /**
- * A review thread opens with one context message and runs the review only when
- * a later message starts with `reviewCommand`. Messages after the last review
- * request are follow-ups.
+ * A review thread is `opened` until the review command is sent, at
+ * `reviewedAt`. Then it is `reviewing` while the agent runs and `reviewed`
+ * after, until a later user message makes it `follow-ups`.
  */
 export function agentState(
-  thread: { userMessages: readonly string[]; isRunning: boolean } | null,
-  reviewCommand: string,
+  thread: { userMessages: readonly UserMessage[]; reviewedAt: number | null; isRunning: boolean } | null,
 ): AgentState {
   if (thread === null) return "none";
-  const { userMessages } = thread;
-  const lastReview = userMessages.map((message) => message.startsWith(reviewCommand)).lastIndexOf(true);
-  if (lastReview === -1) return userMessages.length > 1 ? "follow-ups" : "opened";
-  if (lastReview < userMessages.length - 1) return "follow-ups";
-  return thread.isRunning ? "reviewing" : "brief-ready";
+  const { reviewedAt } = thread;
+  if (reviewedAt === null) return "opened";
+  if (thread.userMessages.some((message) => message.createdAt > reviewedAt)) return "follow-ups";
+  return thread.isRunning ? "reviewing" : "reviewed";
 }
 
 /** Whether the viewer's review is requested, or their approval predates the head. */

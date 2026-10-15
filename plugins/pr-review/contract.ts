@@ -30,6 +30,11 @@ const reviewStateSchema = z.enum([
   "PENDING",
 ]);
 
+const agentSchema = z.object({
+  state: z.enum(["none", "opened", "reviewing", "reviewed", "follow-ups"]),
+  threadId: z.string().nullable(),
+});
+
 export const queueEntrySchema = z.object({
   repo: repoSchema,
   number: z.number().int().positive(),
@@ -70,10 +75,7 @@ export const queueEntrySchema = z.object({
   otherReviews: z.array(
     z.object({ login: z.string(), avatarUrl: z.string().nullable(), state: reviewStateSchema }),
   ),
-  agent: z.object({
-    state: z.enum(["none", "opened", "reviewing", "brief-ready", "follow-ups"]),
-    threadId: z.string().nullable(),
-  }),
+  agent: agentSchema,
 });
 export type QueueEntry = z.infer<typeof queueEntrySchema>;
 

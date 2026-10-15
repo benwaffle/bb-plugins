@@ -61,7 +61,11 @@ teams and you have not reviewed yet. Columns:
 | Size | Additions, deletions, and changed files. |
 | Reviews | The latest review state and avatar of every human reviewer other than you. |
 | Me | `requested`, `commented`, `changes requested`, `approved`, `approved, new commits`, `author`, or `—`. |
-| Agent | `—` when there is no review thread, `opened` before the review runs, `reviewing` while it runs, `brief ready` after it, `follow-ups` once you sent other messages. |
+| Agent | `—` when there is no review thread, `opened` until the review command is sent, `reviewing` while it runs, `reviewed` after it, and `follow-ups` once you sent a message after the review. |
+
+The review command counts when `bb pr-review review` sends it, or when any
+line of a message you send starts with it. Each message is checked once, and
+the time of the last review is kept in the plugin database.
 
 Click a row, or its **Review** button, to open the PR's review thread; one is
 started when there is none. The icons at the row's end open the PR in the
@@ -196,6 +200,10 @@ Refs live in the plugin's SQLite database, one row per thread and ref:
 `thread_id`, `kind` (`gh-pr`, `gh-issue`, or `jira`), `key` (`owner/repo#n`
 or `ACME-n`), `url`, `title`, and `source` (`review-target`, `environment`,
 `title`, `body`, `fixes`, `refs`, `mention`, or `sibling`).
+
+The `reviews` table has one row per review thread: `reviewed_at`, the time
+the review command was last sent, and `scanned_through`, the time of the
+newest message checked for it.
 
 ## Limits
 

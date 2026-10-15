@@ -69,7 +69,7 @@ const AGENT_LABELS: Record<QueueEntry["agent"]["state"], string> = {
   none: "—",
   opened: "opened",
   reviewing: "reviewing",
-  "brief-ready": "brief ready",
+  reviewed: "reviewed",
   "follow-ups": "follow-ups",
 };
 

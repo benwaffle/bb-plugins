@@ -19,10 +19,12 @@ import {
 import {
   agentState,
   classifyPull,
+  isReviewMessage,
   pullKey,
   sortQueue,
   stackLinks,
   type PullSnapshot,
+  type UserMessage,
   type Viewer,
 } from "./queue.js";
 import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
@@ -273,30 +275,48 @@ export function createPlugin(deps: PluginDeps) {
       }
     }
 
-    async function userMessages(threadId: string): Promise<string[]> {
+    async function userMessages(threadId: string): Promise<UserMessage[]> {
       const history = await bb.sdk.threads.promptHistory({ threadId });
       return [...history]
         .sort((left, right) => left.createdAt - right.createdAt)
-        .map((entry) =>
-          entry.input
+        .map((entry) => ({
+          createdAt: entry.createdAt,
+          text: entry.input
             .flatMap((part) => (part.type === "text" ? [part.text] : []))
             .join("\n")
             .trim(),
-        );
+        }));
+    }
+
+    /**
+     * When the review command was last sent to the thread: by `runReview`, or
+     * typed into a message. Each message is scanned for the command once, and
+     * the result is kept in the plugin database, so a review stays known after
+     * its message leaves the prompt history bb returns.
+     */
+    function lastReviewAt(threadId: string, messages: readonly UserMessage[]): number | null {
+      const { reviewedAt, scannedThrough } = store.review(threadId);
+      const unscanned = messages.filter((message) => message.createdAt > scannedThrough);
+      const newest = unscanned.at(-1);
+      if (newest === undefined) return reviewedAt;
+      const found = unscanned.filter((message) => isReviewMessage(message.text, REVIEW_COMMAND)).at(-1);
+      store.recordScan(threadId, newest.createdAt, found?.createdAt ?? null);
+      return found === undefined ? reviewedAt : Math.max(found.createdAt, reviewedAt ?? 0);
     }
 
     async function threadAgentState(threadId: string | undefined): Promise<QueueEntry["agent"]> {
       if (threadId === undefined) return { state: "none", threadId: null };
       const thread = await liveThread(threadId);
       if (thread === null) return { state: "none", threadId: null };
-      let messages: string[] = [];
+      let messages: UserMessage[] = [];
       try {
         messages = await userMessages(threadId);
       } catch (error) {
         bb.log.warn(`could not read prompt history for ${threadId}: ${errorMessage(error)}`);
       }
       const isRunning = thread.status === "active" || thread.status === "starting";
-      return { state: agentState({ userMessages: messages, isRunning }, REVIEW_COMMAND), threadId };
+      const reviewedAt = lastReviewAt(threadId, messages);
+      return { state: agentState({ userMessages: messages, reviewedAt, isRunning }), threadId };
     }
 
     async function reviewQueue(refresh: boolean) {
@@ -653,6 +673,7 @@ export function createPlugin(deps: PluginDeps) {
         mode: "auto",
         input: [{ type: "text", text: reviewCommand(number), mentions: [] }],
       });
+      store.recordReview(threadId, deps.now());
       bb.realtime.publish(REFS_CHANNEL, { threadId });
       return { delivery: result.delivery };
     }
@@ -710,8 +731,8 @@ export function createPlugin(deps: PluginDeps) {
           others.map(async (otherId) => {
             const thread = await liveThread(otherId);
             if (thread === null) return null;
-            const messages = await userMessages(otherId).catch(() => [] as string[]);
-            const first = messages[0] ?? null;
+            const messages = await userMessages(otherId).catch(() => [] as UserMessage[]);
+            const first = messages[0]?.text ?? null;
             const refs = store.forThread(otherId);
             return {
               threadId: otherId,

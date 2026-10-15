@@ -281,6 +281,62 @@ describe("review", () => {
   });
 });
 
+describe("agent state", () => {
+  type Message = { createdAt: number; text: string };
+  const agentStates = async (harness: Awaited<ReturnType<typeof load>>["harness"]) => {
+    const queue = (await harness.callRpc("reviewQueue", { refresh: false })) as {
+      entries: Array<{ number: number; agent: { state: string } }>;
+    };
+    return queue.entries.find((entry) => entry.number === 596)?.agent.state;
+  };
+  const history = (harness: Awaited<ReturnType<typeof load>>["harness"], messages: Message[]) =>
+    harness.sdk.stub("threads.promptHistory", async () =>
+      messages.map((message, index) => ({
+        id: `msg_${index}`,
+        createdAt: message.createdAt,
+        input: [{ type: "text", text: message.text, mentions: [] }],
+      })),
+    );
+
+  it("is reviewing, then reviewed, after the review command, and follow-ups after a later message", async () => {
+    const { harness, threads, clock } = await load();
+    await harness.runCli(["review", "596"]);
+    expect(await agentStates(harness)).toBe("reviewing");
+    threads.get("thr_1")!.status = "idle";
+    expect(await agentStates(harness)).toBe("reviewed");
+    history(harness, [
+      { createdAt: 1, text: "Review context" },
+      { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
+    ]);
+    expect(await agentStates(harness)).toBe("reviewed");
+    history(harness, [
+      { createdAt: 1, text: "Review context" },
+      { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
+      { createdAt: clock.now + 2_000, text: "Why?" },
+    ]);
+    expect(await agentStates(harness)).toBe("follow-ups");
+  });
+
+  it("finds a review command typed into the thread, on any line, and keeps it once it leaves the history", async () => {
+    const { harness, threads } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    threads.get("thr_1")!.status = "idle";
+    history(harness, [
+      { createdAt: 1, text: "Review context" },
+      { createdAt: 5, text: "What does this change?" },
+    ]);
+    expect(await agentStates(harness)).toBe("opened");
+    history(harness, [
+      { createdAt: 1, text: "Review context" },
+      { createdAt: 5, text: "What does this change?" },
+      { createdAt: 9, text: `Look at the cache first.\n${REVIEW_COMMAND} 596` },
+    ]);
+    expect(await agentStates(harness)).toBe("reviewed");
+    history(harness, [{ createdAt: 12, text: "Fix the first finding" }]);
+    expect(await agentStates(harness)).toBe("follow-ups");
+  });
+});
+
 describe("reviewQueue", () => {
   it("returns open PRs with tickets and the agent thread state", async () => {
     const { harness } = await load();

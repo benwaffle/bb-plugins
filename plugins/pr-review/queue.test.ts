@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   agentState,
   classifyPull,
+  isReviewMessage,
   needsViewer,
   queueSections,
   sortQueue,
@@ -198,25 +199,37 @@ describe("sortQueue", () => {
   });
 });
 
-describe("agentState", () => {
+describe("isReviewMessage", () => {
   const COMMAND = "/tncqr review pr";
-  const state = (userMessages: string[], isRunning: boolean) => agentState({ userMessages, isRunning }, COMMAND);
 
-  it("reports a thread with only its context message as opened, running or not", () => {
-    expect(agentState(null, COMMAND)).toBe("none");
-    expect(state(["Review context"], true)).toBe("opened");
-    expect(state(["Review context"], false)).toBe("opened");
+  it("finds the review command on any line of a message", () => {
+    expect(isReviewMessage(`${COMMAND} 596`, COMMAND)).toBe(true);
+    expect(isReviewMessage(`Review context\n- Ticket ACME-51\n\n${COMMAND} 539`, COMMAND)).toBe(true);
+    expect(isReviewMessage(`Run ${COMMAND} 596 later`, COMMAND)).toBe(false);
+    expect(isReviewMessage("Review context", COMMAND)).toBe(false);
+  });
+});
+
+describe("agentState", () => {
+  const messages = (...times: number[]) => times.map((createdAt) => ({ createdAt, text: "message" }));
+  const state = (createdAt: number[], reviewedAt: number | null, isRunning: boolean) =>
+    agentState({ userMessages: messages(...createdAt), reviewedAt, isRunning });
+
+  it("reports a thread without a review as opened, whatever else it was sent", () => {
+    expect(agentState(null)).toBe("none");
+    expect(state([1], null, true)).toBe("opened");
+    expect(state([1, 2, 3], null, false)).toBe("opened");
   });
 
-  it("reports reviewing, then brief ready, once the review command is sent", () => {
-    expect(state(["Review context", `${COMMAND} 596`], true)).toBe("reviewing");
-    expect(state(["Review context", `${COMMAND} 596`], false)).toBe("brief-ready");
+  it("reports reviewing, then reviewed, once the review command is sent", () => {
+    expect(state([1, 2], 2, true)).toBe("reviewing");
+    expect(state([1, 2], 2, false)).toBe("reviewed");
+    expect(state([1], 5, true)).toBe("reviewing");
   });
 
-  it("reports follow-ups for messages after the context or the last review", () => {
-    expect(state(["Review context", "What does this change do?"], false)).toBe("follow-ups");
-    expect(state(["Review context", `${COMMAND} 596`, "Fix the first finding"], true)).toBe("follow-ups");
-    expect(state(["Review context", `${COMMAND} 596`, "Why?", `${COMMAND} 596`], true)).toBe("reviewing");
+  it("reports follow-ups for messages after the last review", () => {
+    expect(state([1, 2, 3], 2, true)).toBe("follow-ups");
+    expect(state([1, 2, 3, 4], 4, false)).toBe("reviewed");
   });
 });
 
