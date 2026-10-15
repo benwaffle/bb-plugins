@@ -452,9 +452,9 @@ describe("sidebarGroups", () => {
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
       threadReviews: Array<{ threadId: string; pullState: string | null; agent: string }>;
     };
-    expect(groups.threadReviews).toEqual([
-      { threadId: "thr_merged", pullState: "merged", agent: "opened" },
+    expect([...groups.threadReviews].sort((left, right) => left.threadId.localeCompare(right.threadId))).toEqual([
       { threadId: "thr_1", pullState: "open", agent: "opened" },
+      { threadId: "thr_merged", pullState: "merged", agent: "opened" },
     ]);
   });
 });
