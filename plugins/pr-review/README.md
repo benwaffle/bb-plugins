@@ -149,8 +149,18 @@ column.
 
 ## Related threads
 
-The thread panel's **Related threads** action opens a tab that lists other
-threads that have the same ticket ref, with their title and first message.
+The thread panel's **Related threads** action opens a tab that lists the other
+PRs and threads on the thread's ticket:
+
+- each other thread with the same ticket ref. A thread with a PR shows the PR
+  number and title, the PR state (`open`, `draft`, `merged`, or `closed`), and
+  the agent state. A thread without a PR shows its title and agent state;
+- each open PR on the ticket that has no review thread and is not yours,
+  with a **Start** button.
+
+PRs come first, by number, then threads without a PR. Click an item to open
+its thread, with the GitHub PR column docked. The state of a PR that is no
+longer open is read with `gh pr view` and kept until the plugin restarts.
 
 ## Settings
 
@@ -186,6 +196,10 @@ with `-` for no ticket; your own PRs are left out. `start` prints `started` or `
 and the thread id. `review` opens the thread if needed, sends the review
 command, and prints `sent` or `queued` and the thread id. A bare number uses
 the first configured repository.
+
+`related` prints one `owner/repo#n PR-state agent-state threadId title` line
+per item of the Related threads tab, with `-` for no PR, no PR state, or no
+thread.
 
 `refs` prints one `kind key source title url` line per ref and the workspace
 path. A thread's refs are its PR, its ticket, issues from

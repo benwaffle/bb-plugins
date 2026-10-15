@@ -107,6 +107,9 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
     if (line.startsWith("gh api user/teams")) return "acme/platform\n";
     if (line.startsWith("gh api graphql")) return openPulls(nodes);
     if (line.startsWith("gh pr view 596")) return PULL_VIEW;
+    if (line.startsWith("gh pr view 534 -R acme/widgets --json state,isDraft")) {
+      return JSON.stringify({ state: "MERGED", isDraft: false });
+    }
     if (line.startsWith("gh issue view 12")) return JSON.stringify({ title: "Stale prices after a currency change" });
     if (line.startsWith("twg jira workitem get ")) {
       await twg.gate;
@@ -429,29 +432,50 @@ describe("sidebarGroups", () => {
 });
 
 describe("related threads", () => {
-  it("lists other threads sharing the ticket", async () => {
+  it("lists the ticket's other threads with PR and agent state, then its open PRs without a thread", async () => {
     const { harness, bb } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
-    store.record("thr_other", [
-      { kind: "jira", key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" },
+    const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
+    store.record("thr_merged", [
+      ticket,
+      { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
     ]);
+    store.record("thr_notes", [ticket]);
     harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
       id: threadId,
       environmentId: "env_review",
       status: "idle",
-      title: threadId === "thr_other" ? "Implement ACME-51" : "widgets#596",
+      title: threadId === "thr_notes" ? "Plan ACME-51" : "#534 Drop the old cache",
       titleFallback: null,
       deletedAt: null,
       updatedAt: 1,
     }));
-    const related = (await harness.callRpc("relatedThreads", { threadId: "thr_1" })) as {
-      tickets: string[];
-      threads: Array<{ threadId: string; title: string; firstMessage: string | null }>;
-    };
-    expect(related.tickets).toEqual(["ACME-51"]);
-    expect(related.threads).toEqual([
-      expect.objectContaining({ threadId: "thr_other", title: "Implement ACME-51", firstMessage: "Review context" }),
+    const related = await harness.callRpc("relatedThreads", { threadId: "thr_1" });
+    expect(related).toEqual({
+      githubPanel: true,
+      tickets: ["ACME-51"],
+      items: [
+        {
+          title: "Drop the old cache",
+          pull: { repo: REPO, number: 534, url: `https://github.com/${REPO}/pull/534`, state: "merged" },
+          agent: { state: "opened", threadId: "thr_merged" },
+        },
+        {
+          title: "Evict the old catalog entry",
+          pull: { repo: REPO, number: 599, url: `https://github.com/${REPO}/pull/599`, state: "open" },
+          agent: { state: "none", threadId: null },
+        },
+        { title: "Plan ACME-51", pull: null, agent: { state: "opened", threadId: "thr_notes" } },
+      ],
+    });
+
+    const cli = await harness.runCli(["related", "thr_1"]);
+    expect(cli.stdout.split("\n")).toEqual([
+      `${REPO}#534\tmerged\topened\tthr_merged\tDrop the old cache`,
+      `${REPO}#599\topen\tnone\t-\tEvict the old catalog entry`,
+      "-\t-\topened\tthr_notes\tPlan ACME-51",
+      "",
     ]);
   });
 });

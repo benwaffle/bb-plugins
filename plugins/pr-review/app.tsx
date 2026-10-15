@@ -342,12 +342,14 @@ function SectionHeading({
   );
 }
 
+type ReviewTarget = Pick<QueueEntry, "repo" | "number" | "agent">;
+
 function useStartReview(githubPanel: boolean) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [starting, setStarting] = useState<string | null>(null);
   const review = useCallback(
-    (entry: QueueEntry) => {
+    (entry: ReviewTarget) => {
       if (entry.agent.threadId !== null) {
         openReviewThread(navigate, entry.agent.threadId, entry.number, githubPanel);
         return;
@@ -654,9 +656,63 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
   );
 }
 
+function RelatedItemRow({
+  item,
+  githubPanel,
+  starting,
+  onReview,
+}: {
+  item: Related["items"][number];
+  githubPanel: boolean;
+  starting: boolean;
+  onReview: (target: ReviewTarget) => void;
+}) {
+  const navigate = useBbNavigate();
+  const { pull, agent } = item;
+  const open = () => {
+    if (pull !== null) onReview({ repo: pull.repo, number: pull.number, agent });
+    else if (agent.threadId !== null) navigate.toThread(agent.threadId);
+  };
+  const details = [
+    ...(pull === null || pull.state === null ? [] : [pull.state]),
+    ...(agent.threadId === null ? [] : [`agent ${AGENT_LABELS[agent.state]}`]),
+  ];
+  return (
+    <li className="flex items-start gap-2 rounded-md border border-border p-2">
+      <button
+        type="button"
+        disabled={starting}
+        onClick={open}
+        className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <div className={`flex items-baseline gap-1.5 text-sm ${pull?.state === "open" ? "font-medium" : "text-muted-foreground"}`}>
+          {pull === null ? null : <span className="shrink-0">#{pull.number}</span>}
+          <span className="hover:underline">{item.title}</span>
+        </div>
+        {details.length === 0 ? null : <div className="text-xs text-muted-foreground">{details.join(" · ")}</div>}
+      </button>
+      {pull !== null && agent.threadId === null ? (
+        <button type="button" className={buttonClass} disabled={starting} onClick={open}>
+          {starting ? "Starting…" : "Start"}
+        </button>
+      ) : null}
+      {pull !== null && githubPanel ? (
+        <button
+          type="button"
+          className={iconButtonClass}
+          title="Open in the GitHub panel"
+          aria-label="Open in the GitHub panel"
+          onClick={() => openPull(navigate, true, `${pull.repo}#${pull.number}`, pull.url)}
+        >
+          <Icon name="GitPullRequest" className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
 function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
   const [related, setRelated] = useState<Load<Related>>({ status: "loading" });
   const load = useCallback(() => {
     rpc
@@ -666,38 +722,29 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   }, [rpc, threadId]);
   useEffect(load, [load]);
   useRealtime(REFS_CHANNEL, () => load());
+  const { starting, review } = useStartReview(related.status === "ready" && related.value.githubPanel);
 
   if (related.status === "loading") return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (related.status === "error") return <p className="text-sm text-destructive">{related.message}</p>;
-  const { tickets, threads } = related.value;
+  const { tickets, items, githubPanel } = related.value;
   if (tickets.length === 0) {
     return <p className="text-sm text-muted-foreground">This thread has no ticket ref.</p>;
   }
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Other threads on {tickets.join(", ")}</p>
-      {threads.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No other threads share this ticket.</p>
+      <p className="text-xs text-muted-foreground">Other PRs and threads on {tickets.join(", ")}</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No other PRs or threads share this ticket.</p>
       ) : (
         <ul className="space-y-2">
-          {threads.map((thread) => (
-            <li key={thread.threadId}>
-              <button
-                type="button"
-                onClick={() => navigate.toThread(thread.threadId)}
-                className="w-full rounded-md border border-border p-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <div className="text-sm font-medium">{thread.title}</div>
-                {thread.pulls.length === 0 ? null : (
-                  <div className="text-xs text-muted-foreground">{thread.pulls.join(", ")}</div>
-                )}
-                {thread.firstMessage === null ? null : (
-                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-muted-foreground">
-                    {thread.firstMessage}
-                  </p>
-                )}
-              </button>
-            </li>
+          {items.map((item) => (
+            <RelatedItemRow
+              key={item.pull === null ? item.agent.threadId : `${item.pull.repo}#${item.pull.number}:${item.agent.threadId ?? ""}`}
+              item={item}
+              githubPanel={githubPanel}
+              starting={item.pull !== null && starting === `${item.pull.repo}#${item.pull.number}`}
+              onReview={review}
+            />
           ))}
         </ul>
       )}

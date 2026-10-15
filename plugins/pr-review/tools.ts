@@ -199,6 +199,16 @@ export function parsePullView(raw: string): PullView {
   return pullViewSchema.parse(JSON.parse(raw));
 }
 
+const pullStateSchema = z.object({ state: z.enum(["OPEN", "CLOSED", "MERGED"]), isDraft: z.boolean() });
+
+export const PULL_STATE_FIELDS = "state,isDraft";
+
+export function parsePullState(raw: string): "open" | "draft" | "merged" | "closed" {
+  const { state, isDraft } = pullStateSchema.parse(JSON.parse(raw));
+  if (state === "OPEN") return isDraft ? "draft" : "open";
+  return state === "MERGED" ? "merged" : "closed";
+}
+
 const pullListSchema = z.array(
   z.object({ number: z.number(), title: z.string(), url: z.string() }),
 );

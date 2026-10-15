@@ -5,7 +5,7 @@ import {
   type BbPluginApi,
 } from "@get-bb/plugin-sdk";
 import { REFS_CHANNEL } from "./channel.js";
-import { rpcContract, type QueueEntry, type ThreadRef, type Ticket } from "./contract.js";
+import { rpcContract, type QueueEntry, type RelatedResult, type ThreadRef, type Ticket } from "./contract.js";
 import {
   githubRefs,
   githubUrl,
@@ -30,10 +30,12 @@ import {
 import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
 import {
   OPEN_PULLS_QUERY,
+  PULL_STATE_FIELDS,
   PULL_VIEW_FIELDS,
   createToolResolver,
   parseIssueTitle,
   parseOpenPulls,
+  parsePullState,
   parsePullView,
   parseTwgWorkItems,
   runCommand,
@@ -42,6 +44,9 @@ import {
 } from "./tools.js";
 
 export { rpcContract };
+
+type RelatedItem = RelatedResult["items"][number];
+type RelatedPullState = NonNullable<RelatedItem["pull"]>["state"];
 
 const GITHUB_PLUGIN_ID = "github";
 const WORKTREE_PROVIDER_ID = "git-worktree";
@@ -55,7 +60,6 @@ const VIEWER_TTL_MS = 60 * 60_000;
 const ENVIRONMENT_READY_TIMEOUT_MS = 5 * 60_000;
 const ENVIRONMENT_POLL_MS = 2_000;
 const PULL_LINK_TIMEOUT_MS = 30_000;
-const FIRST_MESSAGE_LIMIT = 400;
 
 interface Cached<T> {
   value: T;
@@ -718,42 +722,87 @@ export function createPlugin(deps: PluginDeps) {
       };
     }
 
-    async function relatedThreads(threadId: string) {
-      const tickets = store
-        .forThread(threadId)
-        .filter((ref) => ref.kind === "jira")
-        .map((ref) => ref.key);
+    const pullStates = new Map<string, Cached<NonNullable<RelatedPullState>>>();
+
+    /** A PR's state from GitHub; merged and closed states are kept for good. */
+    async function pullState(repo: string, number: number): Promise<RelatedPullState> {
+      const key = pullKey(repo, number);
+      const cached = pullStates.get(key);
+      if (cached !== undefined && (cached.value === "merged" || cached.value === "closed" || fresh(cached, QUEUE_TTL_MS))) {
+        return cached.value;
+      }
+      try {
+        const state = parsePullState(await gh(["pr", "view", String(number), "-R", repo, "--json", PULL_STATE_FIELDS], 15_000));
+        pullStates.set(key, { value: state, at: Date.now() });
+        return state;
+      } catch (error) {
+        bb.log.warn(`could not read the state of ${key}: ${errorMessage(error)}`);
+        return null;
+      }
+    }
+
+    function isReviewPull(ref: ThreadRef): boolean {
+      return ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment");
+    }
+
+    /**
+     * PRs and threads that share a ticket with `threadId`: each other thread
+     * with that ticket ref, with its PR's state when it has one, and each open
+     * PR on the ticket that has no such thread and is not the viewer's.
+     */
+    async function relatedThreads(threadId: string): Promise<RelatedResult> {
+      const ownRefs = store.forThread(threadId);
+      const tickets = ownRefs.filter((ref) => ref.kind === "jira").map((ref) => ref.key);
+      if (tickets.length === 0) return { githubPanel: await githubPanel(), tickets, items: [] };
+      const ownPulls = new Set(ownRefs.filter(isReviewPull).map((ref) => ref.key));
+      const withoutTicket = (title: string) => tickets.reduce((stripped, key) => titleWithoutTicket(stripped, key), title);
+      const queue = await reviewQueue(false);
+      const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
       const others = [...new Set(tickets.flatMap((key) => store.threadsWith("jira", key)))].filter(
         (other) => other !== threadId,
       );
-      const threads = (
+      const threadItems = (
         await Promise.all(
-          others.map(async (otherId) => {
+          others.map(async (otherId): Promise<RelatedItem | null> => {
             const thread = await liveThread(otherId);
             if (thread === null) return null;
-            const messages = await userMessages(otherId).catch(() => [] as UserMessage[]);
-            const first = messages[0]?.text ?? null;
-            const refs = store.forThread(otherId);
+            const threadTitle = thread.title ?? thread.titleFallback ?? otherId;
+            const ref = store.forThread(otherId).find(isReviewPull);
+            const parsed = ref === undefined ? null : parseRepoKey(ref.key);
+            if (ref === undefined || parsed === null) {
+              return { title: threadTitle, pull: null, agent: await threadAgentState(otherId) };
+            }
+            const entry = queued.get(ref.key);
             return {
-              threadId: otherId,
-              title: thread.title ?? thread.titleFallback ?? otherId,
-              firstMessage:
-                first === null || first.length <= FIRST_MESSAGE_LIMIT
-                  ? first
-                  : `${first.slice(0, FIRST_MESSAGE_LIMIT - 1)}…`,
-              tickets: refs.filter((ref) => ref.kind === "jira").map((ref) => ref.key),
-              pulls: refs
-                .filter((ref) => ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment"))
-                .map((ref) => ref.key),
-              updatedAt: thread.updatedAt,
+              title: withoutTicket(entry?.title ?? ref.title ?? threadTitle),
+              pull: {
+                ...parsed,
+                url: ref.url,
+                state: entry === undefined ? await pullState(parsed.repo, parsed.number) : entry.isDraft ? "draft" : "open",
+              },
+              agent: entry?.agent.threadId === otherId ? entry.agent : await threadAgentState(otherId),
             };
           }),
         )
-      )
-        .filter((thread) => thread !== null)
-        .sort((left, right) => right.updatedAt - left.updatedAt)
-        .map(({ updatedAt: _updatedAt, ...thread }) => thread);
-      return { tickets, threads };
+      ).filter((item) => item !== null);
+      const listed = new Set(
+        threadItems.flatMap((item) => (item.pull === null ? [] : [pullKey(item.pull.repo, item.pull.number)])),
+      );
+      const unstarted = queue.entries
+        .filter((entry) => entry.ticketKey !== null && tickets.includes(entry.ticketKey) && entry.me !== "author")
+        .filter((entry) => !ownPulls.has(pullKey(entry.repo, entry.number)) && !listed.has(pullKey(entry.repo, entry.number)))
+        .map((entry): RelatedItem => ({
+          title: withoutTicket(entry.title),
+          pull: { repo: entry.repo, number: entry.number, url: entry.url, state: entry.isDraft ? "draft" : "open" },
+          agent: entry.agent,
+        }));
+      const items = [...threadItems, ...unstarted].sort(
+        (left, right) =>
+          Number(left.pull === null) - Number(right.pull === null) ||
+          (left.pull?.repo ?? "").localeCompare(right.pull?.repo ?? "") ||
+          (left.pull?.number ?? 0) - (right.pull?.number ?? 0),
+      );
+      return { githubPanel: queue.githubPanel, tickets, items };
     }
 
     bb.rpc.register(rpcContract, {
@@ -880,16 +929,22 @@ export function createPlugin(deps: PluginDeps) {
             },
           }),
           related: cliCommand({
-            summary: "List other threads that share a ticket with a thread",
+            summary: "List the other PRs and threads that share a ticket with a thread",
             positionals: [{ name: "threadId", description: "Thread id", required: true }],
             options: jsonOption,
             async run(input) {
               const result = await relatedThreads(input.positionals.threadId);
               if (input.options.json) return { exitCode: 0, stdout: `${JSON.stringify(result)}\n` };
-              return {
-                exitCode: 0,
-                stdout: result.threads.map((thread) => `${thread.threadId}\t${thread.title}\n`).join(""),
-              };
+              const lines = result.items.map((item) =>
+                [
+                  item.pull === null ? "-" : pullKey(item.pull.repo, item.pull.number),
+                  item.pull?.state ?? "-",
+                  item.agent.state,
+                  item.agent.threadId ?? "-",
+                  item.title,
+                ].join("\t"),
+              );
+              return { exitCode: 0, stdout: lines.map((line) => `${line}\n`).join("") };
             },
           }),
         },

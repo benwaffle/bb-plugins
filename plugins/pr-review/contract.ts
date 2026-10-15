@@ -99,14 +99,23 @@ const queueResultSchema = z.object({
 export type QueueResult = z.infer<typeof queueResultSchema>;
 
 const relatedResultSchema = z.object({
+  githubPanel: z.boolean(),
   tickets: z.array(z.string()),
-  threads: z.array(
+  /** PRs and threads that share a ticket with the thread, PRs by number first. */
+  items: z.array(
     z.object({
-      threadId: z.string(),
+      /** The PR title without its ticket prefix, or the thread title for a thread without a PR. */
       title: z.string(),
-      firstMessage: z.string().nullable(),
-      tickets: z.array(z.string()),
-      pulls: z.array(z.string()),
+      pull: z
+        .object({
+          repo: repoSchema,
+          number: z.number().int().positive(),
+          url: z.string(),
+          /** null when GitHub could not be read. */
+          state: z.enum(["open", "draft", "merged", "closed"]).nullable(),
+        })
+        .nullable(),
+      agent: agentSchema,
     }),
   ),
 });
