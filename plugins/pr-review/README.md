@@ -33,11 +33,16 @@ repositories in this order:
 4. PRs you commented on or requested changes on.
 5. Everything else, including your own PRs.
 
-PRs you approved at their current head go into a collapsed **Approved,
-waiting on merge** section. Merged and closed PRs are not listed. Draft PRs
-come after all ready PRs, in the same group order, and show in muted text with
-a **Draft** badge. Inside each group, the oldest number is first. A title drops
+Each group has a header: **Approved but changed** (1), **Needs you** (2 and
+3), **Commented** (4), and **Others** (5). Draft PRs from every group go into a
+collapsed **Drafts** section after them, in the same group order, and show in
+muted text with a **Draft** badge. PRs you approved at their current head go
+into a collapsed **Approved, waiting on merge** section. Merged and closed PRs
+are not listed. Inside each group, the oldest number is first. A title drops
 its ticket prefix, such as `ACME-51: `, because the Ticket column shows it.
+
+The header counts the ready PRs that request your review or whose approval
+went stale, and every open PR, such as `6 need you · 19 open`.
 
 A PR is stacked when its base branch is the head branch of another open PR in
 the same repository, such as #553 targeting #552's branch. A stacked PR shows

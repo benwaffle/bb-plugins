@@ -21,6 +21,7 @@ import type {
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
 import { titleWithoutTicket } from "./parse";
+import { needsViewer, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
 import { stackedThreadRow, stackPrefix, ticketGroups } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
@@ -249,6 +250,8 @@ function QueueRow({
   );
 }
 
+const QUEUE_COLUMNS = 7;
+
 function QueueTable({ children }: { children: ReactNode }) {
   return (
     <table className="w-full border-collapse text-sm">
@@ -265,7 +268,7 @@ function QueueTable({ children }: { children: ReactNode }) {
           </th>
         </tr>
       </thead>
-      <tbody>{children}</tbody>
+      {children}
     </table>
   );
 }
@@ -299,6 +302,44 @@ function useReviewQueue() {
   const { starting, review } = useStartReview(queue.status === "ready" && queue.value.githubPanel);
 
   return { queue, tickets, starting, load, review };
+}
+
+/** "6 need you · 19 open": PRs that wait on the viewer, and every open PR. */
+function queueCount(entries: readonly QueueEntry[]): string {
+  return `${entries.filter(needsViewer).length} need you · ${entries.length} open`;
+}
+
+/** Which collapsible queue sections are open; every one starts closed. */
+function useOpenSections() {
+  const [open, setOpen] = useState<ReadonlySet<QueueSectionKey>>(new Set());
+  const isOpen = (section: QueueSection<QueueEntry>) => !section.collapsible || open.has(section.key);
+  const toggle = (key: QueueSectionKey) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  return { isOpen, toggle };
+}
+
+function SectionHeading({
+  section,
+  open,
+  onToggle,
+  className,
+}: {
+  section: QueueSection<QueueEntry>;
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+}) {
+  const label = `${section.label} (${section.entries.length})`;
+  if (!section.collapsible) return <span className={className}>{label}</span>;
+  return (
+    <button type="button" className={`${linkClass} ${className}`} aria-expanded={open} onClick={onToggle}>
+      {open ? "▾" : "▸"} {label}
+    </button>
+  );
 }
 
 function useStartReview(githubPanel: boolean) {
@@ -423,7 +464,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
 
 function ReviewQueuePanel() {
   const { queue, tickets, starting, load, review } = useReviewQueue();
-  const [showApproved, setShowApproved] = useState(false);
+  const { isOpen, toggle } = useOpenSections();
 
   if (queue.status === "loading") {
     return <div className="p-4 text-sm text-muted-foreground md:p-5">Loading open pull requests…</div>;
@@ -440,8 +481,7 @@ function ReviewQueuePanel() {
   }
 
   const { entries, githubPanel, errors, setup, viewer, fetchedAt } = queue.value;
-  const active = entries.filter((entry) => entry.bucket !== "approved");
-  const approved = entries.filter((entry) => entry.bucket === "approved");
+  const sections = queueSections(entries);
   const row = (entry: QueueEntry) => (
     <QueueRow
       key={`${entry.repo}#${entry.number}`}
@@ -458,7 +498,7 @@ function ReviewQueuePanel() {
       <div className="mx-auto w-full max-w-6xl space-y-4">
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
-            {active.length} to look at as {viewer} · updated {new Date(fetchedAt).toLocaleTimeString()}
+            {queueCount(entries)} as {viewer} · updated {new Date(fetchedAt).toLocaleTimeString()}
           </span>
           <button type="button" className={buttonClass} onClick={() => load(true)}>
             Refresh
@@ -474,23 +514,26 @@ function ReviewQueuePanel() {
             {error.repo}: {error.message}
           </p>
         ))}
-        {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing waiting on you.</p>
+        {sections.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No open pull requests.</p>
         ) : (
-          <QueueTable>{active.map(row)}</QueueTable>
-        )}
-        {approved.length === 0 ? null : (
-          <section className="space-y-2">
-            <button
-              type="button"
-              className={`${linkClass} text-sm font-medium`}
-              aria-expanded={showApproved}
-              onClick={() => setShowApproved((open) => !open)}
-            >
-              {showApproved ? "▾" : "▸"} Approved, waiting on merge ({approved.length})
-            </button>
-            {showApproved ? <QueueTable>{approved.map(row)}</QueueTable> : null}
-          </section>
+          <QueueTable>
+            {sections.map((section) => (
+              <tbody key={section.key}>
+                <tr className="border-b border-border">
+                  <th colSpan={QUEUE_COLUMNS} className="pt-4 pb-1 text-left">
+                    <SectionHeading
+                      section={section}
+                      open={isOpen(section)}
+                      onToggle={() => toggle(section.key)}
+                      className="text-sm font-medium"
+                    />
+                  </th>
+                </tr>
+                {isOpen(section) ? section.entries.map(row) : null}
+              </tbody>
+            ))}
+          </QueueTable>
         )}
       </div>
     </div>
@@ -546,7 +589,7 @@ function QueueColumnRow({
 
 function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
   const { queue, starting, load, review } = useReviewQueue();
-  const [showApproved, setShowApproved] = useState(false);
+  const { isOpen, toggle } = useOpenSections();
 
   if (queue.status === "loading") {
     return <p className="p-3 text-sm text-muted-foreground">Loading…</p>;
@@ -562,8 +605,7 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
     );
   }
   const { entries, errors, setup } = queue.value;
-  const active = entries.filter((entry) => entry.bucket !== "approved");
-  const approved = entries.filter((entry) => entry.bucket === "approved");
+  const sections = queueSections(entries);
   const row = (entry: QueueEntry) => (
     <QueueColumnRow
       key={`${entry.repo}#${entry.number}`}
@@ -576,7 +618,7 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
-        <span>{active.length} to look at</span>
+        <span>{queueCount(entries)}</span>
         <button type="button" className={buttonClass} onClick={() => load(true)}>
           Refresh
         </button>
@@ -592,23 +634,20 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
             {error.repo}: {error.message}
           </p>
         ))}
-        {active.length === 0 ? (
-          <p className="px-2 text-sm text-muted-foreground">Nothing waiting on you.</p>
+        {sections.length === 0 ? (
+          <p className="px-2 text-sm text-muted-foreground">No open pull requests.</p>
         ) : (
-          <ul className="space-y-0.5">{active.map(row)}</ul>
-        )}
-        {approved.length === 0 ? null : (
-          <section className="space-y-1">
-            <button
-              type="button"
-              className={`${linkClass} px-2 text-xs font-medium text-muted-foreground`}
-              aria-expanded={showApproved}
-              onClick={() => setShowApproved((open) => !open)}
-            >
-              {showApproved ? "▾" : "▸"} Approved ({approved.length})
-            </button>
-            {showApproved ? <ul className="space-y-0.5">{approved.map(row)}</ul> : null}
-          </section>
+          sections.map((section) => (
+            <section key={section.key} className="space-y-1">
+              <SectionHeading
+                section={section}
+                open={isOpen(section)}
+                onToggle={() => toggle(section.key)}
+                className="px-2 text-xs font-medium text-muted-foreground"
+              />
+              {isOpen(section) ? <ul className="space-y-0.5">{section.entries.map(row)}</ul> : null}
+            </section>
+          ))
         )}
       </div>
     </div>

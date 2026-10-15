@@ -288,3 +288,52 @@ export function agentState(
   if (lastReview < userMessages.length - 1) return "follow-ups";
   return thread.isRunning ? "reviewing" : "brief-ready";
 }
+
+/** Whether the viewer's review is requested, or their approval predates the head. */
+export function needsViewer(entry: { me: MyState; isDraft: boolean }): boolean {
+  return !entry.isDraft && (entry.me === "requested" || entry.me === "approved-stale");
+}
+
+export type QueueSectionKey = "approval-stale" | "needs-you" | "commented" | "others" | "drafts" | "approved";
+
+export interface QueueSection<T> {
+  key: QueueSectionKey;
+  label: string;
+  collapsible: boolean;
+  entries: T[];
+}
+
+const SECTIONS: ReadonlyArray<Omit<QueueSection<never>, "entries">> = [
+  { key: "approval-stale", label: "Approved but changed", collapsible: false },
+  { key: "needs-you", label: "Needs you", collapsible: false },
+  { key: "commented", label: "Commented", collapsible: false },
+  { key: "others", label: "Others", collapsible: false },
+  { key: "drafts", label: "Drafts", collapsible: true },
+  { key: "approved", label: "Approved, waiting on merge", collapsible: true },
+];
+
+function sectionFor(entry: { bucket: QueueBucket; isDraft: boolean }): QueueSectionKey {
+  if (entry.bucket === "approved") return "approved";
+  if (entry.isDraft) return "drafts";
+  switch (entry.bucket) {
+    case "approval-stale":
+      return "approval-stale";
+    case "requested":
+    case "requested-approved":
+      return "needs-you";
+    case "commented":
+      return "commented";
+    case "other":
+      return "others";
+  }
+}
+
+/** The non-empty queue sections, in queue order, each keeping its entries' order. */
+export function queueSections<T extends { bucket: QueueBucket; isDraft: boolean }>(
+  entries: readonly T[],
+): QueueSection<T>[] {
+  return SECTIONS.map((section) => ({
+    ...section,
+    entries: entries.filter((entry) => sectionFor(entry) === section.key),
+  })).filter((section) => section.entries.length > 0);
+}

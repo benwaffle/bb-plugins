@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   agentState,
   classifyPull,
+  needsViewer,
+  queueSections,
   sortQueue,
   stackLinks,
   type PullReview,
@@ -215,5 +217,40 @@ describe("agentState", () => {
     expect(state(["Review context", "What does this change do?"], false)).toBe("follow-ups");
     expect(state(["Review context", `${COMMAND} 596`, "Fix the first finding"], true)).toBe("follow-ups");
     expect(state(["Review context", `${COMMAND} 596`, "Why?", `${COMMAND} 596`], true)).toBe("reviewing");
+  });
+});
+
+describe("needsViewer", () => {
+  it("counts requested reviews and stale approvals on ready PRs only", () => {
+    expect(needsViewer({ me: "requested", isDraft: false })).toBe(true);
+    expect(needsViewer({ me: "approved-stale", isDraft: false })).toBe(true);
+    expect(needsViewer({ me: "requested", isDraft: true })).toBe(false);
+    expect(needsViewer({ me: "author", isDraft: false })).toBe(false);
+    expect(needsViewer({ me: "commented", isDraft: false })).toBe(false);
+    expect(needsViewer({ me: "none", isDraft: false })).toBe(false);
+  });
+});
+
+describe("queueSections", () => {
+  it("splits the queue into sections in queue order, with drafts and approved PRs collapsible", () => {
+    const entries = [
+      { id: 40, bucket: "approval-stale", isDraft: false },
+      { id: 20, bucket: "requested", isDraft: false },
+      { id: 10, bucket: "requested-approved", isDraft: false },
+      { id: 3, bucket: "other", isDraft: false },
+      { id: 2, bucket: "approval-stale", isDraft: true },
+      { id: 4, bucket: "other", isDraft: true },
+      { id: 6, bucket: "approved", isDraft: false },
+      { id: 7, bucket: "approved", isDraft: true },
+    ] as const;
+    expect(
+      queueSections(entries).map((section) => [section.label, section.collapsible, section.entries.map((entry) => entry.id)]),
+    ).toEqual([
+      ["Approved but changed", false, [40]],
+      ["Needs you", false, [20, 10]],
+      ["Others", false, [3]],
+      ["Drafts", true, [2, 4]],
+      ["Approved, waiting on merge", true, [6, 7]],
+    ]);
   });
 });
