@@ -238,10 +238,11 @@ describe("card looks", () => {
     ]);
   });
 
-  it("shows a stacked draft PR by icon on a card host and by glyph and text elsewhere", () => {
+  it("shows a stacked draft PR by depth and icon on a card host and by glyph and text elsewhere", () => {
     const draft = { ...entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] }), isDraft: true };
     expect(pullRowLook(draft, "#553", true)).toEqual({
       title: "#553 PR 553",
+      depth: 1,
       description: "on #552",
       icon: { name: "GitPullRequestDraft", tone: "muted" },
     });
@@ -250,5 +251,8 @@ describe("card looks", () => {
       title: "#600 PR 600",
       icon: { name: "GitPullRequest", tone: "success" },
     });
+    const top = entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] });
+    expect(pullRowLook(top, "#564", true)).toMatchObject({ title: "#564 PR 564", depth: 2 });
+    expect(pullRowLook(top, "#564", false)).toMatchObject({ title: "\u00a0\u00a0└ #564 PR 564" });
   });
 });

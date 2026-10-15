@@ -379,6 +379,7 @@ function useStartReview(githubPanel: boolean) {
 interface SidebarThreadGroupRow {
   id: string;
   title: string;
+  depth?: number;
   description?: string;
   tooltip?: string;
   icon?: SidebarRowIcon;

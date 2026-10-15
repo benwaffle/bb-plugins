@@ -95,22 +95,25 @@ export function stackedThreadRow(threadId: string, entry: QueueEntry | null, rev
 
 export interface PullRowLook {
   title: string;
+  depth?: number;
   description?: string;
   icon?: SidebarRowIcon;
 }
 
 /**
- * An unstarted PR row's title, description, and icon. A card host shows the
- * draft state as the icon; other hosts get a tree glyph per stack level in
- * the title and "draft" in the description.
+ * An unstarted PR row's title, description, and icon. A card host gets the
+ * stack depth, which it draws as a connector rail, and the draft state as the
+ * icon; other hosts get a tree glyph per stack level in the title and "draft"
+ * in the description.
  */
 export function pullRowLook(entry: QueueEntry, label: string, card: boolean): PullRowLook {
   const title = `${label} ${titleWithoutTicket(entry.title, entry.ticketKey)}`;
-  const stackedOn = entry.parentNumber === null ? [] : [`on #${entry.parentNumber}`];
+  const stackedOn = entry.parentNumber === null ? null : `on #${entry.parentNumber}`;
   if (card) {
-    return { title, ...(stackedOn.length === 0 ? {} : { description: stackedOn[0] }), ...iconFor(queuedPullState(entry)) };
+    const stack = stackedOn === null ? {} : { depth: entry.depth, description: stackedOn };
+    return { title, ...stack, ...iconFor(queuedPullState(entry)) };
   }
-  const description = [...stackedOn, ...(entry.isDraft ? ["draft"] : [])].join(" · ");
+  const description = [stackedOn, entry.isDraft ? "draft" : null].filter((part) => part !== null).join(" · ");
   return { title: `${stackPrefix(entry.depth)}${title}`, ...(description === "" ? {} : { description }) };
 }
 

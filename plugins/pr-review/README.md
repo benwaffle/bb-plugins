@@ -107,8 +107,9 @@ open, grey for a draft, and purple for merged. A merged or closed PR's state
 is read from GitHub. PR rows have no tree glyph and no `draft` text. A
 review thread ends with a dot for its agent state: green when reviewed,
 purple for follow-ups, and grey when opened but not reviewed yet. A running
-agent shows bb's own indicator instead. A stacked thread is indented under
-its base PR with a connector rail. Stacked PR rows still say `on #552`.
+agent shows bb's own indicator instead. A stacked PR row or thread is
+indented under its base PR with a connector rail, one step per stack level,
+and a stacked PR row still says `on #552`.
 **Start** shows when you hover the row. Until bb reports the groups back,
 and on older builds, the sidebar looks as described above.
 
