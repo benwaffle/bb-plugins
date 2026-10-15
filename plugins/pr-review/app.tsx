@@ -20,6 +20,7 @@ import type {
   rpcContract,
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
+import { titleWithoutTicket } from "./parse";
 import { stackedThreadRow, stackPrefix, ticketGroups } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
@@ -70,6 +71,10 @@ const AGENT_LABELS: Record<QueueEntry["agent"]["state"], string> = {
   "brief-ready": "brief ready",
   "follow-ups": "follow-ups",
 };
+
+function entryTitle(entry: QueueEntry): string {
+  return titleWithoutTicket(entry.title, entry.ticketKey);
+}
 
 const REVIEW_GLYPHS: Record<QueueEntry["otherReviews"][number]["state"], string> = {
   APPROVED: "✓",
@@ -160,11 +165,11 @@ function QueueRow({
       }}
     >
       <td className="py-2 pr-3">
-        <div className={`flex items-center gap-1.5 ${entry.isDraft ? "" : "font-medium"}`}>
+        <div className={`flex items-baseline gap-1.5 ${entry.isDraft ? "" : "font-medium"}`}>
           {entry.isDraft ? <DraftBadge /> : null}
           <span className="shrink-0">#{entry.number}</span>
           <StackBadge entry={entry} />
-          <span>{entry.title}</span>
+          <span>{entryTitle(entry)}</span>
         </div>
         <div className="text-xs text-muted-foreground">
           <User login={entry.author} url={entry.authorAvatarUrl} />
@@ -391,18 +396,20 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
         if (item.kind === "thread") return stackedThreadRow(item.threadId, item.entry);
         const { entry } = item;
         const key = `${entry.repo}#${entry.number}`;
-        const stackedOn = entry.parentNumber === null ? [] : [`stacked on #${entry.parentNumber}`];
+        const stackedOn = entry.parentNumber === null ? [] : [`on #${entry.parentNumber}`];
         const baseOf =
           entry.childNumbers.length === 0 ? [] : [`base of ${entry.childNumbers.map((n) => `#${n}`).join(", ")}`];
+        const description = [...stackedOn, ...(entry.isDraft ? ["draft"] : [])].join(" · ");
         return {
           id: key,
-          title: `${stackPrefix(entry.depth)}#${entry.number} ${entry.title}`,
-          description: [...stackedOn, entry.author, ...(entry.isDraft ? ["draft"] : [])].join(" · "),
+          title: `${stackPrefix(entry.depth)}#${entry.number} ${entryTitle(entry)}`,
+          ...(description === "" ? {} : { description }),
           tooltip: [
             key,
+            entry.author,
             `+${entry.additions} −${entry.deletions}`,
             ME_LABELS[entry.me],
-            ...stackedOn,
+            ...(entry.parentNumber === null ? [] : [`stacked on #${entry.parentNumber}`]),
             ...baseOf,
           ].join(" · "),
           onSelect: () => review(entry),
@@ -519,7 +526,7 @@ function QueueColumnRow({
           {entry.isDraft ? <DraftBadge /> : null}
           <span className="shrink-0">#{entry.number}</span>
           <StackBadge entry={entry} />
-          <span className="truncate">{entry.title}</span>
+          <span className="truncate">{entryTitle(entry)}</span>
         </div>
         <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
           <User login={entry.author} url={entry.authorAvatarUrl} />

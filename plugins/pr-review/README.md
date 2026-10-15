@@ -36,7 +36,8 @@ repositories in this order:
 PRs you approved at their current head go into a collapsed **Approved,
 waiting on merge** section. Merged and closed PRs are not listed. Draft PRs
 come after all ready PRs, in the same group order, and show in muted text with
-a **Draft** badge. Inside each group, the oldest number is first.
+a **Draft** badge. Inside each group, the oldest number is first. A title drops
+its ticket prefix, such as `ACME-51: `, because the Ticket column shows it.
 
 A PR is stacked when its base branch is the head branch of another open PR in
 the same repository, such as #553 targeting #552's branch. A stacked PR shows
@@ -50,7 +51,7 @@ teams and you have not reviewed yet. Columns:
 
 | Column | Shows |
 | --- | --- |
-| PR | Number, **on #n** for a stacked PR, title, and the author with their GitHub avatar. |
+| PR | Number, **on #n** for a stacked PR, title, and the author with their GitHub avatar. A wrapped title keeps the number on its first line. |
 | Ticket | Jira key from an `ACME-n:` title prefix, or else a bare `ACME-n` line or `/browse/ACME-n` link in the body. Hover for `ACME-n: <summary> (<status>)`. |
 | Size | Additions, deletions, and changed files. |
 | Reviews | The latest review state and avatar of every human reviewer other than you. |
@@ -69,11 +70,13 @@ has at least two threads or an open PR that has no review thread yet. The row
 shows the ticket key and summary, or only the key until the summary is read,
 and truncates in a narrow sidebar. Hover the ticket row for its summary and
 status. An open PR without a review thread is a muted row under its
-ticket, with the author and a **Start** button; PRs without a ticket are under
-**No ticket**. Under a ticket, stacked PRs come first, each base PR followed by
+ticket, such as `#566 Keep the old task serving`, with a **Start** button; PRs
+without a ticket are under **No ticket**. The row says only `on #552` for a
+stacked PR and `draft` for a draft, so the title, not the number, truncates in
+a narrow sidebar. Hover the row for the author, size, and your state. Your own
+PRs are not listed. Under a ticket, stacked PRs come first, each base PR followed by
 the PRs stacked on it, then the other PRs. A stacked PR's row starts with a
-tree glyph per stack level (`└ #553`, then `  └ #564`) and its description
-says `stacked on #552`. Click the row, or **Start**, to open the PR's review
+tree glyph per stack level (`└ #553`, then `  └ #564`). Click the row, or **Start**, to open the PR's review
 thread; one is started when there is none. PRs you approved at their current head are not
 listed. Threads keep their own rows, so pinning, archiving, renaming, and
 dragging work as usual. A thread's ticket is its PR's ticket, or else the
@@ -170,7 +173,7 @@ size, your state, agent state, title. Before them, it prints a `setup <hint>`
 line for each setting that still needs a value. `groups` prints what the sidebar groups
 come from: one `ACME-n thread <threadId>` line per thread with a ticket, and
 one `ACME-n pr owner/repo#n <title>` line per open PR without a review thread,
-with `-` for no ticket. `start` prints `started` or `existing`
+with `-` for no ticket; your own PRs are left out. `start` prints `started` or `existing`
 and the thread id. `review` opens the thread if needed, sends the review
 command, and prints `sent` or `queued` and the thread id. A bare number uses
 the first configured repository.

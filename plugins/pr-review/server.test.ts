@@ -339,8 +339,9 @@ describe("reviewQueue", () => {
 });
 
 describe("sidebarGroups", () => {
-  it("maps review threads to their ticket and lists unstarted PRs with their project", async () => {
-    const { harness } = await load();
+  it("maps review threads to their ticket and lists unstarted PRs, except the viewer's own, with their project", async () => {
+    const own = { ...graphqlNode(610, "ACME-51: Log catalog misses", ""), author: { login: "benwaffle", avatarUrl: "" } };
+    const { harness } = await load([...OPEN_PULL_NODES, own]);
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
       githubPanel: boolean;

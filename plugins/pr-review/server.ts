@@ -465,7 +465,7 @@ export function createPlugin(deps: PluginDeps) {
       const pulls = (
         await Promise.all(
           queue.entries
-            .filter((entry) => entry.agent.threadId === null && entry.bucket !== "approved")
+            .filter((entry) => entry.agent.threadId === null && entry.bucket !== "approved" && entry.me !== "author")
             .map(async (entry) => {
               const projectId = await projectFor(entry.repo);
               return projectId === null ? null : { projectId, entry };
