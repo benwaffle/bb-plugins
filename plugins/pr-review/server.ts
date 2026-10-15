@@ -27,6 +27,7 @@ import {
   type UserMessage,
   type Viewer,
 } from "./queue.js";
+import { queuedPullState, relatedItems, withoutTickets, type RelatedItem, type RelatedPullState } from "./related.js";
 import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
 import {
   OPEN_PULLS_QUERY,
@@ -44,9 +45,6 @@ import {
 } from "./tools.js";
 
 export { rpcContract };
-
-type RelatedItem = RelatedResult["items"][number];
-type RelatedPullState = NonNullable<RelatedItem["pull"]>["state"];
 
 const GITHUB_PLUGIN_ID = "github";
 const WORKTREE_PROVIDER_ID = "git-worktree";
@@ -304,7 +302,7 @@ export function createPlugin(deps: PluginDeps) {
       const newest = unscanned.at(-1);
       if (newest === undefined) return reviewedAt;
       const found = unscanned.filter((message) => isReviewMessage(message.text, REVIEW_COMMAND)).at(-1);
-      store.recordScan(threadId, newest.createdAt, found?.createdAt ?? null);
+      store.recordReview(threadId, found?.createdAt ?? null, newest.createdAt);
       return found === undefined ? reviewedAt : Math.max(found.createdAt, reviewedAt ?? 0);
     }
 
@@ -677,7 +675,7 @@ export function createPlugin(deps: PluginDeps) {
         mode: "auto",
         input: [{ type: "text", text: reviewCommand(number), mentions: [] }],
       });
-      store.recordReview(threadId, deps.now());
+      store.recordReview(threadId, deps.now(), 0);
       bb.realtime.publish(REFS_CHANNEL, { threadId });
       return { delivery: result.delivery };
     }
@@ -755,7 +753,6 @@ export function createPlugin(deps: PluginDeps) {
       const tickets = ownRefs.filter((ref) => ref.kind === "jira").map((ref) => ref.key);
       if (tickets.length === 0) return { githubPanel: await githubPanel(), tickets, items: [] };
       const ownPulls = new Set(ownRefs.filter(isReviewPull).map((ref) => ref.key));
-      const withoutTicket = (title: string) => tickets.reduce((stripped, key) => titleWithoutTicket(stripped, key), title);
       const queue = await reviewQueue(false);
       const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
       const others = [...new Set(tickets.flatMap((key) => store.threadsWith("jira", key)))].filter(
@@ -774,35 +771,18 @@ export function createPlugin(deps: PluginDeps) {
             }
             const entry = queued.get(ref.key);
             return {
-              title: withoutTicket(entry?.title ?? ref.title ?? threadTitle),
+              title: withoutTickets(entry?.title ?? ref.title ?? threadTitle, tickets),
               pull: {
                 ...parsed,
                 url: ref.url,
-                state: entry === undefined ? await pullState(parsed.repo, parsed.number) : entry.isDraft ? "draft" : "open",
+                state: entry === undefined ? await pullState(parsed.repo, parsed.number) : queuedPullState(entry),
               },
               agent: entry?.agent.threadId === otherId ? entry.agent : await threadAgentState(otherId),
             };
           }),
         )
       ).filter((item) => item !== null);
-      const listed = new Set(
-        threadItems.flatMap((item) => (item.pull === null ? [] : [pullKey(item.pull.repo, item.pull.number)])),
-      );
-      const unstarted = queue.entries
-        .filter((entry) => entry.ticketKey !== null && tickets.includes(entry.ticketKey) && entry.me !== "author")
-        .filter((entry) => !ownPulls.has(pullKey(entry.repo, entry.number)) && !listed.has(pullKey(entry.repo, entry.number)))
-        .map((entry): RelatedItem => ({
-          title: withoutTicket(entry.title),
-          pull: { repo: entry.repo, number: entry.number, url: entry.url, state: entry.isDraft ? "draft" : "open" },
-          agent: entry.agent,
-        }));
-      const items = [...threadItems, ...unstarted].sort(
-        (left, right) =>
-          Number(left.pull === null) - Number(right.pull === null) ||
-          (left.pull?.repo ?? "").localeCompare(right.pull?.repo ?? "") ||
-          (left.pull?.number ?? 0) - (right.pull?.number ?? 0),
-      );
-      return { githubPanel: queue.githubPanel, tickets, items };
+      return { githubPanel: queue.githubPanel, tickets, items: relatedItems(threadItems, queue.entries, tickets, ownPulls) };
     }
 
     bb.rpc.register(rpcContract, {

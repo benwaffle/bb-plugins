@@ -52,6 +52,7 @@
     "sidebar.ts",
     "parse.ts",
     "queue.ts",
+    "related.ts",
     "store.ts",
     "tickets.ts",
     "tools.ts"

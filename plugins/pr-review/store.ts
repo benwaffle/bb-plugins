@@ -56,10 +56,11 @@ export interface RefStore {
   ticketThreads(): Map<string, string>;
   /** When the review command was last sent to the thread, and up to which message time its history was scanned. */
   review(threadId: string): { reviewedAt: number | null; scannedThrough: number };
-  /** Records a review command sent at `reviewedAt`, keeping a later recorded one. */
-  recordReview(threadId: string, reviewedAt: number): void;
-  /** Records that messages up to `scannedThrough` were scanned, and the last review among them. */
-  recordScan(threadId: string, scannedThrough: number, reviewedAt: number | null): void;
+  /**
+   * Records a review command sent at `reviewedAt` (null for none) and that
+   * messages up to `scannedThrough` were scanned, keeping the later of each.
+   */
+  recordReview(threadId: string, reviewedAt: number | null, scannedThrough: number): void;
 }
 
 export function createRefStore(storage: Storage): RefStore {
@@ -137,26 +138,16 @@ export function createRefStore(storage: Storage): RefStore {
       return { reviewedAt: row?.reviewed_at ?? null, scannedThrough: row?.scanned_through ?? 0 };
     },
 
-    recordReview(threadId, reviewedAt) {
-      db()
-        .prepare(
-          `INSERT INTO reviews (thread_id, reviewed_at) VALUES (?, ?)
-           ON CONFLICT (thread_id) DO UPDATE SET
-             reviewed_at = MAX(COALESCE(reviews.reviewed_at, 0), excluded.reviewed_at)`,
-        )
-        .run(threadId, reviewedAt);
-    },
-
-    recordScan(threadId, scannedThrough, reviewedAt) {
+    recordReview(threadId, reviewedAt, scannedThrough) {
       db()
         .prepare(
           `INSERT INTO reviews (thread_id, reviewed_at, scanned_through) VALUES (@threadId, @reviewedAt, @scannedThrough)
            ON CONFLICT (thread_id) DO UPDATE SET
              scanned_through = MAX(reviews.scanned_through, excluded.scanned_through),
-             reviewed_at = CASE
-               WHEN excluded.reviewed_at IS NULL THEN reviews.reviewed_at
-               ELSE MAX(COALESCE(reviews.reviewed_at, 0), excluded.reviewed_at)
-             END`,
+             reviewed_at = MAX(
+               COALESCE(reviews.reviewed_at, excluded.reviewed_at),
+               COALESCE(excluded.reviewed_at, reviews.reviewed_at)
+             )`,
         )
         .run({ threadId, reviewedAt, scannedThrough });
     },
