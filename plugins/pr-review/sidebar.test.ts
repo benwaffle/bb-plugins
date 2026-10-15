@@ -123,6 +123,26 @@ describe("ticketGroups", () => {
       { threadId: "thr_old" },
     ]);
   });
+
+  it("labels PR rows with the repository only in a group that mixes repositories", () => {
+    const gadget = (number: number): QueueEntry => ({ ...entry(number, "ACME-21"), repo: "acme/gadgets" });
+    const result: SidebarGroupsResult = {
+      githubPanel: true,
+      tickets: [],
+      threadTickets: [{ threadId: "thr_gadget", ticketKey: "ACME-21" }],
+      pulls: [
+        { projectId: "proj_widgets", entry: entry(600, "ACME-21") },
+        { projectId: "proj_widgets", entry: entry(601, "ACME-30") },
+      ],
+      threadPulls: [{ threadId: "thr_gadget", entry: gadget(12) }],
+    };
+    const groups = ticketGroups(result, new Map([["thr_gadget", "proj_widgets"]]));
+    const labels = groups.map((group) =>
+      group.items.flatMap((item) => (item.kind === "pull" ? [group.pullLabel(item.entry.repo, item.entry.number)] : [])),
+    );
+
+    expect(labels).toEqual([["widgets#600"], ["#601"]]);
+  });
 });
 
 describe("stackFirst", () => {

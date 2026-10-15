@@ -4,6 +4,7 @@ import {
   classifyPull,
   isReviewMessage,
   needsViewer,
+  pullLabeler,
   queueSections,
   sortQueue,
   stackLinks,
@@ -241,6 +242,16 @@ describe("needsViewer", () => {
     expect(needsViewer({ me: "author", isDraft: false })).toBe(false);
     expect(needsViewer({ me: "commented", isDraft: false })).toBe(false);
     expect(needsViewer({ me: "none", isDraft: false })).toBe(false);
+  });
+});
+
+describe("pullLabeler", () => {
+  it("names the repository only when the PRs mix repositories", () => {
+    expect(pullLabeler(["acme/widgets", "acme/widgets"])("acme/widgets", 600)).toBe("#600");
+    expect(pullLabeler([])("acme/widgets", 600)).toBe("#600");
+    const mixed = pullLabeler(["acme/widgets", "acme/gadgets"]);
+    expect(mixed("acme/widgets", 600)).toBe("widgets#600");
+    expect(mixed("acme/gadgets", 12)).toBe("gadgets#12");
   });
 });
 

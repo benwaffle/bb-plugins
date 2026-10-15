@@ -80,7 +80,8 @@ shows the ticket key and summary, or only the key until the summary is read,
 and truncates in a narrow sidebar. Hover the ticket row for its summary and
 status. An open PR without a review thread is a muted row under its
 ticket, such as `#566 Keep the old task serving`, with a **Start** button; PRs
-without a ticket are under **No ticket**. The row says only `on #552` for a
+without a ticket are under **No ticket**. When a group's PRs are in more than
+one repository, each PR row names its repository, such as `widgets#566`. The row says only `on #552` for a
 stacked PR and `draft` for a draft, so the title, not the number, truncates in
 a narrow sidebar. Hover the row for the author, size, and your state. Your own
 PRs are not listed. Under a ticket, stacked PRs come first, each base PR followed by
@@ -142,7 +143,8 @@ agent is busy, the message is queued.
 tab docked as a column to its left. Drag the divider to resize it; bb
 remembers the width. Use the column's header to move it back to the right
 panel or close it. A compact **Review queue** tab, with the current PR
-highlighted, is in the thread panel's new-tab launcher. Docking needs a bb
+highlighted, is in the thread panel's new-tab launcher. Its rows show `#600`,
+or `widgets#600` when the queue has PRs from more than one repository. Docking needs a bb
 build with docked thread panels (`toThread`'s `experimental_dockedPanels`).
 Older builds, or bb without the GitHub plugin, open the thread with no docked
 column.
@@ -158,7 +160,8 @@ PRs and threads on the thread's ticket:
 - each open PR on the ticket that has no review thread and is not yours,
   with a **Start** button.
 
-PRs come first, by number, then threads without a PR. Click an item to open
+PRs come first, by number, then threads without a PR. A PR shows as `#600`, or
+as `widgets#600` when the tab lists PRs from more than one repository. Click an item to open
 its thread, with the GitHub PR column docked. The state of a PR that is no
 longer open is read with `gh pr view` and kept until the plugin restarts.
 

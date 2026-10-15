@@ -1,5 +1,5 @@
 import type { QueueEntry, SidebarGroupsResult } from "./contract.js";
-import { pullKey, stackOrder } from "./queue.js";
+import { pullKey, pullLabeler, stackOrder } from "./queue.js";
 import { ticketTooltip } from "./tickets.js";
 
 export const NO_TICKET_LABEL = "No ticket";
@@ -15,6 +15,8 @@ export interface TicketGroup {
   tooltip: string | null;
   threadIds: string[];
   items: TicketGroupItem[];
+  /** A PR row's label, which names the repository only in a group that mixes repositories. */
+  pullLabel: (repo: string, number: number) => string;
 }
 
 /**
@@ -95,6 +97,7 @@ export function ticketGroups(
         tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
         items: [],
+        pullLabel: pullLabeler([]),
       };
       groups.set(key, group);
     }
@@ -111,7 +114,10 @@ export function ticketGroups(
     group.threadIds.push(threadId);
     group.items.push({ kind: "thread", threadId, entry: pullByThreadId.get(threadId) ?? null });
   }
-  for (const group of groups.values()) group.items = stackFirstItems(group.items);
+  for (const group of groups.values()) {
+    group.items = stackFirstItems(group.items);
+    group.pullLabel = pullLabeler(group.items.flatMap((item) => (item.entry === null ? [] : [item.entry.repo])));
+  }
   return [...groups.values()].sort(
     (left, right) => Number(left.label === NO_TICKET_LABEL) - Number(right.label === NO_TICKET_LABEL),
   );

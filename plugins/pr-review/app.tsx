@@ -21,7 +21,7 @@ import type {
 } from "./contract";
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
 import { titleWithoutTicket } from "./parse";
-import { needsViewer, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
+import { needsViewer, pullLabeler, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
 import { stackedThreadRow, stackPrefix, ticketGroups } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
@@ -445,7 +445,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
         const description = [...stackedOn, ...(entry.isDraft ? ["draft"] : [])].join(" · ");
         return {
           id: key,
-          title: `${stackPrefix(entry.depth)}#${entry.number} ${entryTitle(entry)}`,
+          title: `${stackPrefix(entry.depth)}${group.pullLabel(entry.repo, entry.number)} ${entryTitle(entry)}`,
           ...(description === "" ? {} : { description }),
           tooltip: [
             key,
@@ -544,11 +544,13 @@ function ReviewQueuePanel() {
 
 function QueueColumnRow({
   entry,
+  label,
   current,
   starting,
   onReview,
 }: {
   entry: QueueEntry;
+  label: string;
   current: boolean;
   starting: boolean;
   onReview: (entry: QueueEntry) => void;
@@ -569,7 +571,7 @@ function QueueColumnRow({
           className={`flex items-center gap-1.5 text-sm ${entry.isDraft ? "text-muted-foreground" : "font-medium"}`}
         >
           {entry.isDraft ? <DraftBadge /> : null}
-          <span className="shrink-0">#{entry.number}</span>
+          <span className="shrink-0">{label}</span>
           <StackBadge entry={entry} />
           <span className="truncate">{entryTitle(entry)}</span>
         </div>
@@ -608,10 +610,12 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
   }
   const { entries, errors, setup } = queue.value;
   const sections = queueSections(entries);
+  const label = pullLabeler(entries.map((entry) => entry.repo));
   const row = (entry: QueueEntry) => (
     <QueueColumnRow
       key={`${entry.repo}#${entry.number}`}
       entry={entry}
+      label={label(entry.repo, entry.number)}
       current={entry.agent.threadId === threadId}
       starting={starting === `${entry.repo}#${entry.number}`}
       onReview={review}
@@ -658,11 +662,13 @@ function ReviewQueueColumn({ threadId }: PluginThreadPanelProps) {
 
 function RelatedItemRow({
   item,
+  label,
   githubPanel,
   starting,
   onReview,
 }: {
   item: Related["items"][number];
+  label: string | null;
   githubPanel: boolean;
   starting: boolean;
   onReview: (target: ReviewTarget) => void;
@@ -686,7 +692,7 @@ function RelatedItemRow({
         className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       >
         <div className={`flex items-baseline gap-1.5 text-sm ${pull?.state === "open" ? "font-medium" : "text-muted-foreground"}`}>
-          {pull === null ? null : <span className="shrink-0">#{pull.number}</span>}
+          {label === null ? null : <span className="shrink-0">{label}</span>}
           <span className="hover:underline">{item.title}</span>
         </div>
         {details.length === 0 ? null : <div className="text-xs text-muted-foreground">{details.join(" · ")}</div>}
@@ -727,6 +733,7 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   if (related.status === "loading") return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (related.status === "error") return <p className="text-sm text-destructive">{related.message}</p>;
   const { tickets, items, githubPanel } = related.value;
+  const label = pullLabeler(items.flatMap((item) => (item.pull === null ? [] : [item.pull.repo])));
   if (tickets.length === 0) {
     return <p className="text-sm text-muted-foreground">This thread has no ticket ref.</p>;
   }
@@ -741,6 +748,7 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
             <RelatedItemRow
               key={item.pull === null ? item.agent.threadId : `${item.pull.repo}#${item.pull.number}:${item.agent.threadId ?? ""}`}
               item={item}
+              label={item.pull === null ? null : label(item.pull.repo, item.pull.number)}
               githubPanel={githubPanel}
               starting={item.pull !== null && starting === `${item.pull.repo}#${item.pull.number}`}
               onReview={review}

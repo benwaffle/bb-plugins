@@ -21,6 +21,7 @@ import {
   classifyPull,
   isReviewMessage,
   pullKey,
+  shortRepo,
   sortQueue,
   stackLinks,
   type PullSnapshot,
@@ -84,10 +85,6 @@ function distinct(values: Iterable<string | null>): string[] {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function shortRepo(repo: string): string {
-  return repo.slice(repo.indexOf("/") + 1);
 }
 
 /**

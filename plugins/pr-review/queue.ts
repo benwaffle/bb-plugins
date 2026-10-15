@@ -142,6 +142,19 @@ export function pullKey(repo: string, number: number): string {
   return `${repo}#${number}`;
 }
 
+export function shortRepo(repo: string): string {
+  return repo.slice(repo.indexOf("/") + 1);
+}
+
+/**
+ * Labels for PRs shown together: `#600` when they are all in one repository,
+ * and `widgets#600` when they mix repositories.
+ */
+export function pullLabeler(repos: Iterable<string>): (repo: string, number: number) => string {
+  const mixed = new Set(repos).size > 1;
+  return (repo, number) => (mixed ? `${shortRepo(repo)}#${number}` : `#${number}`);
+}
+
 export interface StackLink {
   parentNumber: number | null;
   depth: number;
