@@ -99,19 +99,30 @@ last. Older bb builds sort the review threads by their own thread order and
 show them before the PR rows, so a thread's position and title do not show its
 stack there.
 
-On bb builds that draw card groups (they report groups back with a
-`style`), each ticket is a card. Its header shows a ticket icon, the key in
-mono (`ACME-21`), the summary, and how many of its PRs have a review thread
+On bb builds that draw styled groups (they report groups back with a
+`style`), the **Sidebar style** setting picks the look:
+
+- **minimal** (the default): the header shows the ticket key as a pill at
+  its left (`ACME-21`), then the summary, with no box around the group. An
+  unstarted PR is a ghost row with a **+** button in place of **Start**.
+- **card**: each ticket is a bordered card. Its header shows a ticket icon,
+  the key in mono (`ACME-21`), and the summary. **Start** shows when you
+  hover a PR row.
+
+In both, the header shows how many of the ticket's PRs have a review thread
 (`1/3`). PR rows and review threads start with a PR state icon: green for
 open, grey for a draft, and purple for merged. A merged or closed PR's state
 is read from GitHub. PR rows have no tree glyph and no `draft` text. A
-review thread ends with a dot for its agent state: green when reviewed,
-purple for follow-ups, and grey when opened but not reviewed yet. A running
-agent shows bb's own indicator instead. A stacked PR row or thread is
-indented under its base PR with a connector rail, one step per stack level,
-and a stacked PR row still says `on #552`.
-**Start** shows when you hover the row. Until bb reports the groups back,
-and on older builds, the sidebar looks as described above.
+review thread is a plain thread row that ends with a dot for its agent state:
+green when reviewed, purple for follow-ups, and grey when opened but not
+reviewed yet. A running agent shows bb's own indicator instead. A stacked PR
+row or thread is indented under its base PR with a connector rail, one step
+per stack level, and a stacked PR row still says `on #552`.
+
+A bb build that draws card groups but not minimal ones reports a minimal
+group back as `flat`; pr-review then draws cards there, even with minimal
+chosen. Until bb reports the groups back, and on older builds, the sidebar
+looks as described above.
 
 The groups refresh when a review thread starts and once a minute. This needs
 a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds
@@ -187,8 +198,9 @@ longer open is read with `gh pr view` and kept until the plugin restarts.
 | Jira project keys | `ACME` | Keys recognised as tickets. |
 | Jira site | `https://example.atlassian.net` | Base URL for ticket links. |
 | Review project | none | Project that review threads start in when no project's remote matches. |
+| Sidebar style | `minimal` | `minimal` or `card` ticket groups in the sidebar (see [Sidebar](#sidebar)). |
 
-Every setting is empty after install. Until Repositories is set, the queue is
+Every setting but Sidebar style is empty after install. Until Repositories is set, the queue is
 empty and shows a hint to set it. Tickets are recognised only when both Jira
 project keys and Jira site are set; until then the queue shows a hint for them,
 and PRs are not grouped by ticket.

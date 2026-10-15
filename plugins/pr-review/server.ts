@@ -29,6 +29,7 @@ import {
   type Viewer,
 } from "./queue.js";
 import { queuedPullState, relatedItems, withoutTickets, type RelatedItem, type RelatedPullState } from "./related.js";
+import { SIDEBAR_STYLES } from "./sidebar.js";
 import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
 import {
   OPEN_PULLS_QUERY,
@@ -180,6 +181,14 @@ export function createPlugin(deps: PluginDeps) {
         label: "Review project",
         description:
           "Project that review threads start in when no project's git remote matches the PR's repository.",
+      },
+      sidebarStyle: {
+        type: "select",
+        label: "Sidebar style",
+        description:
+          'How ticket groups look in the sidebar: "minimal" shows the ticket key as a pill and unstarted PRs as ghost rows, "card" draws each ticket as a bordered card. bb builds that draw neither show flat groups.',
+        options: [...SIDEBAR_STYLES],
+        default: "minimal",
       },
     });
     const store = createRefStore(bb.storage);

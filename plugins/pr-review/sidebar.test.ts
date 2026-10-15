@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
 import {
   groupHeaderLook,
+  pullActionLabel,
   pullRowLook,
+  sidebarLook,
+  sidebarStyle,
   stackedThreadRow,
   stackFirst,
   stackPrefix,
@@ -76,7 +79,7 @@ describe("ticketGroups", () => {
     expect(
       groups.map((group) => ({
         project: group.projectId,
-        label: groupHeaderLook(group, false).label,
+        label: groupHeaderLook(group, "legacy").label,
         tooltip: group.tooltip,
         threads: group.threadIds,
         items: group.items.map(itemLabel),
@@ -184,7 +187,7 @@ describe("stackPrefix", () => {
   });
 });
 
-describe("card looks", () => {
+describe("styled looks", () => {
   const result = (pulls: QueueEntry[]): SidebarGroupsResult => ({
     githubPanel: true,
     tickets: [{ key: "ACME-21", summary: "Speed up the importer", status: null, url: "https://jira/ACME-21" }],
@@ -207,16 +210,17 @@ describe("card looks", () => {
     ["thr_running", "proj_widgets"],
   ]);
 
-  it("splits the ticket key from its summary on a card host and keeps one label elsewhere", () => {
+  it("splits the ticket key from its summary on card and minimal hosts and keeps one label elsewhere", () => {
     const [ticket, none] = ticketGroups(result([entry(7, null)]), projects);
-    expect(ticket && groupHeaderLook(ticket, true)).toEqual({
+    expect(ticket && groupHeaderLook(ticket, "card")).toEqual({
       label: "Speed up the importer",
       keyLabel: "ACME-21",
       icon: TICKET_ICON,
-      style: "card",
     });
-    expect(none && groupHeaderLook(none, true)).toEqual({ label: "No ticket", icon: TICKET_ICON, style: "card" });
-    expect(ticket && groupHeaderLook(ticket, false)).toEqual({ label: "ACME-21 Speed up the importer" });
+    expect(none && groupHeaderLook(none, "card")).toEqual({ label: "No ticket", icon: TICKET_ICON });
+    expect(ticket && groupHeaderLook(ticket, "minimal")).toEqual({ label: "Speed up the importer", keyLabel: "ACME-21" });
+    expect(none && groupHeaderLook(none, "minimal")).toEqual({ label: "No ticket" });
+    expect(ticket && groupHeaderLook(ticket, "legacy")).toEqual({ label: "ACME-21 Speed up the importer" });
   });
 
   it("gives review threads their PR icon and an agent dot unless the agent is running", () => {
@@ -240,19 +244,67 @@ describe("card looks", () => {
 
   it("shows a stacked draft PR by depth and icon on a card host and by glyph and text elsewhere", () => {
     const draft = { ...entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] }), isDraft: true };
-    expect(pullRowLook(draft, "#553", true)).toEqual({
+    expect(pullRowLook(draft, "#553", "card")).toEqual({
       title: "#553 PR 553",
       depth: 1,
       description: "on #552",
       icon: { name: "GitPullRequestDraft", tone: "muted" },
     });
-    expect(pullRowLook(draft, "#553", false)).toEqual({ title: "└ #553 PR 553", description: "on #552 · draft" });
-    expect(pullRowLook(entry(600, null), "#600", true)).toEqual({
+    expect(pullRowLook(draft, "#553", "legacy")).toEqual({ title: "└ #553 PR 553", description: "on #552 · draft" });
+    expect(pullRowLook(entry(600, null), "#600", "card")).toEqual({
       title: "#600 PR 600",
       icon: { name: "GitPullRequest", tone: "success" },
     });
+    expect(pullRowLook(draft, "#553", "minimal")).toEqual({
+      title: "#553 PR 553",
+      depth: 1,
+      description: "on #552",
+      icon: { name: "GitPullRequestDraft", tone: "muted" },
+      variant: "ghost",
+    });
     const top = entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] });
-    expect(pullRowLook(top, "#564", true)).toMatchObject({ title: "#564 PR 564", depth: 2 });
-    expect(pullRowLook(top, "#564", false)).toMatchObject({ title: "\u00a0\u00a0└ #564 PR 564" });
+    expect(pullRowLook(top, "#564", "card")).toMatchObject({ title: "#564 PR 564", depth: 2 });
+    expect(pullRowLook(top, "#564", "legacy")).toMatchObject({ title: "\u00a0\u00a0└ #564 PR 564" });
+  });
+
+  it("labels the start action + on a minimal host and Start elsewhere", () => {
+    expect(pullActionLabel("minimal", false)).toBe("+");
+    expect(pullActionLabel("minimal", true)).toBe("…");
+    expect(pullActionLabel("card", false)).toBe("Start");
+    expect(pullActionLabel("legacy", true)).toBe("Starting…");
+  });
+});
+
+describe("sidebarLook", () => {
+  it("reads the chosen style from the settings, minimal unless card", () => {
+    expect(sidebarStyle(undefined)).toBe("minimal");
+    expect(sidebarStyle("card")).toBe("card");
+    expect(sidebarStyle("minimal")).toBe("minimal");
+  });
+
+  const legacy = (style: string) => ({ look: "legacy", style });
+  const styled = (look: string) => ({ look, style: look });
+
+  it("publishes legacy groups with the chosen style until the host reports a style back", () => {
+    expect(sidebarLook("minimal", undefined, false)).toEqual(legacy("minimal"));
+    expect(sidebarLook("card", undefined, false)).toEqual(legacy("card"));
+  });
+
+  it("uses minimal groups once a host reports minimal back", () => {
+    expect(sidebarLook("minimal", "minimal", false)).toEqual(styled("minimal"));
+  });
+
+  it("falls back to card groups on a host that reports a minimal group back as flat", () => {
+    expect(sidebarLook("minimal", "flat", false)).toEqual(styled("card"));
+    expect(sidebarLook("minimal", "card", true)).toEqual(styled("card"));
+  });
+
+  it("tries minimal again after switching from card on a host not known to reject it", () => {
+    expect(sidebarLook("minimal", "card", false)).toEqual(styled("minimal"));
+  });
+
+  it("uses card groups when card is chosen and the host reports any style", () => {
+    expect(sidebarLook("card", "card", false)).toEqual(styled("card"));
+    expect(sidebarLook("card", "minimal", false)).toEqual(styled("card"));
   });
 });

@@ -84,8 +84,8 @@ export interface StackedThreadRow {
 /**
  * A review thread's sidebar entry: the stack depth and "stacked on #N" of
  * its PR, absent when the PR is a stack base, not stacked, or not queued,
- * and its PR's state icon and agent dot, which bb builds without card
- * groups ignore.
+ * and its PR's state icon and agent dot, which bb builds without card or
+ * minimal groups ignore. Thread rows look the same on card and minimal hosts.
  */
 export function stackedThreadRow(threadId: string, entry: QueueEntry | null, review: ThreadReview | null): StackedThreadRow {
   const look = review === null ? {} : { ...iconFor(review.pullState), ...trailingFor(review.agent) };
@@ -93,46 +93,102 @@ export function stackedThreadRow(threadId: string, entry: QueueEntry | null, rev
   return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}`, ...look };
 }
 
+/** The sidebar style chosen in the plugin settings. */
+export type SidebarStyle = "minimal" | "card";
+
+export const SIDEBAR_STYLES: readonly SidebarStyle[] = ["minimal", "card"];
+
+/**
+ * The payload pr-review publishes: the chosen style when the host draws it,
+ * card groups when the host draws card but not minimal groups, and legacy
+ * flat groups on hosts that draw neither.
+ */
+export type SidebarLook = SidebarStyle | "legacy";
+
+export function sidebarStyle(value: unknown): SidebarStyle {
+  return value === "card" ? "card" : "minimal";
+}
+
+/**
+ * Whether the host reported this plugin's groups in a style pr-review never
+ * publishes, such as "flat". A host that draws card but not minimal groups
+ * reports a "minimal" group back that way.
+ */
+export function rejectsMinimal(reported: string | undefined): boolean {
+  return reported !== undefined && reported !== "minimal" && reported !== "card";
+}
+
+/**
+ * The look to publish and the `style` to publish it with, from the chosen
+ * style, the style the host reported for this plugin's groups (undefined
+ * until it reports one, and always on hosts that predate styled groups),
+ * and whether the host already rejected minimal groups. Legacy groups carry
+ * the chosen style, so a host that draws styled groups reports which one it
+ * took.
+ */
+export function sidebarLook(
+  chosen: SidebarStyle,
+  reported: string | undefined,
+  minimalRejected: boolean,
+): { look: SidebarLook; style: SidebarStyle } {
+  if (reported === undefined) return { look: "legacy", style: chosen };
+  if (chosen === "card" || minimalRejected || rejectsMinimal(reported)) return { look: "card", style: "card" };
+  return { look: "minimal", style: "minimal" };
+}
+
 export interface PullRowLook {
   title: string;
   depth?: number;
   description?: string;
   icon?: SidebarRowIcon;
+  variant?: "ghost";
 }
 
 /**
- * An unstarted PR row's title, description, and icon. A card host gets the
- * stack depth, which it draws as a connector rail, and the draft state as the
- * icon; other hosts get a tree glyph per stack level in the title and "draft"
- * in the description.
+ * An unstarted PR row's title, description, and icon. Card and minimal
+ * hosts get the stack depth, which they draw as a connector rail, and the
+ * draft state as the icon, and a minimal host draws the row as a ghost row;
+ * legacy hosts get a tree glyph per stack level in the title and "draft" in
+ * the description.
  */
-export function pullRowLook(entry: QueueEntry, label: string, card: boolean): PullRowLook {
+export function pullRowLook(entry: QueueEntry, label: string, look: SidebarLook): PullRowLook {
   const title = `${label} ${titleWithoutTicket(entry.title, entry.ticketKey)}`;
   const stackedOn = entry.parentNumber === null ? null : `on #${entry.parentNumber}`;
-  if (card) {
+  if (look !== "legacy") {
     const stack = stackedOn === null ? {} : { depth: entry.depth, description: stackedOn };
-    return { title, ...stack, ...iconFor(queuedPullState(entry)) };
+    const variant = look === "minimal" ? { variant: "ghost" as const } : {};
+    return { title, ...stack, ...iconFor(queuedPullState(entry)), ...variant };
   }
   const description = [stackedOn, entry.isDraft ? "draft" : null].filter((part) => part !== null).join(" · ");
   return { title: `${stackPrefix(entry.depth)}${title}`, ...(description === "" ? {} : { description }) };
+}
+
+/**
+ * An unstarted PR row's action label: a single "+" on a minimal host, which
+ * draws it as a compact button, and "Start" elsewhere.
+ */
+export function pullActionLabel(look: SidebarLook, starting: boolean): string {
+  if (look === "minimal") return starting ? "…" : "+";
+  return starting ? "Starting…" : "Start";
 }
 
 export interface GroupHeaderLook {
   label: string;
   keyLabel?: string;
   icon?: string;
-  style?: "card";
 }
 
 /**
- * A ticket group's header: on a card host the ticket key in `keyLabel`, the
- * summary as the label, and the ticket icon; on other hosts the key and
- * summary in one label.
+ * A ticket group's header: on card and minimal hosts the ticket key in
+ * `keyLabel` and the summary as the label, with the ticket icon on a card
+ * host (a minimal host draws the key as a pill instead); on legacy hosts the
+ * key and summary in one label.
  */
-export function groupHeaderLook({ ticketKey, summary }: TicketGroup, card: boolean): GroupHeaderLook {
-  if (ticketKey === null) return card ? { label: NO_TICKET_LABEL, icon: TICKET_ICON, style: "card" } : { label: NO_TICKET_LABEL };
-  if (card) return { label: summary ?? "", keyLabel: ticketKey, icon: TICKET_ICON, style: "card" };
-  return { label: summary === null ? ticketKey : `${ticketKey} ${summary}` };
+export function groupHeaderLook({ ticketKey, summary }: TicketGroup, look: SidebarLook): GroupHeaderLook {
+  const icon = look === "card" ? { icon: TICKET_ICON } : {};
+  if (ticketKey === null) return { label: NO_TICKET_LABEL, ...icon };
+  if (look === "legacy") return { label: summary === null ? ticketKey : `${ticketKey} ${summary}` };
+  return { label: summary ?? "", keyLabel: ticketKey, ...icon };
 }
 
 function isStacked(entry: QueueEntry): boolean {

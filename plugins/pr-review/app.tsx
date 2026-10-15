@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactN
 import {
   definePluginApp,
   experimental_Icon as Icon,
+  experimental_usePluginId,
   experimental_useSidebarThreads,
   useBbNavigate,
   useRealtime,
   useRpc,
+  useSettings,
   type BbNavigate,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
@@ -24,12 +26,17 @@ import { titleWithoutTicket } from "./parse";
 import { needsViewer, pullLabeler, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
 import {
   groupHeaderLook,
+  pullActionLabel,
   pullRowLook,
+  rejectsMinimal,
+  sidebarLook,
+  sidebarStyle,
   stackedThreadRow,
   ticketGroups,
   TICKET_ICON,
   type GroupHeaderLook,
-  type SidebarRowIcon,
+  type PullRowLook,
+  type SidebarStyle,
   type StackedThreadRow,
 } from "./sidebar";
 import { ticketTooltip } from "./tickets";
@@ -376,13 +383,9 @@ function useStartReview(githubPanel: boolean) {
   return { starting, review };
 }
 
-interface SidebarThreadGroupRow {
+interface SidebarThreadGroupRow extends PullRowLook {
   id: string;
-  title: string;
-  depth?: number;
-  description?: string;
   tooltip?: string;
-  icon?: SidebarRowIcon;
   onSelect(): void;
   action?: { label: string; run(): void };
 }
@@ -395,6 +398,7 @@ interface SidebarThreadGroupRow {
 type SidebarThreadGroupThreadRow = StackedThreadRow;
 
 interface SidebarThreadGroup extends GroupHeaderLook {
+  style: SidebarStyle;
   projectId: string;
   key: string;
   tooltip?: string;
@@ -409,8 +413,9 @@ type SidebarThreadGroupsSlot = (registration: {
   useGroups(): readonly SidebarThreadGroup[];
 }) => void;
 
-/** A group as bb reports it back; card-capable builds always set `style`. */
+/** A group as bb reports it back; builds that draw styled groups always set `style`. */
 interface ResolvedSidebarThreadGroup {
+  pluginId: string;
   style?: string;
 }
 
@@ -431,12 +436,22 @@ const useResolvedSidebarGroups: () => readonly ResolvedSidebarThreadGroup[] =
   ).__bbPluginRuntime?.pluginSdkApp?.experimental_useSidebarThreadGroups ?? (() => NO_RESOLVED_GROUPS);
 
 /**
- * Whether bb draws card groups with icons: it reports the published groups
- * back with `style` set. False until the first groups are published, so the
- * groups render as on older builds until then.
+ * The look to publish for the style chosen in the settings, from the style
+ * bb reports back for this plugin's groups. Legacy until the first groups
+ * are reported back, so the groups render as on older builds until then. A
+ * host that once reported a minimal group back in another style keeps
+ * getting card groups, since a card group's reported style does not tell
+ * whether the host draws minimal ones.
  */
-function useCardGroups(): boolean {
-  return useResolvedSidebarGroups().some((group) => group.style !== undefined);
+function useSidebarLook(): ReturnType<typeof sidebarLook> {
+  const pluginId = experimental_usePluginId();
+  const chosen = sidebarStyle(useSettings().values?.sidebarStyle);
+  const reported = useResolvedSidebarGroups().find((group) => group.pluginId === pluginId)?.style;
+  const [minimalRejected, setMinimalRejected] = useState(false);
+  useEffect(() => {
+    if (rejectsMinimal(reported)) setMinimalRejected(true);
+  }, [reported]);
+  return sidebarLook(chosen, reported, minimalRejected);
 }
 
 const SIDEBAR_REFRESH_MS = 60_000;
@@ -459,7 +474,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
   }, [load]);
   useRealtime(REFS_CHANNEL, () => load());
   const { starting, review } = useStartReview(result?.githubPanel ?? false);
-  const card = useCardGroups();
+  const { look, style } = useSidebarLook();
   const projectIdByThreadId = useMemo(
     () => new Map(threads.map((thread) => [thread.id, thread.projectId])),
     [threads],
@@ -469,7 +484,8 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
     return ticketGroups(result, projectIdByThreadId).map((group) => ({
       projectId: group.projectId,
       key: group.key,
-      ...groupHeaderLook(group, card),
+      ...groupHeaderLook(group, look),
+      style,
       ...(group.tooltip === null ? {} : { tooltip: group.tooltip }),
       threadIds: group.threadIds,
       rows: group.items.map((item): SidebarThreadGroupRow | SidebarThreadGroupThreadRow => {
@@ -480,7 +496,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
           entry.childNumbers.length === 0 ? [] : [`base of ${entry.childNumbers.map((n) => `#${n}`).join(", ")}`];
         return {
           id: key,
-          ...pullRowLook(entry, group.pullLabel(entry.repo, entry.number), card),
+          ...pullRowLook(entry, group.pullLabel(entry.repo, entry.number), look),
           tooltip: [
             key,
             entry.author,
@@ -490,12 +506,12 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
             ...baseOf,
           ].join(" · "),
           onSelect: () => review(entry),
-          action: { label: starting === key ? "Starting…" : "Start", run: () => review(entry) },
+          action: { label: pullActionLabel(look, starting === key), run: () => review(entry) },
         };
       }),
       keepOrder: true,
     }));
-  }, [card, projectIdByThreadId, result, review, starting]);
+  }, [look, projectIdByThreadId, result, review, starting, style]);
 }
 
 function ReviewQueuePanel() {
