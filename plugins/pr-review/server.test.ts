@@ -164,10 +164,10 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
 }
 
 describe("reviewTitle", () => {
-  it("leads with the short repo, number, and ticket and stays within 120 characters", () => {
-    expect(reviewTitle(REPO, 596, "ACME-51: Cache the catalog", "ACME-51")).toBe("widgets#596 ACME-51: Cache the catalog");
-    expect(reviewTitle(REPO, 590, "Run the review workflow", null)).toBe("widgets#590 Run the review workflow");
-    const long = reviewTitle(REPO, 1, "x".repeat(200), "ACME-1");
+  it("leads with the number, drops the ticket prefix, and stays within 120 characters", () => {
+    expect(reviewTitle(596, "ACME-51: Cache the catalog", "ACME-51")).toBe("#596 Cache the catalog");
+    expect(reviewTitle(590, "Run the review workflow", null)).toBe("#590 Run the review workflow");
+    const long = reviewTitle(1, "x".repeat(200), "ACME-1");
     expect(long).toHaveLength(120);
     expect(long.endsWith("…")).toBe(true);
   });
@@ -182,7 +182,7 @@ describe("startReview", () => {
     const [[spawn]] = harness.sdk.callsTo("threads.spawn") as [[Record<string, unknown>]];
     expect(spawn).toMatchObject({
       projectId: "proj_widgets",
-      title: "widgets#596 ACME-51: Cache the widget catalog per tenant",
+      title: "#596 Cache the widget catalog per tenant",
       environment: {
         type: "provider",
         environmentProviderId: "git-worktree",
@@ -190,12 +190,17 @@ describe("startReview", () => {
         inputs: { branch: { kind: "named", name: "origin/bob/catalog-cache" } },
       },
     });
-    const prompt = String(spawn.prompt);
-    expect(prompt).toContain('Ticket: ACME-51 "Cache the widget catalog" [In Progress]');
-    expect(prompt).toContain('Linked issue: acme/widgets#12 "Stale prices after a currency change"');
-    expect(prompt).toContain('acme/widgets#599 "Evict the old catalog entry"');
-    expect(prompt).not.toContain(REVIEW_COMMAND);
-    expect(prompt.split("\n").at(-1)).toBe('Do not review yet. Reply only "Ready." and wait for instructions.');
+    expect(String(spawn.prompt)).toBe(
+      [
+        "Review context for [widgets#596](https://github.com/acme/widgets/pull/596): Cache the widget catalog per tenant (branch `bob/catalog-cache`)",
+        "- Ticket [ACME-51](https://example.atlassian.net/browse/ACME-51): Cache the widget catalog (In Progress)",
+        "- Linked issue [#12](https://github.com/acme/widgets/issues/12): Stale prices after a currency change",
+        "- Other open PRs on ACME-51:",
+        "  - [#599](https://github.com/acme/widgets/pull/599): Evict the old catalog entry",
+        "",
+        'Do not review yet. Reply only "Ready." and wait for instructions.',
+      ].join("\n"),
+    );
   });
 
   it("returns once the worktree is on the PR head branch and bb resolves the PR for it", async () => {

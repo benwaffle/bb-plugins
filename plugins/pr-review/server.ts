@@ -86,15 +86,18 @@ function shortRepo(repo: string): string {
   return repo.slice(repo.indexOf("/") + 1);
 }
 
-export function reviewTitle(repo: string, number: number, title: string, ticket: string | null): string {
-  const prefix = `${shortRepo(repo)}#${number}`;
-  const full = ticket === null ? `${prefix} ${title}` : `${prefix} ${ticket}: ${titleWithoutTicket(title)}`;
+/**
+ * `#596 <PR title>`, cut to 120 characters. The sidebar's project header and
+ * ticket group show the repository and ticket, so the title leaves them out.
+ */
+export function reviewTitle(number: number, title: string, ticket: string | null): string {
+  const full = `#${number} ${titleWithoutTicket(title, ticket)}`;
   return full.length <= TITLE_LIMIT ? full : `${full.slice(0, TITLE_LIMIT - 1)}…`;
 }
 
 export interface ReviewContext {
   repo: string;
-  pull: Pick<PullView, "number" | "title" | "url" | "headRefName" | "additions" | "deletions" | "files">;
+  pull: Pick<PullView, "number" | "title" | "url" | "headRefName">;
   ticket: Ticket | null;
   issues: ReadonlyArray<{ key: string; title: string | null; url: string }>;
   siblings: ReadonlyArray<{ key: string; title: string; url: string }>;
@@ -109,25 +112,25 @@ export function reviewCommand(number: number): string {
  * starts the review. The review runs when `reviewCommand` is sent.
  */
 export function contextPrompt(context: ReviewContext): string {
-  const { pull, ticket } = context;
+  const { repo, pull, ticket } = context;
+  const ticketKey = ticket?.key ?? null;
+  const label = (key: string) => (key.startsWith(`${repo}#`) ? key.slice(repo.length) : key);
   const lines = [
-    "Review context (data gathered by the pr-review plugin):",
-    `- PR: ${pullKey(context.repo, pull.number)} "${pull.title}" ${pull.url}`,
-    `  branch ${pull.headRefName}, +${pull.additions}/-${pull.deletions} across ${pull.files.length} files`,
+    `Review context for [${shortRepo(repo)}#${pull.number}](${pull.url}): ${titleWithoutTicket(pull.title, ticketKey)} (branch \`${pull.headRefName}\`)`,
   ];
   if (ticket !== null) {
-    const status = ticket.status === null ? "" : ` [${ticket.status}]`;
-    const summary = ticket.summary === null ? "" : ` "${ticket.summary}"`;
-    lines.push(`- Ticket: ${ticket.key}${summary}${status} ${ticket.url}`);
+    const summary = ticket.summary === null ? "" : `: ${ticket.summary}`;
+    const status = ticket.status === null ? "" : ` (${ticket.status})`;
+    lines.push(`- Ticket [${ticket.key}](${ticket.url})${summary}${status}`);
   }
   for (const issue of context.issues) {
-    const title = issue.title === null ? "" : ` "${issue.title}"`;
-    lines.push(`- Linked issue: ${issue.key}${title} ${issue.url}`);
+    const title = issue.title === null ? "" : `: ${issue.title}`;
+    lines.push(`- Linked issue [${label(issue.key)}](${issue.url})${title}`);
   }
   if (ticket !== null && context.siblings.length > 0) {
     lines.push(`- Other open PRs on ${ticket.key}:`);
     for (const sibling of context.siblings) {
-      lines.push(`  - ${sibling.key} "${sibling.title}" ${sibling.url}`);
+      lines.push(`  - [${label(sibling.key)}](${sibling.url}): ${titleWithoutTicket(sibling.title, ticketKey)}`);
     }
   }
   lines.push("", 'Do not review yet. Reply only "Ready." and wait for instructions.');
@@ -631,7 +634,7 @@ export function createPlugin(deps: PluginDeps) {
           machine: { type: "existing", hostId },
           inputs: { branch: base },
         },
-        title: reviewTitle(repo, number, resolved.pull.title, resolved.ticket?.key ?? null),
+        title: reviewTitle(number, resolved.pull.title, resolved.ticket?.key ?? null),
         prompt: contextPrompt({ repo, ...resolved }),
         pluginMetadata: { repo, number },
       });

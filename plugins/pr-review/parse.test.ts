@@ -39,9 +39,12 @@ describe("ticketKey", () => {
 });
 
 describe("titleWithoutTicket", () => {
-  it("drops the ticket prefix", () => {
-    expect(titleWithoutTicket("ACME-51: Cache the catalog")).toBe("Cache the catalog");
-    expect(titleWithoutTicket("Cache the catalog")).toBe("Cache the catalog");
+  it("drops the PR's own ticket prefix and keeps any other", () => {
+    expect(titleWithoutTicket("ACME-51: Cache the catalog", "ACME-51")).toBe("Cache the catalog");
+    expect(titleWithoutTicket("[ACME-51]: Cache the catalog", "ACME-51")).toBe("Cache the catalog");
+    expect(titleWithoutTicket("Cache the catalog", "ACME-51")).toBe("Cache the catalog");
+    expect(titleWithoutTicket("OPS-7: Cache the catalog", "ACME-51")).toBe("OPS-7: Cache the catalog");
+    expect(titleWithoutTicket("OPS-7: Cache the catalog", null)).toBe("OPS-7: Cache the catalog");
   });
 });
 

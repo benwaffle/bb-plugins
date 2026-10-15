@@ -179,9 +179,6 @@ export const PULL_VIEW_FIELDS = [
   "reviews",
   "reviewDecision",
   "latestReviews",
-  "files",
-  "additions",
-  "deletions",
   "isCrossRepository",
   "state",
 ] as const;
@@ -193,11 +190,8 @@ const pullViewSchema = z.object({
   headRefName: z.string(),
   url: z.string(),
   reviewDecision: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
   isCrossRepository: z.boolean(),
   state: z.string(),
-  files: z.array(z.object({ path: z.string() })),
 });
 export type PullView = z.infer<typeof pullViewSchema>;
 

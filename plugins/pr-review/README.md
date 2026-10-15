@@ -99,11 +99,23 @@ A new review thread:
 - gets a `git-worktree` environment based on `origin/<head branch>`, then runs
   `gh pr checkout <n>` in it once the worktree is ready. If that branch is
   already checked out in another worktree, it checks out as `review/pr-<n>`;
-- is titled `widgets#596 ACME-51: <PR title>`, cut to 120 characters;
-- gets a first message with the PR, the ticket's summary and status, the
-  linked issues, and the other open PRs on the same ticket, and an instruction
-  to reply "Ready." and wait. bb cannot start a thread without a message, so
-  the agent runs one short turn; it does not review.
+- is titled `#596 <PR title>`, without the title's ticket prefix, cut to 120
+  characters. The project header and the ticket group show the repository and
+  ticket;
+- gets a first message with Markdown links to the PR, the ticket (with its
+  summary and status), the linked issues, and the other open PRs on the same
+  ticket, and an instruction to reply "Ready." and wait. bb cannot start a
+  thread without a message, so the agent runs one short turn; it does not
+  review. The diff size is not in the message, because the GitHub PR column
+  shows it live:
+
+  ```md
+  Review context for [widgets#596](https://github.com/acme/widgets/pull/596): Cache the widget catalog per tenant (branch `bob/catalog-cache`)
+  - Ticket [ACME-51](https://example.atlassian.net/browse/ACME-51): Cache the widget catalog (In Progress)
+  - Linked issue [#12](https://github.com/acme/widgets/issues/12): Stale prices after a currency change
+  - Other open PRs on ACME-51:
+    - [#599](https://github.com/acme/widgets/pull/599): Evict the old catalog entry
+  ```
 
 The thread opens after `gh pr checkout` finishes and bb's branch lookup for the
 worktree finds the PR (up to 30 seconds after checkout). The GitHub plugin's

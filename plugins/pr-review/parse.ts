@@ -71,8 +71,11 @@ function hasProjectKey(key: string, projectKeys: readonly string[]): boolean {
   return projectKeys.includes(project);
 }
 
-export function titleWithoutTicket(title: string): string {
-  return title.replace(TITLE_TICKET_PATTERN, "").trim();
+/** `title` without its `ticketKey:` prefix; unchanged when it has another prefix or none. */
+export function titleWithoutTicket(title: string, ticketKey: string | null): string {
+  const match = TITLE_TICKET_PATTERN.exec(title);
+  if (ticketKey === null || match === null || match[1] !== ticketKey) return title;
+  return title.slice(match[0].length).trim();
 }
 
 function qualify(reference: string, repo: string): string {
