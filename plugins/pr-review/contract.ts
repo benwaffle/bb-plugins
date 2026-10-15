@@ -30,8 +30,10 @@ const reviewStateSchema = z.enum([
   "PENDING",
 ]);
 
+const agentStateSchema = z.enum(["none", "opened", "reviewing", "reviewed", "follow-ups"]);
+
 const agentSchema = z.object({
-  state: z.enum(["none", "opened", "reviewing", "reviewed", "follow-ups"]),
+  state: agentStateSchema,
   threadId: z.string().nullable(),
 });
 
@@ -98,6 +100,8 @@ const queueResultSchema = z.object({
 });
 export type QueueResult = z.infer<typeof queueResultSchema>;
 
+const pullStateSchema = z.enum(["open", "draft", "merged", "closed"]);
+
 const relatedResultSchema = z.object({
   githubPanel: z.boolean(),
   tickets: z.array(z.string()),
@@ -112,7 +116,7 @@ const relatedResultSchema = z.object({
           number: z.number().int().positive(),
           url: z.string(),
           /** null when GitHub could not be read. */
-          state: z.enum(["open", "draft", "merged", "closed"]).nullable(),
+          state: pullStateSchema.nullable(),
         })
         .nullable(),
       agent: agentSchema,
@@ -127,6 +131,10 @@ const sidebarGroupsResultSchema = z.object({
   threadTickets: z.array(z.object({ threadId: threadIdSchema, ticketKey: z.string() })),
   pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),
   threadPulls: z.array(z.object({ threadId: threadIdSchema, entry: queueEntrySchema })),
+  /** The PR state and agent state of each thread in `threadTickets` that reviews a PR. */
+  threadReviews: z.array(
+    z.object({ threadId: threadIdSchema, pullState: pullStateSchema.nullable(), agent: agentStateSchema }),
+  ),
 });
 export type SidebarGroupsResult = z.infer<typeof sidebarGroupsResultSchema>;
 

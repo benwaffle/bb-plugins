@@ -1,17 +1,24 @@
 import type { QueueEntry, SidebarGroupsResult } from "./contract.js";
-import { pullKey, pullLabeler, stackOrder } from "./queue.js";
+import { pullKey, pullLabeler, stackOrder, type AgentState } from "./queue.js";
+import { titleWithoutTicket } from "./parse.js";
+import { queuedPullState, type RelatedPullState } from "./related.js";
 import { ticketTooltip } from "./tickets.js";
 
 export const NO_TICKET_LABEL = "No ticket";
 
+export type ThreadReview = Omit<SidebarGroupsResult["threadReviews"][number], "threadId">;
+
 export type TicketGroupItem =
   | { kind: "pull"; entry: QueueEntry }
-  | { kind: "thread"; threadId: string; entry: QueueEntry | null };
+  | { kind: "thread"; threadId: string; entry: QueueEntry | null; review: ThreadReview | null };
 
 export interface TicketGroup {
   projectId: string;
   key: string;
-  label: string;
+  /** null for the group of PRs without a ticket. */
+  ticketKey: string | null;
+  /** The ticket summary, or null until it is read and for "No ticket". */
+  summary: string | null;
   tooltip: string | null;
   threadIds: string[];
   items: TicketGroupItem[];
@@ -28,19 +35,101 @@ export function stackPrefix(depth: number): string {
   return depth === 0 ? "" : `${"\u00a0\u00a0".repeat(depth - 1)}└ `;
 }
 
+export type SidebarTone = "success" | "muted" | "accent" | "danger";
+
+export interface SidebarRowIcon {
+  name: string;
+  tone: SidebarTone;
+}
+
+export type SidebarRowTrailing = { kind: "dot"; tone: SidebarTone } | { kind: "text"; text: string };
+
+/** The icon pr-review registers for ticket group headers. */
+export const TICKET_ICON = "pr-review/ticket";
+
+const PULL_ICONS: Record<NonNullable<RelatedPullState>, SidebarRowIcon> = {
+  open: { name: "GitPullRequest", tone: "success" },
+  draft: { name: "GitPullRequestDraft", tone: "muted" },
+  merged: { name: "GitMerge", tone: "accent" },
+  closed: { name: "GitPullRequestClosed", tone: "danger" },
+};
+
+const AGENT_DOTS: Partial<Record<AgentState, SidebarTone>> = {
+  opened: "muted",
+  reviewed: "success",
+  "follow-ups": "accent",
+};
+
+function iconFor(state: RelatedPullState): { icon?: SidebarRowIcon } {
+  return state === null ? {} : { icon: PULL_ICONS[state] };
+}
+
+/**
+ * The agent state as a trailing dot. A running agent has none, because the
+ * host shows its own running indicator.
+ */
+function trailingFor(agent: AgentState): { trailing?: SidebarRowTrailing } {
+  const tone = AGENT_DOTS[agent];
+  return tone === undefined ? {} : { trailing: { kind: "dot", tone } };
+}
+
 export interface StackedThreadRow {
   threadId: string;
   depth?: number;
   description?: string;
+  icon?: SidebarRowIcon;
+  trailing?: SidebarRowTrailing;
 }
 
 /**
  * A review thread's sidebar entry: the stack depth and "stacked on #N" of
- * its PR, absent when the PR is a stack base, not stacked, or not queued.
+ * its PR, absent when the PR is a stack base, not stacked, or not queued,
+ * and its PR's state icon and agent dot, which bb builds without card
+ * groups ignore.
  */
-export function stackedThreadRow(threadId: string, entry: QueueEntry | null): StackedThreadRow {
-  if (entry === null || entry.parentNumber === null) return { threadId };
-  return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}` };
+export function stackedThreadRow(threadId: string, entry: QueueEntry | null, review: ThreadReview | null): StackedThreadRow {
+  const look = review === null ? {} : { ...iconFor(review.pullState), ...trailingFor(review.agent) };
+  if (entry === null || entry.parentNumber === null) return { threadId, ...look };
+  return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}`, ...look };
+}
+
+export interface PullRowLook {
+  title: string;
+  description?: string;
+  icon?: SidebarRowIcon;
+}
+
+/**
+ * An unstarted PR row's title, description, and icon. A card host shows the
+ * draft state as the icon; other hosts get a tree glyph per stack level in
+ * the title and "draft" in the description.
+ */
+export function pullRowLook(entry: QueueEntry, label: string, card: boolean): PullRowLook {
+  const title = `${label} ${titleWithoutTicket(entry.title, entry.ticketKey)}`;
+  const stackedOn = entry.parentNumber === null ? [] : [`on #${entry.parentNumber}`];
+  if (card) {
+    return { title, ...(stackedOn.length === 0 ? {} : { description: stackedOn[0] }), ...iconFor(queuedPullState(entry)) };
+  }
+  const description = [...stackedOn, ...(entry.isDraft ? ["draft"] : [])].join(" · ");
+  return { title: `${stackPrefix(entry.depth)}${title}`, ...(description === "" ? {} : { description }) };
+}
+
+export interface GroupHeaderLook {
+  label: string;
+  keyLabel?: string;
+  icon?: string;
+  style?: "card";
+}
+
+/**
+ * A ticket group's header: on a card host the ticket key in `keyLabel`, the
+ * summary as the label, and the ticket icon; on other hosts the key and
+ * summary in one label.
+ */
+export function groupHeaderLook({ ticketKey, summary }: TicketGroup, card: boolean): GroupHeaderLook {
+  if (ticketKey === null) return card ? { label: NO_TICKET_LABEL, icon: TICKET_ICON, style: "card" } : { label: NO_TICKET_LABEL };
+  if (card) return { label: summary ?? "", keyLabel: ticketKey, icon: TICKET_ICON, style: "card" };
+  return { label: summary === null ? ticketKey : `${ticketKey} ${summary}` };
 }
 
 function isStacked(entry: QueueEntry): boolean {
@@ -81,19 +170,16 @@ export function ticketGroups(
 ): TicketGroup[] {
   const tickets = new Map(result.tickets.map((ticket) => [ticket.key, ticket]));
   const groups = new Map<string, TicketGroup>();
-  const labelFor = (ticketKey: string | null): string => {
-    if (ticketKey === null) return NO_TICKET_LABEL;
-    const summary = tickets.get(ticketKey)?.summary ?? null;
-    return summary === null ? ticketKey : `${ticketKey} ${summary}`;
-  };
   const groupFor = (projectId: string, ticketKey: string | null): TicketGroup => {
     const key = `${projectId}:${ticketKey ?? ""}`;
     let group = groups.get(key);
     if (group === undefined) {
+      const summary = ticketKey === null ? null : (tickets.get(ticketKey)?.summary ?? null);
       group = {
         projectId,
         key,
-        label: labelFor(ticketKey),
+        ticketKey,
+        summary,
         tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
         items: [],
@@ -104,6 +190,7 @@ export function ticketGroups(
     return group;
   };
   const pullByThreadId = new Map(result.threadPulls.map(({ threadId, entry }) => [threadId, entry]));
+  const reviewByThreadId = new Map(result.threadReviews.map(({ threadId, ...review }) => [threadId, review]));
   for (const { projectId, entry } of result.pulls) {
     groupFor(projectId, entry.ticketKey).items.push({ kind: "pull", entry });
   }
@@ -112,13 +199,18 @@ export function ticketGroups(
     if (projectId === undefined) continue;
     const group = groupFor(projectId, ticketKey);
     group.threadIds.push(threadId);
-    group.items.push({ kind: "thread", threadId, entry: pullByThreadId.get(threadId) ?? null });
+    group.items.push({
+      kind: "thread",
+      threadId,
+      entry: pullByThreadId.get(threadId) ?? null,
+      review: reviewByThreadId.get(threadId) ?? null,
+    });
   }
   for (const group of groups.values()) {
     group.items = stackFirstItems(group.items);
     group.pullLabel = pullLabeler(group.items.flatMap((item) => (item.entry === null ? [] : [item.entry.repo])));
   }
   return [...groups.values()].sort(
-    (left, right) => Number(left.label === NO_TICKET_LABEL) - Number(right.label === NO_TICKET_LABEL),
+    (left, right) => Number(left.ticketKey === null) - Number(right.ticketKey === null),
   );
 }

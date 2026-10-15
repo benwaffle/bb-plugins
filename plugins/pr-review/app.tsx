@@ -22,7 +22,16 @@ import type {
 import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
 import { titleWithoutTicket } from "./parse";
 import { needsViewer, pullLabeler, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
-import { stackedThreadRow, stackPrefix, ticketGroups } from "./sidebar";
+import {
+  groupHeaderLook,
+  pullRowLook,
+  stackedThreadRow,
+  ticketGroups,
+  TICKET_ICON,
+  type GroupHeaderLook,
+  type SidebarRowIcon,
+  type StackedThreadRow,
+} from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
 type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T };
@@ -372,25 +381,21 @@ interface SidebarThreadGroupRow {
   title: string;
   description?: string;
   tooltip?: string;
+  icon?: SidebarRowIcon;
   onSelect(): void;
   action?: { label: string; run(): void };
 }
 
 /**
- * A thread row the host decorates with a stack glyph and description. bb
- * builds without these drop the entry and ignore `keepOrder`, so every
- * thread is also listed in `threadIds`.
+ * A thread row the host decorates with a stack depth, description, icon, and
+ * trailing dot. bb builds without these drop the entry and ignore
+ * `keepOrder`, so every thread is also listed in `threadIds`.
  */
-interface SidebarThreadGroupThreadRow {
-  threadId: string;
-  depth?: number;
-  description?: string;
-}
+type SidebarThreadGroupThreadRow = StackedThreadRow;
 
-interface SidebarThreadGroup {
+interface SidebarThreadGroup extends GroupHeaderLook {
   projectId: string;
   key: string;
-  label: string;
   tooltip?: string;
   threadIds: readonly string[];
   rows: readonly (SidebarThreadGroupRow | SidebarThreadGroupThreadRow)[];
@@ -402,6 +407,36 @@ type SidebarThreadGroupsSlot = (registration: {
   title: string;
   useGroups(): readonly SidebarThreadGroup[];
 }) => void;
+
+/** A group as bb reports it back; card-capable builds always set `style`. */
+interface ResolvedSidebarThreadGroup {
+  style?: string;
+}
+
+const NO_RESOLVED_GROUPS: readonly ResolvedSidebarThreadGroup[] = [];
+
+/**
+ * The hook bb builds with sidebar groups install for reading every plugin's
+ * resolved groups. SDK 0.5.29 does not export it, so it is read from the
+ * plugin runtime; it is present or absent for the life of the app.
+ */
+const useResolvedSidebarGroups: () => readonly ResolvedSidebarThreadGroup[] =
+  (
+    globalThis as {
+      __bbPluginRuntime?: {
+        pluginSdkApp?: { experimental_useSidebarThreadGroups?: () => readonly ResolvedSidebarThreadGroup[] };
+      };
+    }
+  ).__bbPluginRuntime?.pluginSdkApp?.experimental_useSidebarThreadGroups ?? (() => NO_RESOLVED_GROUPS);
+
+/**
+ * Whether bb draws card groups with icons: it reports the published groups
+ * back with `style` set. False until the first groups are published, so the
+ * groups render as on older builds until then.
+ */
+function useCardGroups(): boolean {
+  return useResolvedSidebarGroups().some((group) => group.style !== undefined);
+}
 
 const SIDEBAR_REFRESH_MS = 60_000;
 const NO_SIDEBAR_GROUPS: readonly SidebarThreadGroup[] = [];
@@ -423,6 +458,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
   }, [load]);
   useRealtime(REFS_CHANNEL, () => load());
   const { starting, review } = useStartReview(result?.githubPanel ?? false);
+  const card = useCardGroups();
   const projectIdByThreadId = useMemo(
     () => new Map(threads.map((thread) => [thread.id, thread.projectId])),
     [threads],
@@ -432,21 +468,18 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
     return ticketGroups(result, projectIdByThreadId).map((group) => ({
       projectId: group.projectId,
       key: group.key,
-      label: group.label,
+      ...groupHeaderLook(group, card),
       ...(group.tooltip === null ? {} : { tooltip: group.tooltip }),
       threadIds: group.threadIds,
       rows: group.items.map((item): SidebarThreadGroupRow | SidebarThreadGroupThreadRow => {
-        if (item.kind === "thread") return stackedThreadRow(item.threadId, item.entry);
+        if (item.kind === "thread") return stackedThreadRow(item.threadId, item.entry, item.review);
         const { entry } = item;
         const key = `${entry.repo}#${entry.number}`;
-        const stackedOn = entry.parentNumber === null ? [] : [`on #${entry.parentNumber}`];
         const baseOf =
           entry.childNumbers.length === 0 ? [] : [`base of ${entry.childNumbers.map((n) => `#${n}`).join(", ")}`];
-        const description = [...stackedOn, ...(entry.isDraft ? ["draft"] : [])].join(" · ");
         return {
           id: key,
-          title: `${stackPrefix(entry.depth)}${group.pullLabel(entry.repo, entry.number)} ${entryTitle(entry)}`,
-          ...(description === "" ? {} : { description }),
+          ...pullRowLook(entry, group.pullLabel(entry.repo, entry.number), card),
           tooltip: [
             key,
             entry.author,
@@ -461,7 +494,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
       }),
       keepOrder: true,
     }));
-  }, [projectIdByThreadId, result, review, starting]);
+  }, [card, projectIdByThreadId, result, review, starting]);
 }
 
 function ReviewQueuePanel() {
@@ -760,7 +793,26 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   );
 }
 
+function TicketIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+      <path d="M13 5v2M13 17v2M13 11v2" />
+    </svg>
+  );
+}
+
 export default definePluginApp((app) => {
+  app.experimental_icons.register({ name: TICKET_ICON, component: TicketIcon });
   const slots: typeof app.slots & { experimental_sidebarThreadGroups?: SidebarThreadGroupsSlot } = app.slots;
   slots.experimental_sidebarThreadGroups?.({
     id: "tickets",

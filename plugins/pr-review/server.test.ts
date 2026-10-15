@@ -429,6 +429,34 @@ describe("sidebarGroups", () => {
       ].join("\n"),
     });
   });
+
+  it("gives each review thread its PR state, read from GitHub for a PR that left the queue, and its agent state", async () => {
+    const { harness, bb } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const store = (await import("./store.js")).createRefStore(bb.storage);
+    const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
+    store.record("thr_merged", [
+      ticket,
+      { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
+    ]);
+    store.record("thr_notes", [ticket]);
+    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
+      id: threadId,
+      environmentId: "env_review",
+      status: "idle",
+      title: null,
+      titleFallback: null,
+      deletedAt: null,
+      updatedAt: 1,
+    }));
+    const groups = (await harness.callRpc("sidebarGroups", {})) as {
+      threadReviews: Array<{ threadId: string; pullState: string | null; agent: string }>;
+    };
+    expect(groups.threadReviews).toEqual([
+      { threadId: "thr_merged", pullState: "merged", agent: "opened" },
+      { threadId: "thr_1", pullState: "open", agent: "opened" },
+    ]);
+  });
 });
 
 describe("related threads", () => {

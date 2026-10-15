@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
-import { stackedThreadRow, stackFirst, stackPrefix, ticketGroups, type TicketGroupItem } from "./sidebar";
+import {
+  groupHeaderLook,
+  pullRowLook,
+  stackedThreadRow,
+  stackFirst,
+  stackPrefix,
+  TICKET_ICON,
+  ticketGroups,
+  type TicketGroupItem,
+} from "./sidebar";
 
 function itemLabel(item: TicketGroupItem): string {
   return item.kind === "thread" ? item.threadId : `#${item.entry.number}`;
@@ -53,6 +62,7 @@ describe("ticketGroups", () => {
         { projectId: "proj_widgets", entry: entry(9, "ACME-30") },
       ],
       threadPulls: [],
+      threadReviews: [],
     };
     const groups = ticketGroups(
       result,
@@ -66,7 +76,7 @@ describe("ticketGroups", () => {
     expect(
       groups.map((group) => ({
         project: group.projectId,
-        label: group.label,
+        label: groupHeaderLook(group, false).label,
         tooltip: group.tooltip,
         threads: group.threadIds,
         items: group.items.map(itemLabel),
@@ -103,6 +113,7 @@ describe("ticketGroups", () => {
         { threadId: "thr_552", entry: base },
         { threadId: "thr_564", entry: top },
       ],
+      threadReviews: [],
     };
     const [group] = ticketGroups(
       result,
@@ -116,7 +127,7 @@ describe("ticketGroups", () => {
     expect(group?.threadIds).toEqual(["thr_old", "thr_564", "thr_552"]);
     expect(group?.items.map(itemLabel)).toEqual(["thr_552", "#553", "thr_564", "#570", "#560", "thr_old"]);
     expect(
-      group?.items.flatMap((item) => (item.kind === "thread" ? [stackedThreadRow(item.threadId, item.entry)] : [])),
+      group?.items.flatMap((item) => (item.kind === "thread" ? [stackedThreadRow(item.threadId, item.entry, item.review)] : [])),
     ).toEqual([
       { threadId: "thr_552" },
       { threadId: "thr_564", depth: 2, description: "stacked on #553" },
@@ -135,6 +146,7 @@ describe("ticketGroups", () => {
         { projectId: "proj_widgets", entry: entry(601, "ACME-30") },
       ],
       threadPulls: [{ threadId: "thr_gadget", entry: gadget(12) }],
+      threadReviews: [],
     };
     const groups = ticketGroups(result, new Map([["thr_gadget", "proj_widgets"]]));
     const labels = groups.map((group) =>
@@ -169,5 +181,74 @@ describe("stackPrefix", () => {
     expect(stackPrefix(0)).toBe("");
     expect(stackPrefix(1)).toBe("└ ");
     expect(stackPrefix(2)).toBe("\u00a0\u00a0└ ");
+  });
+});
+
+describe("card looks", () => {
+  const result = (pulls: QueueEntry[]): SidebarGroupsResult => ({
+    githubPanel: true,
+    tickets: [{ key: "ACME-21", summary: "Speed up the importer", status: null, url: "https://jira/ACME-21" }],
+    threadTickets: [
+      { threadId: "thr_merged", ticketKey: "ACME-21" },
+      { threadId: "thr_followups", ticketKey: "ACME-21" },
+      { threadId: "thr_running", ticketKey: "ACME-21" },
+    ],
+    pulls: pulls.map((pull) => ({ projectId: "proj_widgets", entry: pull })),
+    threadPulls: [],
+    threadReviews: [
+      { threadId: "thr_merged", pullState: "merged", agent: "reviewed" },
+      { threadId: "thr_followups", pullState: "open", agent: "follow-ups" },
+      { threadId: "thr_running", pullState: "draft", agent: "reviewing" },
+    ],
+  });
+  const projects = new Map([
+    ["thr_merged", "proj_widgets"],
+    ["thr_followups", "proj_widgets"],
+    ["thr_running", "proj_widgets"],
+  ]);
+
+  it("splits the ticket key from its summary on a card host and keeps one label elsewhere", () => {
+    const [ticket, none] = ticketGroups(result([entry(7, null)]), projects);
+    expect(ticket && groupHeaderLook(ticket, true)).toEqual({
+      label: "Speed up the importer",
+      keyLabel: "ACME-21",
+      icon: TICKET_ICON,
+      style: "card",
+    });
+    expect(none && groupHeaderLook(none, true)).toEqual({ label: "No ticket", icon: TICKET_ICON, style: "card" });
+    expect(ticket && groupHeaderLook(ticket, false)).toEqual({ label: "ACME-21 Speed up the importer" });
+  });
+
+  it("gives review threads their PR icon and an agent dot unless the agent is running", () => {
+    const [group] = ticketGroups(result([]), projects);
+    expect(
+      group?.items.flatMap((item) => (item.kind === "thread" ? [stackedThreadRow(item.threadId, item.entry, item.review)] : [])),
+    ).toEqual([
+      {
+        threadId: "thr_merged",
+        icon: { name: "GitMerge", tone: "accent" },
+        trailing: { kind: "dot", tone: "success" },
+      },
+      {
+        threadId: "thr_followups",
+        icon: { name: "GitPullRequest", tone: "success" },
+        trailing: { kind: "dot", tone: "accent" },
+      },
+      { threadId: "thr_running", icon: { name: "GitPullRequestDraft", tone: "muted" } },
+    ]);
+  });
+
+  it("shows a stacked draft PR by icon on a card host and by glyph and text elsewhere", () => {
+    const draft = { ...entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [] }), isDraft: true };
+    expect(pullRowLook(draft, "#553", true)).toEqual({
+      title: "#553 PR 553",
+      description: "on #552",
+      icon: { name: "GitPullRequestDraft", tone: "muted" },
+    });
+    expect(pullRowLook(draft, "#553", false)).toEqual({ title: "└ #553 PR 553", description: "on #552 · draft" });
+    expect(pullRowLook(entry(600, null), "#600", true)).toEqual({
+      title: "#600 PR 600",
+      icon: { name: "GitPullRequest", tone: "success" },
+    });
   });
 });

@@ -99,6 +99,19 @@ last. Older bb builds sort the review threads by their own thread order and
 show them before the PR rows, so a thread's position and title do not show its
 stack there.
 
+On bb builds that draw card groups (they report groups back with a
+`style`), each ticket is a card. Its header shows a ticket icon, the key in
+mono (`ACME-21`), the summary, and how many of its PRs have a review thread
+(`1/3`). PR rows and review threads start with a PR state icon: green for
+open, grey for a draft, and purple for merged. A merged or closed PR's state
+is read from GitHub. PR rows have no tree glyph and no `draft` text. A
+review thread ends with a dot for its agent state: green when reviewed,
+purple for follow-ups, and grey when opened but not reviewed yet. A running
+agent shows bb's own indicator instead. A stacked thread is indented under
+its base PR with a connector rail. Stacked PR rows still say `on #552`.
+**Start** shows when you hover the row. Until bb reports the groups back,
+and on older builds, the sidebar looks as described above.
+
 The groups refresh when a review thread starts and once a minute. This needs
 a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds
 show the thread list without ticket groups.

@@ -491,6 +491,15 @@ export function createPlugin(deps: PluginDeps) {
             }),
         )
       ).filter((pull) => pull !== null);
+      const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
+      const threadReviews = (
+        await Promise.all(
+          [...threadTickets.keys()].map(async (threadId) => {
+            const { pull, agent } = await threadReview(threadId, queued);
+            return pull === null ? null : { threadId, pullState: pull.state, agent: agent.state };
+          }),
+        )
+      ).filter((review) => review !== null);
       return {
         githubPanel: queue.githubPanel,
         tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
@@ -499,6 +508,7 @@ export function createPlugin(deps: PluginDeps) {
         threadPulls: queue.entries.flatMap((entry) =>
           entry.agent.threadId === null ? [] : [{ threadId: entry.agent.threadId, entry }],
         ),
+        threadReviews,
       };
     }
 
@@ -741,6 +751,32 @@ export function createPlugin(deps: PluginDeps) {
     }
 
     /**
+     * The PR `threadId` reviews, with its state, the PR's title as recorded,
+     * and the thread's agent state. `pull` is null for a thread that does
+     * not review a PR.
+     */
+    async function threadReview(
+      threadId: string,
+      queued: ReadonlyMap<string, QueueEntry>,
+    ): Promise<{ pull: RelatedItem["pull"]; title: string | null; agent: QueueEntry["agent"] }> {
+      const ref = store.forThread(threadId).find(isReviewPull);
+      const parsed = ref === undefined ? null : parseRepoKey(ref.key);
+      if (ref === undefined || parsed === null) {
+        return { pull: null, title: null, agent: await threadAgentState(threadId) };
+      }
+      const entry = queued.get(ref.key);
+      return {
+        pull: {
+          ...parsed,
+          url: ref.url,
+          state: entry === undefined ? await pullState(parsed.repo, parsed.number) : queuedPullState(entry),
+        },
+        title: entry?.title ?? ref.title,
+        agent: entry?.agent.threadId === threadId ? entry.agent : await threadAgentState(threadId),
+      };
+    }
+
+    /**
      * PRs and threads that share a ticket with `threadId`: each other thread
      * with that ticket ref, with its PR's state when it has one, and each open
      * PR on the ticket that has no such thread and is not the viewer's.
@@ -761,21 +797,8 @@ export function createPlugin(deps: PluginDeps) {
             const thread = await liveThread(otherId);
             if (thread === null) return null;
             const threadTitle = thread.title ?? thread.titleFallback ?? otherId;
-            const ref = store.forThread(otherId).find(isReviewPull);
-            const parsed = ref === undefined ? null : parseRepoKey(ref.key);
-            if (ref === undefined || parsed === null) {
-              return { title: threadTitle, pull: null, agent: await threadAgentState(otherId) };
-            }
-            const entry = queued.get(ref.key);
-            return {
-              title: withoutTickets(entry?.title ?? ref.title ?? threadTitle, tickets),
-              pull: {
-                ...parsed,
-                url: ref.url,
-                state: entry === undefined ? await pullState(parsed.repo, parsed.number) : queuedPullState(entry),
-              },
-              agent: entry?.agent.threadId === otherId ? entry.agent : await threadAgentState(otherId),
-            };
+            const { pull, title, agent } = await threadReview(otherId, queued);
+            return { title: pull === null ? threadTitle : withoutTickets(title ?? threadTitle, tickets), pull, agent };
           }),
         )
       ).filter((item) => item !== null);
