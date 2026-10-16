@@ -138,6 +138,32 @@ describe("ticketGroups", () => {
     ]);
   });
 
+  it("counts stack depth only over the base PRs in the same group", () => {
+    const result: SidebarGroupsResult = {
+      githubPanel: true,
+      tickets: [],
+      threadTickets: [{ threadId: "thr_553", ticketKey: "ACME-21" }],
+      pulls: [
+        { projectId: "proj_widgets", entry: entry(552, "ACME-30", { parentNumber: null, depth: 0, childNumbers: [553] }) },
+        { projectId: "proj_widgets", entry: entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] }) },
+      ],
+      threadPulls: [{ threadId: "thr_553", entry: entry(553, "ACME-21", { parentNumber: 552, depth: 1, childNumbers: [564] }) }],
+      threadReviews: [],
+    };
+    const group = ticketGroups(result, new Map([["thr_553", "proj_widgets"]])).find(
+      ({ ticketKey }) => ticketKey === "ACME-21",
+    );
+
+    expect(group?.items.map(itemLabel)).toEqual(["thr_553", "#564"]);
+    expect(group?.items.map((item) => item.entry?.depth)).toEqual([0, 1]);
+    const [thread] = group?.items ?? [];
+    expect(thread?.kind === "thread" && stackedThreadRow(thread.threadId, thread.entry, thread.review)).toEqual({
+      threadId: "thr_553",
+      depth: 0,
+      description: "stacked on #552",
+    });
+  });
+
   it("labels PR rows with the repository only in a group that mixes repositories", () => {
     const gadget = (number: number): QueueEntry => ({ ...entry(number, "ACME-21"), repo: "acme/gadgets" });
     const result: SidebarGroupsResult = {

@@ -21,6 +21,7 @@ export interface TicketGroup {
   summary: string | null;
   tooltip: string | null;
   threadIds: string[];
+  /** Each entry's depth counts only the base PRs in this group. */
   items: TicketGroupItem[];
   /** A PR row's label, which names the repository only in a group that mixes repositories. */
   pullLabel: (repo: string, number: number) => string;
@@ -223,6 +224,24 @@ function stackFirstItems(items: readonly TicketGroupItem[]): TicketGroupItem[] {
   return [...stackFirst([...byEntry.keys()]).flatMap((entry) => byEntry.get(entry) ?? []), ...unknown];
 }
 
+/**
+ * `items` with each entry's depth counting only the base PRs among `items`,
+ * so a PR whose base PR sits in another group starts at depth 0. `items`
+ * must list each base PR before its dependents, as `stackFirstItems` does.
+ */
+function withVisibleDepth(items: readonly TicketGroupItem[]): TicketGroupItem[] {
+  const depthByKey = new Map<string, number>();
+  return items.map((item) => {
+    const { entry } = item;
+    if (entry === null) return item;
+    const parentDepth =
+      entry.parentNumber === null ? undefined : depthByKey.get(pullKey(entry.repo, entry.parentNumber));
+    const depth = parentDepth === undefined ? 0 : parentDepth + 1;
+    depthByKey.set(pullKey(entry.repo, entry.number), depth);
+    return { ...item, entry: { ...entry, depth } };
+  });
+}
+
 export function ticketGroups(
   result: SidebarGroupsResult,
   projectIdByThreadId: ReadonlyMap<string, string>,
@@ -266,7 +285,7 @@ export function ticketGroups(
     });
   }
   for (const group of groups.values()) {
-    group.items = stackFirstItems(group.items);
+    group.items = withVisibleDepth(stackFirstItems(group.items));
     group.pullLabel = pullLabeler(group.items.flatMap((item) => (item.entry === null ? [] : [item.entry.repo])));
   }
   return [...groups.values()].sort(
