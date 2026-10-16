@@ -159,7 +159,7 @@ diff_args=(--no-ext-diff --no-textconv --find-renames)
     echo
     echo "== commits touching the plugin (old..new) =="
     git -C "$repo" log --format='%h %an <%ae> %ad %s' --date=short \
-      "$old_rev..$new_rev" -- "${scope[@]}" "${root_files[@]}"
+      "$old_rev..$new_rev" -- "${scope[@]}" ${root_files[@]+"${root_files[@]}"}
     echo
     echo "== authors in this range vs. authors of the installed history =="
     comm -23 \
@@ -173,18 +173,18 @@ diff_args=(--no-ext-diff --no-textconv --find-renames)
   fi
   echo "== reviewed-scope diffstat =="
   git -C "$repo" diff "${diff_args[@]}" --stat=200 "$old_rev" "$new_rev" -- \
-    "${scope[@]}" "${root_files[@]}"
+    "${scope[@]}" ${root_files[@]+"${root_files[@]}"}
   echo
   echo "== changed lines in reviewed scope, excluding lockfiles =="
   git -C "$repo" diff "${diff_args[@]}" --numstat "$old_rev" "$new_rev" -- \
-    "${scope[@]}" "${root_files[@]}" \
+    "${scope[@]}" ${root_files[@]+"${root_files[@]}"} \
     ':(exclude,glob)**/package-lock.json' ':(exclude,glob)**/pnpm-lock.yaml' \
     ':(exclude,glob)**/yarn.lock' ':(exclude,glob)**/bun.lock*' \
     | awk '{ if ($1 == "-") bin++; else n += $1 + $2 } END { printf "%d lines, %d binary files\n", n, bin }'
   echo
   echo "== vendored, minified, generated, or binary paths changed =="
   git -C "$repo" diff "${diff_args[@]}" --numstat "$old_rev" "$new_rev" -- \
-    "${scope[@]}" "${root_files[@]}" \
+    "${scope[@]}" ${root_files[@]+"${root_files[@]}"} \
     | awk -F '\t' '
         $1 == "-" { print "binary: " $3; next }
         $3 ~ /(^|\/)(vendor|vendored|third[_-]party|dist|build|node_modules|generated)\// ||
@@ -193,7 +193,7 @@ diff_args=(--no-ext-diff --no-textconv --find-renames)
 } >"$out/summary.txt"
 
 git -C "$repo" diff "${diff_args[@]}" "$old_rev" "$new_rev" -- \
-  "${scope[@]}" "${root_files[@]}" >"$out/diff.patch"
+  "${scope[@]}" ${root_files[@]+"${root_files[@]}"} >"$out/diff.patch"
 
 awk '
   /^\+\+\+ / { file = substr($0, 7); next }

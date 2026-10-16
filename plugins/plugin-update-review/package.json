@@ -44,7 +44,8 @@
     "types:check": "env -u BB_CLI bb plugin types --check .",
     "types:refresh": "env -u BB_CLI bb plugin types .",
     "lint:script": "bash -n skills/plugin-update-review/scripts/prepare-review.sh",
-    "check": "npm run types:check && npm run typecheck && npm run lint:script && npm run build"
+    "test": "bash test/prepare-review-root.test.sh",
+    "check": "npm run types:check && npm run typecheck && npm run lint:script && npm test && npm run build"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.5.29",

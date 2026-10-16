@@ -43,6 +43,14 @@ jobs:
       - name: Ensure checks leave tracked files clean
         run: git diff --exit-code
 
+  macos-bash:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run prepare-review.sh with the system bash 3.2
+        run: TEST_BASH=/bin/bash bash plugins/plugin-update-review/test/prepare-review-root.test.sh
+
   extension:
     runs-on: ubuntu-latest
     steps:
