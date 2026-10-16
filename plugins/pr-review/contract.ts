@@ -126,7 +126,6 @@ const relatedResultSchema = z.object({
 export type RelatedResult = z.infer<typeof relatedResultSchema>;
 
 const sidebarGroupsResultSchema = z.object({
-  githubPanel: z.boolean(),
   tickets: z.array(ticketSchema),
   threadTickets: z.array(z.object({ threadId: threadIdSchema, ticketKey: z.string() })),
   pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),

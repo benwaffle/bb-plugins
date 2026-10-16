@@ -8,14 +8,3 @@ export function githubPanelPath(pullKey: string): string | null {
 }
 
 export const QUEUE_PANEL_ACTION_ID = "queue";
-
-export interface ReviewDockedPanel {
-  pluginId?: string;
-  actionId: string;
-  title?: string;
-}
-
-export function reviewDockedPanels(number: number | null, githubPanel: boolean): ReviewDockedPanel[] {
-  if (!githubPanel) return [];
-  return [{ pluginId: "github", actionId: "pull", title: number === null ? "GitHub PR" : `PR #${number}` }];
-}

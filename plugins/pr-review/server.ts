@@ -510,7 +510,6 @@ export function createPlugin(deps: PluginDeps) {
         )
       ).filter((review) => review !== null);
       return {
-        githubPanel: queue.githubPanel,
         tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
         threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
         pulls,

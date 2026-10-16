@@ -403,13 +403,11 @@ describe("sidebarGroups", () => {
     const { harness } = await load([...OPEN_PULL_NODES, own]);
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
-      githubPanel: boolean;
       tickets: Array<{ key: string; summary: string | null }>;
       threadTickets: Array<{ threadId: string; ticketKey: string }>;
       pulls: Array<{ projectId: string; entry: { number: number; ticketKey: string | null } }>;
       threadPulls: Array<{ threadId: string; entry: { number: number } }>;
     };
-    expect(groups.githubPanel).toBe(true);
     expect(groups.threadPulls.map(({ threadId, entry }) => [threadId, entry.number])).toEqual([["thr_1", 596]]);
     expect(groups.threadTickets).toEqual([{ threadId: "thr_1", ticketKey: "ACME-51" }]);
     expect(groups.pulls.map(({ projectId, entry }) => [projectId, entry.number, entry.ticketKey])).toEqual([

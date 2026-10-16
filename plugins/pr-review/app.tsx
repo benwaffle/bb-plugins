@@ -21,7 +21,7 @@ import type {
   Ticket,
   rpcContract,
 } from "./contract";
-import { githubPanelPath, QUEUE_PANEL_ACTION_ID, reviewDockedPanels, type ReviewDockedPanel } from "./links";
+import { githubPanelPath, QUEUE_PANEL_ACTION_ID } from "./links";
 import { titleWithoutTicket } from "./parse";
 import { needsViewer, pullLabeler, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
 import {
@@ -59,16 +59,6 @@ function openPull(navigate: BbNavigate, githubPanel: boolean, key: string, url: 
   }
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
-}
-
-type ToThreadWithDockedPanels = (
-  threadId: string,
-  options?: { experimental_dockedPanels?: readonly ReviewDockedPanel[] },
-) => void;
-
-function openReviewThread(navigate: BbNavigate, threadId: string, number: number | null, githubPanel: boolean): void {
-  const toThread: ToThreadWithDockedPanels = navigate.toThread;
-  toThread(threadId, { experimental_dockedPanels: reviewDockedPanels(number, githubPanel) });
 }
 
 const ME_LABELS: Record<QueueEntry["me"], string> = {
@@ -315,7 +305,7 @@ function useReviewQueue() {
     [queue],
   );
 
-  const { starting, review } = useStartReview(queue.status === "ready" && queue.value.githubPanel);
+  const { starting, review } = useStartReview();
 
   return { queue, tickets, starting, load, review };
 }
@@ -360,25 +350,25 @@ function SectionHeading({
 
 type ReviewTarget = Pick<QueueEntry, "repo" | "number" | "agent">;
 
-function useStartReview(githubPanel: boolean) {
+function useStartReview() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [starting, setStarting] = useState<string | null>(null);
   const review = useCallback(
     (entry: ReviewTarget) => {
       if (entry.agent.threadId !== null) {
-        openReviewThread(navigate, entry.agent.threadId, entry.number, githubPanel);
+        navigate.toThread(entry.agent.threadId);
         return;
       }
       const key = `${entry.repo}#${entry.number}`;
       setStarting(key);
       rpc
         .call("startReview", { repo: entry.repo, number: entry.number })
-        .then(({ threadId }) => openReviewThread(navigate, threadId, entry.number, githubPanel))
+        .then(({ threadId }) => navigate.toThread(threadId))
         .catch((error: unknown) => toast.error(`Could not start the review: ${errorMessage(error)}`))
         .finally(() => setStarting(null));
     },
-    [githubPanel, navigate, rpc],
+    [navigate, rpc],
   );
   return { starting, review };
 }
@@ -473,7 +463,7 @@ function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
     return () => clearInterval(timer);
   }, [load]);
   useRealtime(REFS_CHANNEL, () => load());
-  const { starting, review } = useStartReview(result?.githubPanel ?? false);
+  const { starting, review } = useStartReview();
   const { look, style } = useSidebarLook();
   const projectIdByThreadId = useMemo(
     () => new Map(threads.map((thread) => [thread.id, thread.projectId])),
@@ -778,7 +768,7 @@ function RelatedThreadsPanel({ threadId }: PluginThreadPanelProps) {
   }, [rpc, threadId]);
   useEffect(load, [load]);
   useRealtime(REFS_CHANNEL, () => load());
-  const { starting, review } = useStartReview(related.status === "ready" && related.value.githubPanel);
+  const { starting, review } = useStartReview();
 
   if (related.status === "loading") return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (related.status === "error") return <p className="text-sm text-destructive">{related.message}</p>;

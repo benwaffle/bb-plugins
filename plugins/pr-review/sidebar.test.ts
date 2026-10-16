@@ -48,7 +48,6 @@ function entry(
 describe("ticketGroups", () => {
   it("groups threads and unstarted PRs per project and ticket, with untagged PRs last", () => {
     const result: SidebarGroupsResult = {
-      githubPanel: true,
       tickets: [
         { key: "ACME-21", summary: "Speed up the importer", status: "In Progress", url: "https://jira/ACME-21" },
         { key: "ACME-30", summary: null, status: null, url: "https://jira/ACME-30" },
@@ -100,7 +99,6 @@ describe("ticketGroups", () => {
     const base = withThread(entry(552, "ACME-21", { parentNumber: null, depth: 0, childNumbers: [553, 570] }), "thr_552");
     const top = withThread(entry(564, "ACME-21", { parentNumber: 553, depth: 2, childNumbers: [] }), "thr_564");
     const result: SidebarGroupsResult = {
-      githubPanel: true,
       tickets: [],
       threadTickets: [
         { threadId: "thr_old", ticketKey: "ACME-21" },
@@ -140,7 +138,6 @@ describe("ticketGroups", () => {
 
   it("counts stack depth only over the base PRs in the same group", () => {
     const result: SidebarGroupsResult = {
-      githubPanel: true,
       tickets: [],
       threadTickets: [{ threadId: "thr_553", ticketKey: "ACME-21" }],
       pulls: [
@@ -167,7 +164,6 @@ describe("ticketGroups", () => {
   it("labels PR rows with the repository only in a group that mixes repositories", () => {
     const gadget = (number: number): QueueEntry => ({ ...entry(number, "ACME-21"), repo: "acme/gadgets" });
     const result: SidebarGroupsResult = {
-      githubPanel: true,
       tickets: [],
       threadTickets: [{ threadId: "thr_gadget", ticketKey: "ACME-21" }],
       pulls: [
@@ -215,7 +211,6 @@ describe("stackPrefix", () => {
 
 describe("styled looks", () => {
   const result = (pulls: QueueEntry[]): SidebarGroupsResult => ({
-    githubPanel: true,
     tickets: [{ key: "ACME-21", summary: "Speed up the importer", status: null, url: "https://jira/ACME-21" }],
     threadTickets: [
       { threadId: "thr_merged", ticketKey: "ACME-21" },

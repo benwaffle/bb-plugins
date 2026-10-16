@@ -164,15 +164,10 @@ diff and checks instead of a PR picker.
 `/thermo-nuclear-code-quality-review review pr <n>` to the thread. When the
 agent is busy, the message is queued.
 
-**Review** and **Open** open the thread with the GitHub plugin's **GitHub PR**
-tab docked as a column to its left. Drag the divider to resize it; bb
-remembers the width. Use the column's header to move it back to the right
-panel or close it. A compact **Review queue** tab, with the current PR
+**Review** and **Open** open the thread. The GitHub plugin's **GitHub PR**
+tab is in the thread panel. A compact **Review queue** tab, with the current PR
 highlighted, is in the thread panel's new-tab launcher. Its rows show `#600`,
-or `widgets#600` when the queue has PRs from more than one repository. Docking needs a bb
-build with docked thread panels (`toThread`'s `experimental_dockedPanels`).
-Older builds, or bb without the GitHub plugin, open the thread with no docked
-column.
+or `widgets#600` when the queue has PRs from more than one repository.
 
 ## Related threads
 
@@ -187,7 +182,7 @@ PRs and threads on the thread's ticket:
 
 PRs come first, by number, then threads without a PR. A PR shows as `#600`, or
 as `widgets#600` when the tab lists PRs from more than one repository. Click an item to open
-its thread, with the GitHub PR column docked. The state of a PR that is no
+its thread. The state of a PR that is no
 longer open is read with `gh pr view` and kept until the plugin restarts.
 
 ## Settings
