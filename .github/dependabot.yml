@@ -28,8 +28,11 @@ updates:
         update-types: [minor, patch]
     # bb shims these packages at runtime, and `bb plugin types --check`
     # requires each plugin to declare the host's version. `bb plugin types`
-    # updates them along with the bb SDK.
+    # updates them along with the bb SDK. The same check requires
+    # @get-bb/plugin-sdk to match the SDK bb-app bundles, which can lag the
+    # npm release, so `bb plugin types` sets it after a bb-app bump.
     ignore:
+      - dependency-name: "@get-bb/plugin-sdk"
       - dependency-name: "@pierre/diffs"
       - dependency-name: "@radix-ui/react-alert-dialog"
       - dependency-name: "@radix-ui/react-context-menu"

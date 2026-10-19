@@ -48,7 +48,7 @@
     "check": "npm run types:check && npm run typecheck && npm run lint:script && npm test && npm run build"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.6.52",
+    "@get-bb/plugin-sdk": "0.6.49",
     "@types/node": "^22.0.0",
     "bb-app": "0.46.1",
     "typescript": "^5.7.0"
