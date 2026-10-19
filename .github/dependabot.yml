@@ -26,6 +26,21 @@ updates:
       production:
         dependency-type: production
         update-types: [minor, patch]
+    # bb shims these packages at runtime, and `bb plugin types --check`
+    # requires each plugin to declare the host's version. `bb plugin types`
+    # updates them along with the bb SDK.
+    ignore:
+      - dependency-name: "@pierre/diffs"
+      - dependency-name: "@radix-ui/react-alert-dialog"
+      - dependency-name: "@radix-ui/react-context-menu"
+      - dependency-name: "@radix-ui/react-dialog"
+      - dependency-name: "@radix-ui/react-dropdown-menu"
+      - dependency-name: "@radix-ui/react-hover-card"
+      - dependency-name: "@radix-ui/react-menubar"
+      - dependency-name: "@radix-ui/react-navigation-menu"
+      - dependency-name: "@radix-ui/react-popover"
+      - dependency-name: "@radix-ui/react-select"
+      - dependency-name: "@radix-ui/react-tooltip"
 
   - package-ecosystem: github-actions
     directory: /
