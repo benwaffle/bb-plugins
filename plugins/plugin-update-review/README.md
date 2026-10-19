@@ -51,6 +51,12 @@ for example when the diff is over 800 lines or when vendored or minified
 code changed. Before it applies an update, it confirms that the candidate is
 still the commit that it reviewed.
 
+`skills/plugin-update-review/scripts/ci-status.sh <owner>/<repo> <sha>`
+reports whether a git candidate has a green `CI` run. A Dependabot
+auto-merge pushes with `GITHUB_TOKEN`, which starts no workflows, so a merge
+commit with no run passes when its pull request head has the same tree and a
+green run.
+
 ## Weekly review (optional)
 
 This command creates an automation. The automation runs the review every

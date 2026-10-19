@@ -43,8 +43,8 @@
     "typecheck": "tsc --noEmit",
     "types:check": "env -u BB_CLI bb plugin types --check .",
     "types:refresh": "env -u BB_CLI bb plugin types .",
-    "lint:script": "bash -n skills/plugin-update-review/scripts/prepare-review.sh",
-    "test": "bash test/prepare-review-root.test.sh",
+    "lint:script": "bash -n skills/plugin-update-review/scripts/prepare-review.sh && bash -n skills/plugin-update-review/scripts/ci-status.sh",
+    "test": "bash test/prepare-review-root.test.sh && bash test/ci-status.test.sh",
     "check": "npm run types:check && npm run typecheck && npm run lint:script && npm test && npm run build"
   },
   "devDependencies": {

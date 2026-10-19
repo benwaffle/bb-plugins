@@ -51,6 +51,9 @@ jobs:
       - name: Run prepare-review.sh with the system bash 3.2
         run: TEST_BASH=/bin/bash bash plugins/plugin-update-review/test/prepare-review-root.test.sh
 
+      - name: Run ci-status.sh with the system bash 3.2
+        run: TEST_BASH=/bin/bash bash plugins/plugin-update-review/test/ci-status.test.sh
+
   extension:
     runs-on: ubuntu-latest
     steps:

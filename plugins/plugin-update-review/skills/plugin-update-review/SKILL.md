@@ -156,3 +156,18 @@ Use this format for every plugin, and keep the field order:
 - UI loads: <changes to what the app entry fetches or loads, or "none">
 - reasons: <one or two sentences for the verdict>
 ```
+
+## CI status of a git candidate
+
+When a workflow asks whether a git candidate has green CI, run:
+
+```sh
+scripts/ci-status.sh <owner>/<repo> <candidate-sha> [<workflow-name>]
+```
+
+It exits 0 only for a completed, successful run of the named workflow
+(default `CI`); runs of other workflows, such as "Dependabot Updates", do not
+count. A commit with no run of that workflow also passes when it is the merge
+commit of a pull request whose head has the same tree and a green run. This
+covers Dependabot auto-merges, whose push to the default branch starts no
+workflows. Report the line it prints as the CI evidence.
