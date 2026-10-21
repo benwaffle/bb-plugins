@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_HUES, parseCssColor, projectAccentColor, projectHue } from "./palette.js";
+import { PROJECT_HUES, colorHue, parseCssColor, projectAccentColor, projectHue } from "./palette.js";
 
 const SAMPLE_NAMES = ["bb", "atlas", "orchard", "lantern", "quill"];
 
@@ -36,5 +36,24 @@ describe("parseCssColor", () => {
     for (const color of ["", "#12", "red; background: blue", "url(x.png) x", "a".repeat(65)]) {
       expect(parseCssColor(color)).toBeNull();
     }
+  });
+});
+
+describe("colorHue", () => {
+  it("reads the hue of oklch colors", () => {
+    expect(colorHue("oklch(0.86 0.07 236)")).toBe(236);
+    expect(colorHue("oklch(0.8 0.1 400deg / 50%)")).toBe(40);
+  });
+
+  it("converts hex colors to their OKLCH hue", () => {
+    expect(colorHue("#f00")).toBe(29);
+    expect(colorHue("#ff0000ff")).toBe(29);
+    expect(colorHue("#7fb4ff")).toBe(257);
+  });
+
+  it("has no hue for grays or other color forms", () => {
+    expect(colorHue("#808080")).toBeUndefined();
+    expect(colorHue("tomato")).toBeUndefined();
+    expect(colorHue("rgb(10, 20, 30)")).toBeUndefined();
   });
 });

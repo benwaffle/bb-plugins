@@ -24,7 +24,7 @@ import { REALTIME_CHANNEL } from "./channel";
 import type { rpcContract } from "./contract";
 import { BUTTON_CLASS, decorateProjectRows, removeDecorations } from "./decorate";
 import { parseEmoji, searchEmoji } from "./emoji";
-import { projectAccentColor } from "./palette";
+import { colorHue, projectAccentColor } from "./palette";
 
 interface PickerTarget {
   readonly projectId: string;
@@ -50,11 +50,12 @@ export interface SidebarProjectDecorationRegistration {
 
 /**
  * `app.slots.experimental_sidebarThreadDecoration`, typed here for the same
- * reason. The host shows `leading` before thread rows outside their project.
+ * reason. On thread rows outside their project's header, the host draws
+ * `hue` (an OKLCH hue, 0–360) as an edge and a tint on the project name.
  */
 export interface SidebarThreadDecoration {
-  leading?: string;
   title?: string;
+  hue?: number;
 }
 
 export interface SidebarThreadDecorationRegistration {
@@ -303,13 +304,14 @@ export function useThreadDecoration(
   store: SidebarStore,
   projectId: string,
 ): SidebarThreadDecoration | null {
-  const { emojiByProject, projectNames } = useSidebarState(store);
-  const leading = emojiByProject.get(projectId);
+  const { colorByProject, projectNames } = useSidebarState(store);
   const title = projectNames.get(projectId);
-  return useMemo(
-    () => (leading === undefined ? null : { leading, ...(title === undefined ? {} : { title }) }),
-    [leading, title],
-  );
+  const color = colorByProject.get(projectId) ?? (title === undefined ? undefined : projectAccentColor(title));
+  const hue = color === undefined ? undefined : colorHue(color);
+  return useMemo(() => {
+    if (title === undefined && hue === undefined) return null;
+    return { ...(title === undefined ? {} : { title }), ...(hue === undefined ? {} : { hue }) };
+  }, [title, hue]);
 }
 
 /**

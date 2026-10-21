@@ -148,7 +148,7 @@ describe("project-emoji app with the decoration slot", () => {
 });
 
 describe("project-emoji app with the thread decoration slot", () => {
-  it("decorates each project's thread rows with its emoji and name", async () => {
+  it("decorates each project's thread rows with its name and header hue", async () => {
     const registrations = setupWithDecorationSlot();
     const Overlay = registrations.overlays[0]!.component;
     const decoration = registrations.threadDecorations[0]!;
@@ -172,9 +172,9 @@ describe("project-emoji app with the thread decoration slot", () => {
     const view = renderSlot({ component: Harness }, {}, { rpc, sidebarThreads });
 
     await vi.waitFor(() => {
-      expect(JSON.parse(view.getByTestId(ATLAS).textContent!)).toEqual({ leading: "🧭", title: "atlas" });
+      expect(JSON.parse(view.getByTestId(QUILL).textContent!)).toEqual({ title: "quill", hue: 257 });
     });
-    expect(JSON.parse(view.getByTestId(QUILL).textContent!)).toEqual({ leading: "🪶", title: "quill" });
+    expect(JSON.parse(view.getByTestId(ATLAS).textContent!)).toEqual({ title: "atlas", hue: 164 });
     expect(view.getByTestId("proj_unknown").textContent).toBe("null");
   });
 });
