@@ -48,9 +48,27 @@ export interface SidebarProjectDecorationRegistration {
   useDecoration(projectId: string): SidebarProjectDecoration | null;
 }
 
+/**
+ * `app.slots.experimental_sidebarThreadDecoration`, typed here for the same
+ * reason. The host shows `leading` before thread rows outside their project.
+ */
+export interface SidebarThreadDecoration {
+  leading?: string;
+  title?: string;
+}
+
+export interface SidebarThreadDecorationRegistration {
+  id: string;
+  title: string;
+  useDecoration(projectId: string): SidebarThreadDecoration | null;
+}
+
 type SlotsWithProjectDecoration = PluginAppSlots & {
   experimental_sidebarProjectDecoration?: (
     registration: SidebarProjectDecorationRegistration,
+  ) => void;
+  experimental_sidebarThreadDecoration?: (
+    registration: SidebarThreadDecorationRegistration,
   ) => void;
 };
 
@@ -281,6 +299,19 @@ export function useProjectDecoration(
   }, [store, projectId, emoji, projectName, accentColor, tint]);
 }
 
+export function useThreadDecoration(
+  store: SidebarStore,
+  projectId: string,
+): SidebarThreadDecoration | null {
+  const { emojiByProject, projectNames } = useSidebarState(store);
+  const leading = emojiByProject.get(projectId);
+  const title = projectNames.get(projectId);
+  return useMemo(
+    () => (leading === undefined ? null : { leading, ...(title === undefined ? {} : { title }) }),
+    [leading, title],
+  );
+}
+
 /**
  * Inserts emoji buttons into the bundled sidebar's project rows, for hosts
  * without `experimental_sidebarProjectDecoration`.
@@ -393,6 +424,11 @@ export default definePluginApp((app) => {
     id: "project-emoji",
     title: "Project emoji",
     useDecoration: (projectId) => useProjectDecoration(store, projectId),
+  });
+  slots.experimental_sidebarThreadDecoration?.({
+    id: "project-emoji",
+    title: "Project emoji",
+    useDecoration: (projectId) => useThreadDecoration(store, projectId),
   });
   app.slots.experimental_appOverlay({
     id: "project-emoji",

@@ -4,7 +4,10 @@ import type { PluginAppBuilder, PluginSidebarProject } from "@get-bb/plugin-sdk/
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { fireEvent } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import definition, { type SidebarProjectDecorationRegistration } from "./app.js";
+import definition, {
+  type SidebarProjectDecorationRegistration,
+  type SidebarThreadDecorationRegistration,
+} from "./app.js";
 import { BUTTON_ATTRIBUTE } from "./decorate.js";
 
 const ATLAS = "proj_atlas";
@@ -31,11 +34,12 @@ const rpc = {
 interface Registrations {
   overlays: { id: string; component: ComponentType }[];
   decorations: SidebarProjectDecorationRegistration[];
+  threadDecorations: SidebarThreadDecorationRegistration[];
 }
 
 /** Runs the app setup against a host that offers the project decoration slot. */
 function setupWithDecorationSlot(): Registrations {
-  const registrations: Registrations = { overlays: [], decorations: [] };
+  const registrations: Registrations = { overlays: [], decorations: [], threadDecorations: [] };
   const builder = {
     slots: {
       experimental_appOverlay: (registration: Registrations["overlays"][number]) => {
@@ -43,6 +47,9 @@ function setupWithDecorationSlot(): Registrations {
       },
       experimental_sidebarProjectDecoration: (registration: SidebarProjectDecorationRegistration) => {
         registrations.decorations.push(registration);
+      },
+      experimental_sidebarThreadDecoration: (registration: SidebarThreadDecorationRegistration) => {
+        registrations.threadDecorations.push(registration);
       },
     },
   } as unknown as PluginAppBuilder;
@@ -137,6 +144,38 @@ describe("project-emoji app with the decoration slot", () => {
 
     expect(headerPointerDown).not.toHaveBeenCalled();
     expect(await view.findByRole("searchbox", { name: "Search emoji" })).toBeTruthy();
+  });
+});
+
+describe("project-emoji app with the thread decoration slot", () => {
+  it("decorates each project's thread rows with its emoji and name", async () => {
+    const registrations = setupWithDecorationSlot();
+    const Overlay = registrations.overlays[0]!.component;
+    const decoration = registrations.threadDecorations[0]!;
+    expect({ id: decoration.id, title: decoration.title }).toEqual({
+      id: "project-emoji",
+      title: "Project emoji",
+    });
+    function Row({ projectId }: { projectId: string }) {
+      return <output data-testid={projectId}>{JSON.stringify(decoration.useDecoration(projectId))}</output>;
+    }
+    function Harness() {
+      return (
+        <>
+          <Overlay />
+          <Row projectId={ATLAS} />
+          <Row projectId={QUILL} />
+          <Row projectId="proj_unknown" />
+        </>
+      );
+    }
+    const view = renderSlot({ component: Harness }, {}, { rpc, sidebarThreads });
+
+    await vi.waitFor(() => {
+      expect(JSON.parse(view.getByTestId(ATLAS).textContent!)).toEqual({ leading: "🧭", title: "atlas" });
+    });
+    expect(JSON.parse(view.getByTestId(QUILL).textContent!)).toEqual({ leading: "🪶", title: "quill" });
+    expect(view.getByTestId("proj_unknown").textContent).toBe("null");
   });
 });
 
