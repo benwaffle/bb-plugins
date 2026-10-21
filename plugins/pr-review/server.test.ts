@@ -448,11 +448,11 @@ describe("sidebarGroups", () => {
       updatedAt: 1,
     }));
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
-      threadReviews: Array<{ threadId: string; pullState: string | null; agent: string }>;
+      threadReviews: Array<{ threadId: string; number: number; title: string | null; pullState: string | null; agent: string }>;
     };
     expect([...groups.threadReviews].sort((left, right) => left.threadId.localeCompare(right.threadId))).toEqual([
-      { threadId: "thr_1", pullState: "open", agent: "opened" },
-      { threadId: "thr_merged", pullState: "merged", agent: "opened" },
+      { threadId: "thr_1", number: 596, title: "ACME-51: Cache the widget catalog per tenant", pullState: "open", agent: "opened" },
+      { threadId: "thr_merged", number: 534, title: "ACME-51: Drop the old cache", pullState: "merged", agent: "opened" },
     ]);
   });
 });

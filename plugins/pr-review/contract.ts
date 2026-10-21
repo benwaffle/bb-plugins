@@ -130,9 +130,18 @@ const sidebarGroupsResultSchema = z.object({
   threadTickets: z.array(z.object({ threadId: threadIdSchema, ticketKey: z.string() })),
   pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),
   threadPulls: z.array(z.object({ threadId: threadIdSchema, entry: queueEntrySchema })),
-  /** The PR state and agent state of each thread in `threadTickets` that reviews a PR. */
+  /**
+   * The PR number, PR title (null when unknown), PR state, and agent state
+   * of each thread in `threadTickets` that reviews a PR.
+   */
   threadReviews: z.array(
-    z.object({ threadId: threadIdSchema, pullState: pullStateSchema.nullable(), agent: agentStateSchema }),
+    z.object({
+      threadId: threadIdSchema,
+      number: z.number().int().positive(),
+      title: z.string().nullable(),
+      pullState: pullStateSchema.nullable(),
+      agent: agentStateSchema,
+    }),
   ),
 });
 export type SidebarGroupsResult = z.infer<typeof sidebarGroupsResultSchema>;

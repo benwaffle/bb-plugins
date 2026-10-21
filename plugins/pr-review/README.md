@@ -128,6 +128,14 @@ The groups refresh when a review thread starts and once a minute. This needs
 a bb build with `app.slots.experimental_sidebarThreadGroups`. Older builds
 show the thread list without ticket groups.
 
+Flat sidebar modes (Custom, By machine, Pinned, and cross-project rows) do
+not show the ticket groups. On bb builds with
+`app.slots.experimental_sidebarThreadDecoration` that take a per-thread
+decoration, a ticket thread's row there shows the ticket key on its second
+line and, when the thread reviews a PR, the same PR state icon and agent dot
+as in its group, with the PR number and title (`#552 Drop the old cache`)
+after the thread title.
+
 ## Review threads
 
 A new review thread:

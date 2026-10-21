@@ -504,8 +504,9 @@ export function createPlugin(deps: PluginDeps) {
       const threadReviews = (
         await Promise.all(
           [...threadTickets.keys()].map(async (threadId) => {
-            const { pull, agent } = await threadReview(threadId, queued);
-            return pull === null ? null : { threadId, pullState: pull.state, agent: agent.state };
+            const { pull, title, agent } = await threadReview(threadId, queued);
+            if (pull === null) return null;
+            return { threadId, number: pull.number, title, pullState: pull.state, agent: agent.state };
           }),
         )
       ).filter((review) => review !== null);

@@ -8,6 +8,7 @@ import {
   sidebarStyle,
   stackedThreadRow,
   stackFirst,
+  threadRowDecorations,
   stackPrefix,
   TICKET_ICON,
   ticketGroups,
@@ -220,9 +221,9 @@ describe("styled looks", () => {
     pulls: pulls.map((pull) => ({ projectId: "proj_widgets", entry: pull })),
     threadPulls: [],
     threadReviews: [
-      { threadId: "thr_merged", pullState: "merged", agent: "reviewed" },
-      { threadId: "thr_followups", pullState: "open", agent: "follow-ups" },
-      { threadId: "thr_running", pullState: "draft", agent: "reviewing" },
+      { threadId: "thr_merged", number: 31, title: "ACME-21: Drop the old cache", pullState: "merged", agent: "reviewed" },
+      { threadId: "thr_followups", number: 32, title: null, pullState: "open", agent: "follow-ups" },
+      { threadId: "thr_running", number: 33, title: "Stream rows", pullState: "draft", agent: "reviewing" },
     ],
   });
   const projects = new Map([
@@ -242,6 +243,34 @@ describe("styled looks", () => {
     expect(ticket && groupHeaderLook(ticket, "minimal")).toEqual({ label: "Speed up the importer", keyLabel: "ACME-21" });
     expect(none && groupHeaderLook(none, "minimal")).toEqual({ label: "No ticket" });
     expect(ticket && groupHeaderLook(ticket, "legacy")).toEqual({ label: "ACME-21 Speed up the importer" });
+  });
+
+  it("decorates flat thread rows with the ticket key, the grouped row's icon and dot, and the PR", () => {
+    const groups = result([]);
+    const decorations = threadRowDecorations({
+      ...groups,
+      threadTickets: [...groups.threadTickets, { threadId: "thr_notes", ticketKey: "ACME-21" }],
+    });
+    expect(Object.fromEntries(decorations)).toEqual({
+      thr_merged: {
+        icon: { name: "GitMerge", tone: "accent" },
+        label: "ACME-21",
+        description: "#31 Drop the old cache",
+        trailing: { kind: "dot", tone: "success" },
+      },
+      thr_followups: {
+        icon: { name: "GitPullRequest", tone: "success" },
+        label: "ACME-21",
+        description: "#32",
+        trailing: { kind: "dot", tone: "accent" },
+      },
+      thr_running: {
+        icon: { name: "GitPullRequestDraft", tone: "muted" },
+        label: "ACME-21",
+        description: "#33 Stream rows",
+      },
+      thr_notes: { label: "ACME-21" },
+    });
   });
 
   it("gives review threads their PR icon and an agent dot unless the agent is running", () => {

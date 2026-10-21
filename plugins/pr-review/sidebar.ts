@@ -94,6 +94,39 @@ export function stackedThreadRow(threadId: string, entry: QueueEntry | null, rev
   return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}`, ...look };
 }
 
+export interface ThreadRowDecoration {
+  icon?: SidebarRowIcon;
+  label?: string;
+  description?: string;
+  trailing?: SidebarRowTrailing;
+}
+
+/**
+ * Each ticket thread's decoration on a sidebar row outside its project's
+ * header: the ticket key as the label and, for a thread that reviews a PR,
+ * the PR state icon and agent dot it has in a ticket group and the PR number
+ * and title as the description.
+ */
+export function threadRowDecorations(result: SidebarGroupsResult): Map<string, ThreadRowDecoration> {
+  const reviewByThreadId = new Map(result.threadReviews.map(({ threadId, ...review }) => [threadId, review]));
+  return new Map(
+    result.threadTickets.map(({ threadId, ticketKey }) => {
+      const review = reviewByThreadId.get(threadId);
+      if (review === undefined) return [threadId, { label: ticketKey }];
+      const title = review.title === null ? "" : ` ${titleWithoutTicket(review.title, ticketKey)}`;
+      return [
+        threadId,
+        {
+          ...iconFor(review.pullState),
+          label: ticketKey,
+          description: `#${review.number}${title}`,
+          ...trailingFor(review.agent),
+        },
+      ];
+    }),
+  );
+}
+
 /** The sidebar style chosen in the plugin settings. */
 export type SidebarStyle = "minimal" | "card";
 

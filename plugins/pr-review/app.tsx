@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import {
   definePluginApp,
   experimental_Icon as Icon,
@@ -32,12 +32,14 @@ import {
   sidebarLook,
   sidebarStyle,
   stackedThreadRow,
+  threadRowDecorations,
   ticketGroups,
   TICKET_ICON,
   type GroupHeaderLook,
   type PullRowLook,
   type SidebarStyle,
   type StackedThreadRow,
+  type ThreadRowDecoration,
 } from "./sidebar";
 import { ticketTooltip } from "./tickets";
 
@@ -403,6 +405,17 @@ type SidebarThreadGroupsSlot = (registration: {
   useGroups(): readonly SidebarThreadGroup[];
 }) => void;
 
+/**
+ * `app.slots.experimental_sidebarThreadDecoration`, typed here because SDK
+ * 0.6.49 predates it. bb calls `useThreadDecoration` once per thread row it
+ * shows outside the project's header, such as in flat sidebar modes.
+ */
+type SidebarThreadDecorationSlot = (registration: {
+  id: string;
+  title: string;
+  useThreadDecoration(threadId: string, projectId: string): ThreadRowDecoration | null;
+}) => void;
+
 /** A group as bb reports it back; builds that draw styled groups always set `style`. */
 interface ResolvedSidebarThreadGroup {
   pluginId: string;
@@ -447,22 +460,61 @@ function useSidebarLook(): ReturnType<typeof sidebarLook> {
 const SIDEBAR_REFRESH_MS = 60_000;
 const NO_SIDEBAR_GROUPS: readonly SidebarThreadGroup[] = [];
 
-function useSidebarReviewGroups(): readonly SidebarThreadGroup[] {
+/**
+ * The latest `sidebarGroups` result and each thread's row decoration from
+ * it. `SidebarGroupsLoader` fills it, so the ticket groups and every
+ * decorated thread row share one poll.
+ */
+interface SidebarGroupsStore {
+  set(result: SidebarGroupsResult): void;
+  subscribe(listener: () => void): () => void;
+  result(): SidebarGroupsResult | null;
+  decoration(threadId: string): ThreadRowDecoration | null;
+}
+
+function createSidebarGroupsStore(): SidebarGroupsStore {
+  let result: SidebarGroupsResult | null = null;
+  let decorations = new Map<string, ThreadRowDecoration>();
+  const listeners = new Set<() => void>();
+  return {
+    set(next) {
+      result = next;
+      decorations = threadRowDecorations(next);
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    result: () => result,
+    decoration: (threadId) => decorations.get(threadId) ?? null,
+  };
+}
+
+function SidebarGroupsLoader({ store }: { store: SidebarGroupsStore }) {
   const rpc = useRpc<typeof rpcContract>();
-  const { threads } = experimental_useSidebarThreads();
-  const [result, setResult] = useState<SidebarGroupsResult | null>(null);
   const load = useCallback(() => {
     rpc
       .call("sidebarGroups", {})
-      .then(setResult)
+      .then((result) => store.set(result))
       .catch(() => undefined);
-  }, [rpc]);
+  }, [rpc, store]);
   useEffect(() => {
     load();
     const timer = setInterval(load, SIDEBAR_REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
   useRealtime(REFS_CHANNEL, () => load());
+  return null;
+}
+
+function useThreadRowDecoration(store: SidebarGroupsStore, threadId: string): ThreadRowDecoration | null {
+  return useSyncExternalStore(store.subscribe, () => store.decoration(threadId));
+}
+
+function useSidebarReviewGroups(store: SidebarGroupsStore): readonly SidebarThreadGroup[] {
+  const { threads } = experimental_useSidebarThreads();
+  const result = useSyncExternalStore(store.subscribe, store.result);
   const { starting, review } = useStartReview();
   const { look, style } = useSidebarLook();
   const projectIdByThreadId = useMemo(
@@ -820,11 +872,26 @@ function TicketIcon({ className }: { className?: string }) {
 
 export default definePluginApp((app) => {
   app.experimental_icons.register({ name: TICKET_ICON, component: TicketIcon });
-  const slots: typeof app.slots & { experimental_sidebarThreadGroups?: SidebarThreadGroupsSlot } = app.slots;
+  const slots: typeof app.slots & {
+    experimental_sidebarThreadGroups?: SidebarThreadGroupsSlot;
+    experimental_sidebarThreadDecoration?: SidebarThreadDecorationSlot;
+  } = app.slots;
+  const store = createSidebarGroupsStore();
   slots.experimental_sidebarThreadGroups?.({
     id: "tickets",
     title: "Review threads by ticket",
-    useGroups: useSidebarReviewGroups,
+    useGroups: () => useSidebarReviewGroups(store),
+  });
+  slots.experimental_sidebarThreadDecoration?.({
+    id: "tickets",
+    title: "Review threads by ticket",
+    useThreadDecoration: (threadId) => useThreadRowDecoration(store, threadId),
+  });
+  app.slots.experimental_appOverlay({
+    id: "sidebar-groups",
+    component: function SidebarGroupsOverlay() {
+      return <SidebarGroupsLoader store={store} />;
+    },
   });
   app.slots.navPanel({
     id: "review-queue",
