@@ -1,0 +1,109 @@
+# Curated facts about Diameter applications, keyed by application ID.
+#
+# short:       the interface-style label shown in lists ("S6a/S6d").
+# description: a summary written for this reference, not specification text.
+# spec:        "TS 29.272 §7" style references; the clause is optional.
+#
+# formatClauses maps the clauses of a spec to the application whose command
+# formats they print, for specs whose ABNF headers omit the application ID.
+# The longest matching clause prefix wins.
+
+apps:
+  0:
+    short: Base
+    description: >-
+      The Diameter common messages that every peer supports regardless of the
+      applications it advertises: capabilities exchange, watchdog, peer
+      disconnect, and the session control messages (re-auth, session
+      termination, abort session).
+    spec: ["RFC 6733 §3", "RFC 6733 §5", "RFC 6733 §8"]
+  3:
+    short: Base accounting
+    description: >-
+      The base accounting application. A client reports start, interim, stop,
+      and event records to an accounting server with Accounting-Request and
+      Accounting-Answer.
+    spec: ["RFC 6733 §9"]
+  4:
+    short: DCCA
+    description: >-
+      Diameter Credit-Control, the real-time charging application. A client
+      asks a credit-control server for quota before or during service
+      delivery and reports usage against it. 3GPP Gy/Ro build on it, and Gx
+      reuses its CCR/CCA command pair under its own application ID.
+    spec: ["RFC 8506 §3", "RFC 8506 §5"]
+  16777216:
+    short: Cx/Dx
+    description: >-
+      The IMS registration and authentication application between the
+      I-CSCF/S-CSCF and the HSS (Cx), or the SLF that redirects them to the
+      right HSS (Dx). It authorizes registrations, assigns and records the
+      serving S-CSCF, fetches authentication vectors, and pushes or revokes
+      the IMS user profile.
+    spec: ["TS 29.228", "TS 29.229 §6"]
+  16777217:
+    short: Sh/Dh
+    description: >-
+      The application an IMS application server uses to read and update
+      transparent and non-transparent subscriber data in the HSS, and to
+      subscribe to notifications when that data changes. Dh is the same
+      application towards an SLF.
+    spec: ["TS 29.328", "TS 29.329 §6"]
+  16777236:
+    short: Rx
+    description: >-
+      The application between an application function (for example the
+      P-CSCF) and the PCRF. The AF describes the media of a session so the
+      PCRF can authorize QoS and charging for it, and the PCRF reports
+      bearer events such as loss of access back to the AF.
+    spec: ["TS 29.214 §5"]
+  16777238:
+    short: Gx
+    description: >-
+      The policy and charging control application between the PCEF (in the
+      PGW) and the PCRF. The PCEF opens a session per IP-CAN session with a
+      CCR, the PCRF installs, modifies, and removes PCC rules and QoS in
+      answers or in re-auth requests, and the PCEF reports usage and events.
+    spec: ["TS 29.212 §4", "TS 29.212 §5"]
+  16777251:
+    short: S6a/S6d
+    description: >-
+      The application between the MME (S6a) or SGSN (S6d) and the HSS. It
+      registers the serving node, downloads and updates subscription data,
+      fetches authentication vectors, and cancels or purges a registration.
+    spec: ["TS 29.272 §5", "TS 29.272 §7"]
+  16777252:
+    short: S13/S13'
+    description: >-
+      The equipment identity check between the MME (S13) or SGSN (S13') and
+      the EIR. The serving node sends the IMEI and the EIR answers whether
+      the equipment is white, grey, or black listed.
+    spec: ["TS 29.272 §6", "TS 29.272 §7"]
+  16777255:
+    short: SLg
+    description: >-
+      The location services application between the GMLC and the MME or
+      SGSN. The GMLC asks the serving node to position a UE, and the serving
+      node reports location events back to the GMLC.
+    spec: ["TS 29.172 §5", "TS 29.172 §7"]
+  16777291:
+    short: SLh
+    description: >-
+      The application a GMLC uses to ask the HSS for routing information for
+      location services: the address of the MME, SGSN, MSC, or AMF serving
+      the target UE.
+    spec: ["TS 29.173 §5", "TS 29.173 §6"]
+
+formatClauses:
+  TS 29.212: {"5": 16777238, "5a": 16777266, "5b": 16777303, "5c": 16777349, "E": 16777318}
+  TS 29.214: {"5": 16777236}
+  TS 29.215: {"5": 16777267, "A.7": 16777319, "A.8": 16777320}
+  TS 29.219: {"5": 16777302}
+  TS 29.153: {"5": 16777347}
+  TS 29.154: {"5": 16777348, "A": 16777358}
+  TS 29.217: {"5": 16777342}
+  TS 29.343: {"6": 16777337}
+  TS 29.368: {"6": 16777309}
+  TS 29.468: {"6": 16777335}
+  TS 29.061: {"17": 16777223, "20": 16777292}
+  TS 32.299: {"6.2": 3, "6.4": 4}

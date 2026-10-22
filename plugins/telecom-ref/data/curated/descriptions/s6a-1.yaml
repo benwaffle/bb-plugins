@@ -1,0 +1,552 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/1400":
+    description: >-
+      The subscriber's full profile as the HSS hands it to an MME or SGSN,
+      covering both EPS and GERAN/UTRAN service. It bundles identities such as
+      MSISDN, barring and access restrictions, the UE-level AMBR, the APN
+      configuration profile, GPRS data, trace, LCS, CSG, and many feature-specific
+      subscription items.
+  "10415/1401":
+    description: >-
+      Describes the user's handset. It carries the IMEI (or, for 3GPP2 devices,
+      the MEID) together with the software version, and is sent to the HSS in
+      location and notification procedures or to the EIR for an equipment check.
+  "10415/1402":
+    description: >-
+      The International Mobile Equipment Identity of the terminal as a digit
+      string: normally 14 digits made up of the 8-digit TAC and the 6-digit serial
+      number, optionally followed by a 15th digit.
+  "10415/1403":
+    description: >-
+      The two-digit Software Version Number (SVN) that accompanies the IMEI,
+      identifying the software revision running on the mobile equipment.
+  "10415/1404":
+    description: >-
+      The subscribed GPRS QoS for a PDP context, encoded as in MAP: the octets of
+      QoS-Subscribed and its extension values (Ext through Ext4) are joined into
+      one octet string.
+  "10415/1405":
+    description: >-
+      Bit mask the MME or SGSN sets in ULR to qualify the location update. Bits
+      include Single-Registration-Indication (0), S6a/S6d-Indicator (1, set when
+      sent by an MME), Skip Subscriber Data (2), GPRS-Subscription-Data-Indicator
+      (3), Node-Type-Indicator (4, combined MME/SGSN), Initial-Attach-Indicator (5)
+      and Dual-Registration-5G-Indicator (8).
+  "10415/1406":
+    description: >-
+      Bit mask the HSS returns in ULA. Bit 0 (Separation Indication) says the HSS
+      keeps the MME and SGSN registrations apart, and bit 1 (MME Registered for
+      SMS) confirms the MME is registered for SMS.
+  "10415/1407":
+    description: >-
+      The PLMN identity of the visited network, three octets holding the MCC and
+      MNC in BCD as used in 24.008 PLMN lists; a 2-digit MNC uses a filler nibble
+      of 1111.
+  "10415/1408":
+    description: >-
+      Request for E-UTRAN (EPS) authentication vectors in an AIR. It states how
+      many vectors are wanted, whether they are needed immediately, and may carry
+      resynchronization data after a SQN failure.
+  "10415/1409":
+    description: >-
+      Request for UTRAN or GERAN authentication vectors in an AIR, with the same
+      optional parts as the E-UTRAN variant: number of vectors, immediate-use
+      preference, and resynchronization data.
+  "10415/1410":
+    description: >-
+      How many authentication vectors the MME or SGSN is willing to accept in the
+      answer.
+  "10415/1411":
+    description: >-
+      RAND concatenated with AUTS, sent when the USIM rejected a challenge because
+      of a sequence number mismatch so the HSS/AuC can resynchronize before
+      generating fresh vectors.
+  "10415/1412":
+    description: >-
+      A presence-only marker (its value is ignored) meaning the requested vectors
+      are needed for immediate use. The HSS may use it to decide how many vectors
+      to fetch from the AuC and return.
+  "10415/1413":
+    description: >-
+      Container in the AIA for the authentication vectors the HSS generated, which
+      can be any number of E-UTRAN, UTRAN, or GERAN vectors.
+  "10415/1414":
+    description: >-
+      One EPS authentication vector: RAND, XRES, AUTN, and KASME, with an optional
+      Item-Number that orders it among the returned vectors.
+  "10415/1415":
+    description: >-
+      One UMTS authentication quintet: RAND, XRES, AUTN, cipher key CK, and
+      integrity key IK, plus an optional Item-Number.
+  "10415/1416":
+    description: >-
+      One GSM authentication triplet: RAND, SRES, and ciphering key Kc, plus an
+      optional Item-Number.
+  "10415/1417":
+    description: >-
+      Says which core domains the subscription permits. Values are
+      PACKET_AND_CIRCUIT (0) and ONLY_PACKET (2); value 1 is reserved.
+  "10415/1418":
+    description: >-
+      Bit mask of home-network-specific barring categories set by the operator.
+      Bits 0 to 3 correspond to HPLMN specific barring types 1 to 4, whose meaning
+      is defined by the home operator; they may also apply to MO short messages.
+  "10415/1419":
+    description: >-
+      A sequence number placed in each authentication vector so the receiver
+      knows the order of vectors delivered in one answer.
+  "10415/1420":
+    description: >-
+      Why the HSS (or CSS) is cancelling a location in CLR. Values are
+      MME_UPDATE_PROCEDURE (0), SGSN_UPDATE_PROCEDURE (1),
+      SUBSCRIPTION_WITHDRAWAL (2), UPDATE_PROCEDURE_IWF (3), and
+      INITIAL_ATTACH_PROCEDURE (4).
+  "10415/1421":
+    description: >-
+      Bit mask in DSR that tells the MME or SGSN which parts of the stored profile
+      to remove. Examples are Regional Subscription Withdrawal (0), Complete APN
+      Configuration Profile Withdrawal (1), PDN subscription contexts Withdrawal
+      (3, using Context-Identifier), STN-SR (4), Trace Data Withdrawal (8), CSG
+      Deleted (9), and MSISDN Withdrawal (23).
+  "10415/1422":
+    description: >-
+      Bit mask the SGSN returns in DSA. Bit 0 (Network Node area restricted)
+      reports that the whole SGSN area is now off limits because of regional
+      subscription.
+  "10415/1423":
+    description: >-
+      A numeric identifier for one APN configuration or PDP context in the
+      subscription. It names the default APN inside APN-Configuration-Profile and
+      selects which contexts to delete in DSR.
+  "10415/1424":
+    description: >-
+      Whether service is granted or barred for the subscriber. Values are
+      SERVICE_GRANTED (0) and OPERATOR_DETERMINED_BARRING (1); with the latter,
+      the barring detail is in Operator-Determined-Barring.
+  "10415/1425":
+    description: >-
+      Bit mask of operator determined barring categories. Bits cover all packet
+      oriented services barred (0), roamer access to HPLMN or VPLMN access points
+      (1, 2), and outgoing call barring variants such as all outgoing (3),
+      international (4), and inter-zonal (6) calls.
+  "10415/1426":
+    description: >-
+      Bit mask where each set bit forbids a radio access type for the subscriber.
+      Bits include UTRAN Not Allowed (0), GERAN Not Allowed (1), WB-E-UTRAN Not
+      Allowed (4), HO-To-Non-3GPP-Access Not Allowed (5), NB-IoT Not Allowed (6),
+      NR as Secondary RAT Not Allowed (8), LTE-M Not Allowed (11), and several
+      satellite access bits.
+  "10415/1427":
+    description: >-
+      A dotted domain name that replaces the APN Operator Identifier when the
+      serving node builds the full APN and the APN-FQDN for PGW DNS lookup, in
+      non-roaming and home-routed cases. It can be set per UE or per APN.
+  "10415/1428":
+    description: >-
+      Tells the receiver whether an APN configuration profile is complete or a
+      delta. Values are All_APN_CONFIGURATIONS_INCLUDED (0) and
+      MODIFIED_ADDED_APN_CONFIGURATIONS_INCLUDED (1).
+  "10415/1429":
+    description: >-
+      The subscriber's set of EPS APN subscriptions. It holds one or more
+      APN-Configuration entries, the Context-Identifier of the default APN (with
+      extra defaults when non-IP or Ethernet APNs exist), and a flag saying
+      whether the list is complete.
+  "10415/1430":
+    description: >-
+      Subscription settings for one APN: its Context-Identifier, APN name, PDN
+      type, default-bearer QoS, APN-AMBR, any static UE address or PGW identity,
+      and options such as charging characteristics, LIPA/SIPTO permissions, and
+      5GS interworking.
+  "10415/1431":
+    description: >-
+      The subscribed QoS for an APN's default bearer: a QCI and an
+      Allocation-Retention-Priority. Only non-GBR QCI values may be sent over
+      S6a/S6d.
+  "10415/1432":
+    description: >-
+      Whether the UE may use a PGW in the visited network for this APN, or only
+      one in the home network. Values are NOTALLOWED (0) and ALLOWED (1); absence
+      means not allowed.
+  "10415/1433":
+    description: >-
+      The Session Transfer Number for SRVCC, an E.164 number in TBCD digits that
+      the MME uses to transfer an IMS voice call to the circuit-switched domain.
+  "10415/1434":
+    description: >-
+      The reason given when reporting that a UE can receive short messages again.
+      Values are UE_PRESENT (0) and UE_MEMORY_AVAILABLE (1).
+  "10415/1435":
+    description: >-
+      Aggregate maximum bit rate for uplink and downlink, used for the UE-AMBR or
+      an APN-AMBR. Rates are in bit/s, with extended kbit/s fields used when the
+      value is above the 32-bit limit.
+  "10415/1436":
+    description: >-
+      One closed subscriber group the user belongs to: the CSG-Id, an optional
+      expiry time, the APNs reachable via LIPA from that CSG, and optionally the
+      PLMN it applies to (the registered PLMN when absent).
+  "10415/1437":
+    description: >-
+      The 27-bit Closed Subscriber Group identity as defined in 23.003, carried in
+      an Unsigned32 with the unused low-order bits set to zero.
+  "10415/1438":
+    description: >-
+      Says whether the PGW identity in MIP6-Agent-Info was provisioned in the HSS
+      or picked by the network. Values are STATIC (0) and DYNAMIC (1).
+  "10415/1439":
+    description: >-
+      The time at which the user's membership of a CSG ends.
+  "10415/1440":
+    description: >-
+      The subscribed Subscriber Profile ID for RAT/Frequency Priority (SPID), a
+      value from 1 to 256 that the radio network uses to steer idle and connected
+      mode camping.
+  "10415/1441":
+    description: >-
+      Bit mask the SGSN returns in IDA. Bit 0 (Network Node area restricted)
+      reports that the entire SGSN area is restricted by the regional subscription
+      just inserted.
+  "10415/1442":
+    description: >-
+      Bit mask the HSS returns in PUA. Freeze M-TMSI (0) and Freeze P-TMSI (1)
+      ask the MME or SGSN not to reuse the purged UE's temporary identity right
+      away.
+  "10415/1443":
+    description: >-
+      Bit mask in NOR stating what the serving node is reporting. Bits include
+      Single-Registration-Indication (0), Ready for SM from SGSN (2), UE Reachable
+      from MME (3), Ready for SM from MME (6), Homogeneous Support of IMS Voice
+      Over PS Sessions (7), S6a/S6d-Indicator (8), and Removal of MME Registration
+      for SMS (9).
+  "10415/1444":
+    description: >-
+      The leading IMSI digits (MCC, MNC, and the start of the MSIN) as text. In a
+      Reset it names a group of subscribers sharing that prefix.
+  "10415/1445":
+    description: >-
+      The EIR verdict on a piece of mobile equipment. Values are PERMITTEDLISTED
+      (0), PROHIBITEDLISTED (1), and TRACKINGLISTED (2).
+  "10415/1446":
+    description: >-
+      One regional subscription Zone Code naming a set of tracking or routing
+      areas in the visited network where the user may or may not roam. Up to ten
+      may be given per VPLMN; the serving node works out the allowed areas.
+  "10415/1447":
+    description: >-
+      The random challenge RAND sent to the UE as part of an authentication
+      vector.
+  "10415/1448":
+    description: >-
+      The expected response XRES that the network compares with the UE's answer
+      to the challenge.
+  "10415/1449":
+    description: >-
+      The authentication token AUTN the UE uses to verify the network and check
+      sequence freshness.
+  "10415/1450":
+    description: >-
+      The EPS key K_ASME derived by the HSS for an E-UTRAN vector, from which the
+      MME derives NAS and access stratum keys.
+  "10415/1452":
+    description: >-
+      IPv4 or IPv6 address of the Trace Collection Entity that receives trace
+      records for a subscriber or equipment trace session.
+  "10415/1453":
+    description: >-
+      The GSM ciphering key Kc in a GERAN authentication triplet.
+  "10415/1454":
+    description: >-
+      The signed response SRES expected from the SIM in a GERAN authentication
+      triplet.
+  "10415/1456":
+    description: >-
+      The IP address type allowed for a PDN. Values are IPv4 (0), IPv6 (1),
+      IPv4v6 (2, dual stack), and IPv4_OR_IPv6 (3), which permits either single
+      stack but not dual stack and is used only in the subscription.
+  "10415/1457":
+    description: >-
+      Marks that roaming in the current network is restricted because the serving
+      node lacks a feature the subscription needs. Its single value is
+      Roaming-Restricted-Due-To-Unsupported-Feature (0).
+  "10415/1458":
+    description: >-
+      Activates a subscriber or equipment trace in the serving node. It carries the
+      trace reference, depth, network element types, interfaces and events to
+      record, the collection entity address, and optional MDT settings.
+  "10415/1459":
+    description: >-
+      Identifies a trace session: the MCC and MNC of the PLMN followed by a 3-octet
+      Trace ID, six octets in total.
+  "10415/1462":
+    description: >-
+      How much detail the trace records, using the trace depth values of 32.422
+      (minimum, medium, maximum, and their vendor-specific variants).
+  "10415/1463":
+    description: >-
+      Octet string, coded per 32.422, naming which network element types should
+      run the trace.
+  "10415/1464":
+    description: >-
+      Octet string, coded per 32.422, listing which interfaces the trace should
+      record.
+  "10415/1465":
+    description: >-
+      Octet string, coded per 32.422, listing which events trigger trace
+      recording.
+  "10415/1466":
+    description: >-
+      Identity of the operations and maintenance centre that should receive trace
+      results, coded as in MAP.
+  "10415/1467":
+    description: >-
+      The subscriber's GPRS profile for an SGSN or combined node. It holds between
+      one and fifty PDP-Context entries and a flag saying whether the list is
+      complete.
+  "10415/1468":
+    description: >-
+      Says whether a set of PDP contexts is the full list or only changes. Values
+      are All_PDP_CONTEXTS_INCLUDED (0) and MODIFIED_ADDED_PDP
+      CONTEXTS_INCLUDED (1).
+  "10415/1469":
+    description: >-
+      One subscribed GPRS PDP context: its Context-Identifier, PDP type and
+      optional static address, subscribed QoS, APN, plus options such as APN-AMBR,
+      charging characteristics, LIPA/SIPTO permissions, and non-IP delivery
+      settings.
+  "10415/1470":
+    description: >-
+      The PDP type of a subscribed context, coded as in MAP. Allowed values are
+      IPv4 (0x21), IPv6 (0x57), and Non-IP (0x02).
+  "10415/1471":
+    description: >-
+      The Mobile Equipment Identifier of a 3GPP2 terminal, carried in place of an
+      IMEI and encoded as the MEID octets defined by 3GPP2 A.S0022.
+  "10415/1472":
+    description: >-
+      Used only under a wildcard APN configuration, it names a specific APN the UE
+      has connected to and the PGW serving it, so the HSS can track dynamically
+      allocated gateways for that APN.
+  "10415/1473":
+    description: >-
+      The subscriber's location services data: GMLCs in the home network allowed
+      to request the UE's location, privacy exception classes (S6d only), and
+      subscribed MO-LR classes.
+  "10415/1474":
+    description: >-
+      The E.164 number of a GMLC, in TBCD digits, that may issue mobile
+      terminated location requests for the UE.
+  "10415/1475":
+    description: >-
+      One LCS privacy exception class: the supplementary service code and its
+      status, the notification rule, and the external clients, PLMN clients, or
+      service types allowed to locate the UE.
+  "10415/1476":
+    description: >-
+      A supplementary service code coded as in MAP, used to name LCS classes,
+      call barring services, and similar services.
+  "10415/1477":
+    description: >-
+      The provisioning and activation status of a supplementary service, coded as
+      in MAP.
+  "10415/1478":
+    description: >-
+      How the user is told about a location request. Values are
+      NOTIFY_LOCATION_ALLOWED (0),
+      NOTIFYANDVERIFY_LOCATION_ALLOWED_IF_NO_RESPONSE (1),
+      NOTIFYANDVERIFY_LOCATION_NOT_ALLOWED_IF_NO_RESPONSE (2), and
+      LOCATION_NOT_ALLOWED (3).
+  "10415/1479":
+    description: >-
+      An external LCS client allowed to locate the UE for an MT-LR, with its
+      identity, an optional GMLC restriction, and a notification rule.
+  "10415/1480":
+    description: >-
+      The E.164 number of an external LCS client, in TBCD digits.
+  "10415/1481":
+    description: >-
+      Limits which GMLCs may relay a location request from a client. Values are
+      GMLC_LIST (0) and HOME_COUNTRY (1).
+  "10415/1482":
+    description: >-
+      A category of LCS client inside the PLMN that may locate the UE. Values
+      include BROADCAST_SERVICE (0), O_AND_M_HPLMN (1), O_AND_M_VPLMN (2),
+      ANONYMOUS_LOCATION (3), and TARGET_UE_SUBSCRIBED_SERVICE (4).
+  "10415/1483":
+    description: >-
+      An LCS service type whose clients may locate the UE for an MT-LR, with an
+      optional GMLC restriction and notification rule.
+  "10415/1484":
+    description: >-
+      Numeric identity of an LCS service type, with values as defined in MAP.
+  "10415/1485":
+    description: >-
+      One mobile originated location request class the UE subscribes to, given
+      as a supplementary service code and its status.
+  "10415/1486":
+    description: >-
+      The short-message teleservices the subscriber is provisioned with, given as
+      one or more TS-Code values.
+  "10415/1487":
+    description: >-
+      A teleservice code coded as in MAP, for example the short message MO-PP
+      teleservice.
+  "10415/1488":
+    description: >-
+      One call barring supplementary service that applies to short messages,
+      given as its service code and status.
+  "10415/1489":
+    description: >-
+      The E.164 ISDN number of an SGSN, in TBCD digits.
+  "10415/1490":
+    description: >-
+      Bit mask in IDR asking the MME or SGSN for actions or data. Bits include UE
+      Reachability Request (0), T-ADS Data Request (1), EPS User State Request
+      (2), EPS Location Information Request (3), Current Location Request (4),
+      Local Time Zone Request (5), Remove SMS Registration (6), and P-CSCF
+      Restoration Request (8).
+  "10415/1491":
+    description: >-
+      Whether the subscriber is enabled for IMS Centralized Services, which
+      affects how the serving node handles SRVCC and CS fallback. Values are FALSE
+      (0) and TRUE (1).
+  "10415/1492":
+    description: >-
+      Whether IMS voice over PS is supported in the tracking or routing area the
+      UE used most recently. Values are NOT_SUPPORTED (0) and SUPPORTED (1); used
+      for T-ADS.
+  "10415/1493":
+    description: >-
+      Whether IMS voice over PS is supported uniformly in every TA or RA of the
+      serving node for this subscriber, including roaming agreements. Values are
+      NOT_SUPPORTED (0) and SUPPORTED (1); absence means non-uniform or unknown.
+  "10415/1494":
+    description: >-
+      The time the serving node last had radio contact with the UE, reported for
+      T-ADS.
+  "10415/1495":
+    description: >-
+      The UE's state as known to the MME, the SGSN, or both, returned when the HSS
+      asks for user state.
+  "10415/1496":
+    description: >-
+      The UE's location as known to the MME, the SGSN, or both, returned when the
+      HSS asks for location information.
+  "10415/1497":
+    description: >-
+      The UE's state as seen by the MME, wrapping a User-State value.
+  "10415/1498":
+    description: >-
+      The UE's state as seen by the SGSN, wrapping a User-State value.
+  "10415/1499":
+    description: >-
+      The UE's EPS mobility and connection state. Values include DETACHED (0),
+      ATTACHED_NOT_REACHABLE_FOR_PAGING (1), ATTACHED_REACHABLE_FOR_PAGING (2),
+      CONNECTED_NOT_REACHABLE_FOR_PAGING (3), and CONNECTED_REACHABLE_FOR_PAGING
+      (4).
+  "10415/1600":
+    description: >-
+      Location data from the MME: the E-UTRAN cell and tracking area, optional
+      geographical or geodetic position, location age and whether it is current,
+      CSG information, and the eNodeB ID.
+  "10415/1601":
+    description: >-
+      Location data from the SGSN: cell global identity, location, routing, or
+      service area, optional geographical or geodetic position, location age and
+      whether it is current, and CSG information.
+  "10415/1602":
+    description: >-
+      The E-UTRAN Cell Global Identifier (ECGI) of the cell where the UE is
+      registered, coded as in MAP.
+  "10415/1603":
+    description: >-
+      The Tracking Area Identity (TAI) where the UE is located, coded as in MAP.
+  "10415/1604":
+    description: >-
+      The GERAN/UTRAN Cell Global Identification of the UE's current cell, coded
+      as in MAP.
+  "10415/1605":
+    description: >-
+      The Routing Area Identity (RAI) where the UE is located, coded as in MAP.
+  "10415/1606":
+    description: >-
+      The Location Area Identification (LAI) where the UE is located, coded as in
+      MAP.
+  "10415/1607":
+    description: >-
+      The UTRAN Service Area Identifier (SAI) where the UE is located, coded as in
+      MAP.
+  "10415/1608":
+    description: >-
+      The UE's estimated geographical position in the octet format defined by
+      MAP.
+commands:
+  316:
+    description: >-
+      The MME or SGSN registers itself with the HSS as the node now serving the
+      user and normally receives the subscription data in the answer. The request
+      also reports terminal and SRVCC capability information, and the answer
+      carries ULA-Flags and the Subscription-Data.
+    flow:
+      request: {from: [MME, SGSN], to: [HSS]}
+  317:
+    description: >-
+      The HSS tells an MME or SGSN to delete its record of a subscriber, either
+      because the user moved to a new serving node, because of an initial attach
+      elsewhere, or because the subscription was withdrawn or no longer permits
+      PS or EPC access. Cancellation-Type gives the reason.
+    flow:
+      request: {from: [HSS], to: [MME, SGSN]}
+  318:
+    description: >-
+      The MME or SGSN asks the HSS for authentication vectors for a subscriber,
+      for E-UTRAN and/or UTRAN/GERAN, optionally with resynchronization data. The
+      answer returns the vectors in Authentication-Info.
+    flow:
+      request: {from: [MME, SGSN], to: [HSS]}
+  319:
+    description: >-
+      The HSS pushes new or changed subscription data to the serving MME or SGSN,
+      for example after a profile or barring change or to start a trace. It also
+      asks the node for data such as user state, location, T-ADS information, or
+      UE reachability, which come back in the answer.
+    flow:
+      request: {from: [HSS], to: [MME, SGSN]}
+  320:
+    description: >-
+      The HSS removes selected parts of the subscriber profile stored in the MME
+      or SGSN, such as some APN configurations, regional subscription, trace data,
+      or STN-SR. DSR-Flags says which items to delete.
+    flow:
+      request: {from: [HSS], to: [MME, SGSN]}
+  321:
+    description: >-
+      The MME or SGSN informs the HSS that it has deleted a subscriber's profile,
+      for example after a long period of inactivity or an operator action. The
+      answer may ask the node to freeze the temporary identity.
+    flow:
+      request: {from: [MME, SGSN], to: [HSS]}
+  322:
+    description: >-
+      After a restart, or for planned maintenance, the HSS tells MMEs and SGSNs
+      that it has failed or that shared subscription data has changed, so they can
+      mark affected subscribers for restoration. User-Id prefixes or Reset-IDs
+      can narrow the affected set.
+    flow:
+      request: {from: [HSS], to: [MME, SGSN]}
+  323:
+    description: >-
+      The MME or SGSN informs the HSS of events that happen outside a location
+      update, such as changed terminal information, a dynamically assigned PGW
+      for an APN or for emergency service, the UE becoming reachable or ready for
+      SMS, or monitoring event status.
+    flow:
+      request: {from: [MME, SGSN], to: [HSS]}
+  324:
+    description: >-
+      On the S13/S13' interface, the MME or SGSN sends the terminal's IMEI to the
+      EIR to check whether the equipment is allowed, for example that it is not
+      stolen or faulty. The answer returns an Equipment-Status.
+    flow:
+      request: {from: [MME, SGSN], to: [EIR]}

@@ -1,0 +1,83 @@
+{
+  "name": "bb-plugin-telecom-ref",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A searchable 3GPP Rel-18 telecom reference: Diameter applications, commands, and AVPs, EPC and 5GC interfaces, and network functions, with cross-links and spec references.",
+  "license": "MIT",
+  "author": "Ben Iofel",
+  "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/telecom-ref#readme",
+  "bugs": {
+    "url": "https://github.com/benwaffle/bb-plugins/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benwaffle/bb-plugins.git",
+    "directory": "plugins/telecom-ref"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "3gpp",
+    "diameter",
+    "telecom",
+    "reference"
+  ],
+  "engines": {
+    "bb": ">=0.46",
+    "bbPluginSdk": ">=0.6.68"
+  },
+  "bb": {
+    "name": "Telecom reference",
+    "description": "Search 3GPP Rel-18 Diameter applications, commands, and AVPs, EPC and 5GC interfaces, and network functions, with cross-links and spec references.",
+    "branding": {
+      "icon": "FileText"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/server.meta.json",
+    "dist/app.js",
+    "dist/app.css",
+    "dist/app.meta.json",
+    "README.md",
+    "skills",
+    "data/*.json",
+    "server.ts",
+    "app.tsx",
+    "dataset.ts",
+    "detail.tsx",
+    "format.ts",
+    "links.ts",
+    "search.ts",
+    "types.ts",
+    "ui.tsx",
+    "validate.ts",
+    "view.ts"
+  ],
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "env -u BB_CLI bb plugin types --check .",
+    "types:refresh": "env -u BB_CLI bb plugin types .",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run build",
+    "data": "uv run data/build.py"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.68",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "bb-app": "0.46.2-nightly.39799382507.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  }
+}

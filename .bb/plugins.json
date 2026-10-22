@@ -26,6 +26,10 @@
     {
       "name": "usage-stats",
       "source": "./plugins/usage-stats"
+    },
+    {
+      "name": "telecom-ref",
+      "source": "./plugins/telecom-ref"
     }
   ]
 }

@@ -1,0 +1,307 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/2500":
+    description: >-
+      Tells the MME or SGSN what kind of location the GMLC wants in a Provide-Location-Request.
+      Values include CURRENT_LOCATION (0), CURRENT_OR_LAST_KNOWN_LOCATION (1), INITIAL_LOCATION (2),
+      ACTIVATE_DEFERRED_LOCATION (3), CANCEL_DEFERRED_LOCATION (4), and NOTIFICATION_VERIFICATION_ONLY (5).
+  "10415/2501":
+    description: >-
+      Names the external LCS client that asked for the location. The group holds the client's name
+      string and an indicator of how that name is formatted (both defined in TS 32.299).
+  "10415/2502":
+    description: >-
+      Identifies the party that originated the request at the LCS client side. The group holds a
+      requestor identity string and a format indicator for it (both defined in TS 32.299).
+  "10415/2503":
+    description: >-
+      Priority of the location request. Zero means highest priority and one means normal priority;
+      the receiver treats any other number as normal priority.
+  "10415/2504":
+    description: >-
+      Quality of service the LCS client wants for the location estimate. The group covers the QoS
+      class, the wanted horizontal and vertical accuracy, whether a vertical coordinate is needed, and
+      the acceptable response time.
+  "10415/2508":
+    description: >-
+      Says whether the GMLC also wants the UE's velocity along with its position. Values are
+      VELOCITY_IS_NOT_REQUESTED (0), the default when absent, and VELOCITY_IS_REQUESTED (1).
+  "10415/2511":
+    description: >-
+      Codeword string that the network can include in the notification it sends to the target UE,
+      letting the user recognize who is asking for the location.
+  "10415/2512":
+    description: >-
+      Privacy action to apply toward the target user for a location request. Values include
+      ALLOWED_WITHOUT_NOTIFICATION (0), the default, ALLOWED_WITH_NOTIFICATION (1),
+      ALLOWED_IF_NO_RESPONSE (2), RESTRICTED_IF_NO_RESPONSE (3), and NOT_ALLOWED (4).
+  "10415/2513":
+    description: >-
+      Reports whether the returned location estimate meets the accuracy the client asked for. Values
+      are REQUESTED_ACCURACY_FULFILLED (0) and REQUESTED_ACCURACY_NOT_FULFILLED (1).
+  "10415/2514":
+    description: >-
+      How old the returned location estimate is, counted in minutes since the position was obtained,
+      following the TS 29.002 convention.
+  "10415/2515":
+    description: >-
+      The UE's estimated velocity, encoded as an octet string of at least four octets using the
+      velocity formats of TS 23.032.
+  "10415/2516":
+    description: >-
+      Positioning data for a UE on E-UTRAN, carrying the encoded Positioning-Data element from
+      TS 29.171 that describes which positioning methods were used.
+  "10415/2517":
+    description: >-
+      The E-UTRAN Cell Global Identifier of the cell serving the target UE, encoded as in the GTPv2
+      ECGI field of TS 29.274.
+  "10415/2518":
+    description: >-
+      The event that triggered a Location-Report-Request from the MME or SGSN. Values include
+      EMERGENCY_CALL_ORIGINATION (0), EMERGENCY_CALL_RELEASE (1), MO_LR (2), EMERGENCY_CALL_HANDOVER (3),
+      DEFERRED_MT_LR_RESPONSE (4), DELAYED_LOCATION_REPORTING (6), and HANDOVER_TO_5GC (7).
+  "10415/2519":
+    description: >-
+      Says whether a pseudonym for the target UE is wanted instead of its real identity. Values are
+      PSEUDONYM_NOT_REQUESTED (0), the default when absent, and PSEUDONYM_REQUESTED (1).
+  "10415/2520":
+    description: >-
+      Identifier of the LCS service type the client is using, chosen from the service types for which
+      the client has permission to locate this UE.
+  "10415/2521":
+    description: >-
+      Privacy handling to apply when the LCS client is not in a call or session with the target UE.
+      It wraps one LCS-Privacy-Check value; when absent the default is ALLOWED_WITHOUT_NOTIFICATION.
+  "10415/2522":
+    description: >-
+      Privacy handling to apply when the LCS client has a call or session with the target UE. It wraps
+      one LCS-Privacy-Check value; when absent the default is NOT_ALLOWED.
+  "10415/2523":
+    description: >-
+      Class of the requested location QoS. ASSURED (0) means the accuracy must be met or the result is
+      unusable, while BEST EFFORT (1) accepts a result that misses the requested accuracy.
+  "10415/2524":
+    description: >-
+      Positioning information gathered over GERAN access. The group carries the GERAN positioning data
+      and the GANSS positioning data elements from TS 49.031.
+  "10415/2525":
+    description: >-
+      Encoded Positioning Data element from TS 49.031, describing the positioning methods tried for a
+      UE on GERAN and whether they succeeded.
+  "10415/2526":
+    description: >-
+      Encoded GANSS Positioning Data element from TS 49.031, describing the satellite (GANSS) methods
+      used to position a UE on GERAN.
+  "10415/2527":
+    description: >-
+      Positioning information gathered over UTRAN access. The group carries the UTRAN positioning data,
+      the GANSS positioning data, and any additional UTRAN positioning data.
+  "10415/2528":
+    description: >-
+      Encoded UTRAN positioning data taken from the positionData element of RANAP (TS 25.413): the data
+      discriminator and the data set that describe the methods used.
+  "10415/2529":
+    description: >-
+      Encoded GANSS positioning data set from the RANAP positionData element (TS 25.413), describing
+      satellite methods used for a UE on UTRAN.
+  "10415/2530":
+    description: >-
+      Bit mask sent by the MME or SGSN in a Location-Report-Request. Bit 0 Lgd/SLg-Indicator shows
+      whether the sender is an SGSN on Lgd or an MME on SLg; bits 1 and 2 relate to the MO-LR short
+      circuit feature on Lgd.
+  "10415/2531":
+    description: >-
+      One-octet reference number that ties together the messages of one deferred location request.
+  "10415/2532":
+    description: >-
+      Bit mask of the events that a deferred location request waits for. Bits include UE-Available (0),
+      Entering-Into-Area (1), Leaving-From-Area (2), Being-Inside-Area (3), Periodic-LDR (4), and
+      Motion-Event (5).
+  "10415/2533":
+    description: >-
+      Parameters of an area event for deferred location reporting: the area definition, whether the
+      event fires once or many times, and timing limits such as the minimum and maximum report
+      intervals and the reporting duration.
+  "10415/2534":
+    description: >-
+      Geographic target area for an area event. It holds one to ten Area entries and, except on Lgd,
+      up to 240 Additional-Area entries.
+  "10415/2535":
+    description: >-
+      One area in an area definition, given as an area type plus the matching area identification.
+  "10415/2536":
+    description: >-
+      Kind of area identifier in an Area or Additional-Area. Values include Country Code (0), PLMN ID (1),
+      Location Area ID (2), Routing Area ID (3), Cell Global ID (4), UTRAN Cell ID (5), Tracking Area ID
+      (6), and E-UTRAN Cell Global ID (7).
+  "10415/2537":
+    description: >-
+      Encoded identifier of the area for area-event deferred reporting. The coding depends on the
+      Area-Type, following TS 29.002 for types 0 to 5 and TS 24.080 for tracking area and ECGI; EPC
+      area events use only types 6 and 7.
+  "10415/2538":
+    description: >-
+      Says whether an area or motion event is reported only once or repeatedly. Values are
+      ONE_TIME_EVENT (0), the default, and MULTIPLE_TIME_EVENT (1).
+  "10415/2539":
+    description: >-
+      Shortest gap, in seconds, allowed between successive area or motion event reports, from 1 to
+      32767 seconds. It applies only to repeated events.
+  "10415/2540":
+    description: >-
+      Parameters for periodic deferred location reporting: how many reports to send and the interval
+      between them. Their product must stay below roughly 100 days.
+  "10415/2541":
+    description: >-
+      Number of location reports to send for periodic deferred reporting, from 1 up to 8639999.
+  "10415/2543":
+    description: >-
+      List of PLMNs in which the UE may produce periodic location reports, holding up to 20 PLMN
+      entries and an indicator of whether the list is in priority order.
+  "10415/2544":
+    description: >-
+      One PLMN entry in a reporting PLMN list: the visited PLMN identity and whether that PLMN supports
+      periodic location.
+  "10415/2545":
+    description: >-
+      Bit mask sent by the GMLC in a Provide-Location-Request. Bits are MO-LR-ShortCircuit-Indicator (0),
+      Optimized-LCS-Proc-Req (1) for a combined MME/SGSN, and Delayed-Location-Reporting-Support-Indicator
+      (2) for UEs that are briefly unreachable.
+  "10415/2546":
+    description: >-
+      Bit mask sent by the MME or SGSN in a Provide-Location-Answer. Bits include
+      Deferred-MT-LR-Response-Indicator (0), MO-LR-ShortCircuit-Indicator (1),
+      Optimized-LCS-Proc-Performed (2), and UE-Transiently-Not-Reachable-Indicator (3).
+  "10415/2547":
+    description: >-
+      Information about a deferred mobile-terminated location request reported to the GMLC: the
+      deferred event type, an optional termination cause, and, on an MT-LR restart, the node the UE
+      moved to.
+  "10415/2548":
+    description: >-
+      Reason a deferred location procedure ended. Values include Normal (0), Error Undefined (1),
+      Internal Timeout (2), Congestion (3), MT_LR_Restart (4), and Privacy Violation (5). MT_LR_Restart
+      asks the GMLC to start over, for example after the UE changed serving node.
+  "10415/2549":
+    description: >-
+      Bit mask sent by the GMLC in a Location-Report-Answer. Bit 0 MO-LR-ShortCircuit-Indicator shows
+      that the MO-LR short circuit feature was used to get the estimate, on Lgd only.
+  "10415/2550":
+    description: >-
+      Says whether the PLMN named in the same PLMN-ID-List entry supports periodic location. Values are
+      NOT_SUPPORTED (0), the default, and SUPPORTED (1).
+  "10415/2551":
+    description: >-
+      Says whether the PLMN entries in a reporting PLMN list are in priority order. Values are
+      NOT_PRIORITIZED (0), the default, and PRIORITIZED (1).
+  "10415/2552":
+    description: >-
+      Cell information that the E-SMLC supplies for the target UE: the ECGI of the cell and, when known,
+      the cell portion in which the UE is located.
+  "10415/2556":
+    description: >-
+      Civic (street-style) address of the target UE, given as the XML document carried in the TS 29.171
+      Civic Address element.
+  "10415/2557":
+    description: >-
+      Barometric pressure measured at the UE, as carried in the TS 29.171 element of the same name, which
+      helps estimate altitude.
+  "10415/2558":
+    description: >-
+      Additional UTRAN positioning data from the matching RANAP element of TS 25.413, sent alongside the
+      other UTRAN positioning results.
+  "10415/2559":
+    description: >-
+      Parameters of a motion event for a deferred EPC-MT-LR: the straight-line distance the UE must move,
+      whether reporting repeats, and timing limits on reporting, sampling, and total duration.
+  "10415/2560":
+    description: >-
+      Minimum straight-line distance, in meters (1 to 10000), that the UE must travel to trigger a motion
+      event report in a deferred EPC-MT-LR.
+  "10415/2561":
+    description: >-
+      Longest allowed time, in seconds (1 to 86400), between successive event reports in a deferred
+      EPC-MT-LR. Expiry of this interval is itself a reportable event.
+  "10415/2562":
+    description: >-
+      Longest time, in seconds (1 to 3600), that the UE may wait between checks of whether an area or
+      motion event has happened, for a deferred EPC-MT-LR.
+  "10415/2563":
+    description: >-
+      Total time, in seconds (1 to 8640000), during which event reporting stays active for a deferred
+      EPC-MT-LR.
+  "10415/2564":
+    description: >-
+      Bit string of location requirements for event reports in a deferred EPC-MT-LR. Bit 0
+      Location-Estimate means each report must include a location estimate; other bits are spare.
+  "10415/2565":
+    description: >-
+      An extra area in an area definition beyond the first ten, given as an area type and area
+      identification. It is not used for a PS-MT-LR on Lgd.
+  "10415/2400":
+    description: >-
+      The Local Mobile Station Identity that a VLR assigned to the subscriber (TS 23.003), returned by the
+      HSS so the GMLC can address the MSC.
+  "10415/2401":
+    description: >-
+      Describes the node currently serving the target user, such as an SGSN, MME, MSC, or 3GPP AAA
+      server, with its names, realms, numbers, LCS capability sets, and the GMLC tied to it.
+  "10415/2402":
+    description: >-
+      Diameter identity (host name) of the MME serving the target user.
+  "10415/2403":
+    description: >-
+      E.164 number of the MSC or MSC server serving the user, in international format and encoded as a
+      TBCD string.
+  "10415/2404":
+    description: >-
+      Bit mask showing which LCS capability sets the serving node supports, with bit meanings taken
+      from TS 29.002.
+  "10415/2405":
+    description: >-
+      IPv4 or IPv6 address of the home or visited GMLC associated with the serving node, used so that
+      location messages reach the right GMLC.
+  "10415/2406":
+    description: >-
+      Details of a further node that also serves the target user, alongside the main Serving-Node, with
+      the same kinds of names, realms, numbers, capabilities, and GMLC address.
+  "10415/2407":
+    description: >-
+      IPv4 or IPv6 address of the Privacy Profile Register that holds the target user's location privacy
+      settings.
+  "10415/2408":
+    description: >-
+      Diameter realm of the MME serving the target user.
+  "10415/2409":
+    description: >-
+      Diameter identity (host name) of the SGSN serving the target user.
+  "10415/2410":
+    description: >-
+      Diameter realm of the SGSN serving the target user.
+  "10415/2411":
+    description: >-
+      Bit mask sent by the HSS in an LCS-Routing-Info-Answer. Bit 0
+      Combined-MME/SGSN-Supporting-Optimized-LCS-Proc shows that one combined MME/SGSN serves the UE and
+      supports the optimized LCS procedure.
+commands:
+  8388620:
+    description: >-
+      On SLg (and Lgd), the GMLC asks the MME or SGSN for the location of a target UE, giving the
+      location type, client identity, QoS, privacy checks, and any deferred-event settings. The answer
+      returns the location estimate, accuracy, age, velocity, and positioning or cell data.
+    flow:
+      request: {from: [GMLC], to: [MME, SGSN]}
+  8388621:
+    description: >-
+      On SLg (and Lgd), the MME or SGSN sends unsolicited location data to the GMLC when an event happens,
+      such as an emergency call, an MO-LR, or a deferred or delayed location report. The GMLC answers and
+      may return reporting PLMNs and a reference number.
+    flow:
+      request: {from: [MME, SGSN], to: [GMLC]}
+  8388622:
+    description: >-
+      On SLh, the GMLC asks the HSS which nodes serve a target user, identified by IMSI or MSISDN. The
+      answer returns the serving and any additional serving nodes, the LMSI, GMLC and PPR addresses, and
+      RIA flags.
+    flow:
+      request: {from: [GMLC], to: [HSS]}

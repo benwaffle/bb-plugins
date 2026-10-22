@@ -1,0 +1,1012 @@
+# Summaries written for telecom-ref, not specification text.
+# Network functions and nodes across 2G/3G, EPC, IMS, and 5GC.
+
+# --- Access and user equipment ---
+
+- id: UE
+  name: UE
+  fullName: User Equipment
+  generations: [2G, 3G, 4G, 5G, IMS]
+  description: >-
+    The subscriber's device, made up of the mobile equipment and the USIM or ISIM application on the UICC.
+    It runs the radio, NAS, and IMS client stacks, authenticates with keys held on the card, and talks to
+    the radio access node over the air and to core control functions through NAS or SIP.
+  replaces: []
+  aliases: [MS]
+  spec: ["TS 23.002", "TS 23.501 §4.2"]
+
+- id: BTS
+  name: BTS
+  fullName: Base Transceiver Station
+  generations: [2G]
+  description: >-
+    The GSM radio node that serves one or more cells and terminates the Um air interface. It handles
+    radio transmission, channel coding, and ciphering on the air, and is controlled by a BSC over Abis.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002"]
+
+- id: BSC
+  name: BSC
+  fullName: Base Station Controller
+  generations: [2G]
+  description: >-
+    The GSM access controller that manages radio resources, channel assignment, and handover for a group
+    of BTSs. It connects to the MSC over the A interface for circuit traffic and to the SGSN over Gb
+    (through its packet control unit) for GPRS.
+  replaces: []
+  aliases: [BSS]
+  spec: ["TS 23.002"]
+
+- id: NodeB
+  name: NodeB
+  fullName: Node B
+  generations: [3G]
+  description: >-
+    The UMTS radio base station that terminates the Uu air interface and performs physical-layer
+    processing such as spreading, modulation, and power control. It is controlled by an RNC over Iub.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002"]
+
+- id: RNC
+  name: RNC
+  fullName: Radio Network Controller
+  generations: [3G]
+  description: >-
+    The UTRAN controller that owns radio resource management, RRC signalling, and mobility for the
+    NodeBs below it. It connects to the MSC over Iu-CS, to the SGSN over Iu-PS, to other RNCs over Iur,
+    and with direct tunnel it can send user data straight to an SGW over S12.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002", "TS 23.060"]
+
+- id: eNodeB
+  name: eNodeB
+  fullName: E-UTRAN Node B
+  generations: [4G]
+  description: >-
+    The LTE base station that merges radio access and radio control into one node. It runs RRC, schedules
+    the air interface, selects the MME, carries user data to the SGW over S1-U, and coordinates handover
+    with neighbouring eNodeBs over X2.
+  replaces: [NodeB, RNC]
+  aliases: [eNB]
+  spec: ["TS 23.401 §4.2", "TS 36.300"]
+
+- id: HeNB-GW
+  name: HeNB-GW
+  fullName: Home eNodeB Gateway
+  generations: [4G]
+  description: >-
+    An optional gateway that aggregates many femtocell (Home eNodeB) S1 connections toward the core.
+    To the MME it looks like a single eNodeB, which keeps the number of S1 associations small.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.401 §4.2", "TS 36.300"]
+
+- id: gNB
+  name: gNB
+  fullName: NR Node B
+  generations: [5G]
+  description: >-
+    The 5G NR base station within NG-RAN. It terminates the NR air interface, connects to the AMF over
+    N2 for control and to the UPF over N3 for user data, and talks to other gNBs over Xn. It may be split
+    into central and distributed units.
+  replaces: [eNodeB]
+  aliases: [NG-RAN]
+  spec: ["TS 23.501 §4.2", "TS 38.300"]
+
+- id: Untrusted-N3GPP-AN
+  name: Untrusted non-3GPP AN
+  fullName: Untrusted Non-3GPP IP Access Network
+  generations: [4G]
+  description: >-
+    A WLAN or other non-3GPP IP access that the operator does not trust for direct core attachment. A UE
+    on it reaches the EPC by building an IPsec tunnel to an ePDG, and the access may run its own
+    authentication with the 3GPP AAA Server over SWa.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.402 §4.2"]
+
+- id: TWAN
+  name: TWAN
+  fullName: Trusted WLAN Access Network
+  generations: [4G]
+  description: >-
+    A WLAN that the operator trusts to connect UEs into the EPC without an ePDG. It authenticates users
+    with the 3GPP AAA Server over STa and builds S2a tunnels to the PGW for each PDN connection.
+  replaces: []
+  aliases: [TWAG]
+  spec: ["TS 23.402 §16"]
+
+# --- 2G/3G core ---
+
+- id: MSC
+  name: MSC
+  fullName: Mobile Switching Centre
+  generations: [2G, 3G, 4G]
+  description: >-
+    The circuit-switched core node that sets up voice calls, handles mobility for CS services, and
+    delivers SMS. It is usually combined with a VLR, links to BSCs over A and RNCs over Iu-CS, and in
+    LTE networks supports CS fallback over SGs and SRVCC over Sv.
+  replaces: []
+  aliases: [MSC Server, MSS]
+  spec: ["TS 23.002"]
+
+- id: VLR
+  name: VLR
+  fullName: Visitor Location Register
+  generations: [2G, 3G]
+  description: >-
+    A database, normally co-located with the MSC, that keeps a temporary copy of subscription data and the
+    location area for each UE in its service area. It fetches that data from the HLR over the D interface
+    and allocates TMSIs.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002"]
+
+- id: HLR
+  name: HLR
+  fullName: Home Location Register
+  generations: [2G, 3G]
+  description: >-
+    The master subscriber database for circuit- and packet-switched 2G/3G service. It holds the
+    subscription profile and the current VLR and SGSN for each subscriber, and works with the
+    authentication centre (AuC) to supply authentication vectors over MAP.
+  replaces: []
+  aliases: [HLR/AuC]
+  spec: ["TS 23.002"]
+
+- id: EIR
+  name: EIR
+  fullName: Equipment Identity Register
+  generations: [2G, 3G, 4G]
+  description: >-
+    A database of device identities (IMEIs) and their status, such as allowed, blocked, or tracked.
+    The MSC, SGSN, or MME queries it to check a device before granting service.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002"]
+
+- id: SGSN
+  name: SGSN
+  fullName: Serving GPRS Support Node
+  generations: [2G, 3G, 4G]
+  description: >-
+    The packet-switched serving node for GERAN and UTRAN. It handles GPRS mobility, attach,
+    authentication, and PDP context setup, and forwards user traffic to the GGSN over Gn, or to an SGW
+    over S4 when connected to the EPC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.060", "TS 23.401 §4.4"]
+
+- id: GGSN
+  name: GGSN
+  fullName: Gateway GPRS Support Node
+  generations: [2G, 3G]
+  description: >-
+    The GPRS gateway toward external packet data networks. It anchors PDP contexts, allocates UE IP
+    addresses, enforces policy and charging, and routes traffic to the Gi interface.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.060"]
+
+- id: SMS-SC
+  name: SMS-SC
+  fullName: Short Message Service Centre
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The store-and-forward node that accepts, queues, and delivers short messages. It reaches the serving
+    node for a recipient through an SMS-GMSC and receives mobile-originated messages through an
+    SMS-IWMSC.
+  replaces: []
+  aliases: [SMSC]
+  spec: ["TS 23.040"]
+
+- id: SMS-GMSC
+  name: SMS-GMSC
+  fullName: SMS Gateway MSC
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The function that takes a mobile-terminated short message from the SMS-SC, asks the HLR or HSS for
+    routing information, and forwards the message to the serving MSC, SGSN, MME, or SMSF.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.040"]
+
+- id: SMS-IWMSC
+  name: SMS-IWMSC
+  fullName: SMS Interworking MSC
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The function that receives mobile-originated short messages from the serving network and passes them
+    to the subscriber's SMS-SC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.040"]
+
+# --- EPC ---
+
+- id: MME
+  name: MME
+  fullName: Mobility Management Entity
+  generations: [4G]
+  description: >-
+    The main EPC control node. It terminates NAS from the UE, runs authentication with vectors from the
+    HSS, tracks UEs in idle mode, pages them, and selects the SGW and PGW for EPS bearers. Its main peers
+    are the eNodeB (S1-MME), HSS (S6a), SGW (S11), and other MMEs (S10).
+  replaces: [SGSN]
+  aliases: []
+  spec: ["TS 23.401 §4.4", "TS 23.002"]
+
+- id: SGW
+  name: SGW
+  fullName: Serving Gateway
+  generations: [4G]
+  description: >-
+    The user-plane anchor for mobility between eNodeBs and between LTE and 2G/3G. It terminates S1-U
+    tunnels, buffers downlink data for idle UEs and triggers paging through the MME, and relays traffic to
+    the PGW over S5 or S8.
+  replaces: []
+  aliases: [S-GW]
+  spec: ["TS 23.401 §4.4"]
+
+- id: PGW
+  name: PGW
+  fullName: PDN Gateway
+  generations: [4G]
+  description: >-
+    The EPC gateway toward external packet data networks. It allocates UE IP addresses, hosts the PCEF
+    for policy and charging enforcement, and terminates S5/S8, S2a, and S2b tunnels so that 3GPP and
+    non-3GPP access share one anchor.
+  replaces: [GGSN]
+  aliases: [P-GW, PDN-GW]
+  spec: ["TS 23.401 §4.4", "TS 23.402 §4.2"]
+
+- id: HSS
+  name: HSS
+  fullName: Home Subscriber Server
+  generations: [4G, IMS]
+  description: >-
+    The subscriber database for EPS and IMS. It stores subscription profiles, the identity of the serving
+    MME or S-CSCF, and authentication data, and it generates authentication vectors. Its main peers are
+    the MME and SGSN (S6a/S6d), the CSCFs (Cx), application servers (Sh), and the 3GPP AAA Server (SWx).
+  replaces: [HLR]
+  aliases: [UPSF]
+  spec: ["TS 23.002", "TS 23.401 §4.4"]
+
+- id: PCRF
+  name: PCRF
+  fullName: Policy and Charging Rules Function
+  generations: [4G, IMS]
+  description: >-
+    The EPC policy decision point. It builds PCC rules from subscription data, operator policy, and
+    session information from application functions, and pushes them to the PCEF, BBERF, or TDF. Its main
+    peers are the PCEF (Gx), the AF (Rx), and the OCS (Sy).
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2", "TS 23.401 §4.4"]
+
+- id: PCEF
+  name: PCEF
+  fullName: Policy and Charging Enforcement Function
+  generations: [3G, 4G]
+  description: >-
+    The enforcement point for PCC rules, located in the PGW or GGSN. It detects service data flows,
+    applies gating and QoS, and reports usage to online and offline charging systems over Gy and Gz.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2"]
+
+- id: BBERF
+  name: BBERF
+  fullName: Bearer Binding and Event Reporting Function
+  generations: [4G]
+  description: >-
+    A function in an access gateway, such as an SGW using PMIP or a trusted non-3GPP gateway, that binds
+    service flows to bearers and reports access events when the PCEF cannot do so itself. It receives QoS
+    rules from the PCRF over Gxa or Gxc.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2"]
+
+- id: TDF
+  name: TDF
+  fullName: Traffic Detection Function
+  generations: [4G]
+  description: >-
+    A function that inspects user traffic to detect applications and reports them to the PCRF over Sd.
+    It can also enforce gating, redirection, or bandwidth limits for the detected applications.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2"]
+
+- id: TSSF
+  name: TSSF
+  fullName: Traffic Steering Support Function
+  generations: [4G]
+  description: >-
+    A function on the SGi side that steers detected traffic through operator service chains, such as
+    caches or firewalls. It receives traffic steering control information from the PCRF over St.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2"]
+
+- id: RCAF
+  name: RCAF
+  fullName: RAN Congestion Awareness Function
+  generations: [4G]
+  description: >-
+    A function that gathers RAN user-plane congestion information and identifies the UEs in congested
+    cells. It reports congestion to the PCRF over Np and can share it with the SCEF over Ns.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2"]
+
+- id: OCS
+  name: OCS
+  fullName: Online Charging System
+  generations: [3G, 4G, IMS]
+  description: >-
+    The real-time charging system that rates usage, reserves and deducts credit, and grants quota before
+    service is delivered. It serves the PCEF over Gy, IMS nodes over Ro, and reports spending limit status
+    to the PCRF over Sy.
+  replaces: []
+  aliases: []
+  spec: ["TS 32.240", "TS 32.296"]
+
+- id: OFCS
+  name: OFCS
+  fullName: Offline Charging System
+  generations: [2G, 3G, 4G, IMS]
+  description: >-
+    The post-paid charging chain that collects accounting events from network elements and produces
+    charging data records for billing. Gateways report to it over Gz and IMS nodes over Rf.
+  replaces: []
+  aliases: [CDF, CGF]
+  spec: ["TS 32.240"]
+
+- id: ePDG
+  name: ePDG
+  fullName: Evolved Packet Data Gateway
+  generations: [4G]
+  description: >-
+    The gateway that lets UEs on untrusted non-3GPP access, such as public Wi-Fi, reach the EPC. It
+    terminates IKEv2/IPsec tunnels from the UE over SWu, authenticates the UE through the 3GPP AAA Server
+    over SWm, and builds S2b tunnels to the PGW.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.402 §4.2"]
+
+- id: AAA-Server
+  name: 3GPP AAA Server
+  fullName: 3GPP Authentication, Authorization and Accounting Server
+  generations: [4G]
+  description: >-
+    The home-network server that authenticates and authorizes UEs on non-3GPP access using EAP-AKA or
+    EAP-AKA'. It fetches vectors and profiles from the HSS over SWx and serves the ePDG (SWm), TWAN (STa),
+    and PGW (S6b).
+  replaces: []
+  aliases: [3GPP AAA Server]
+  spec: ["TS 23.402 §4.2"]
+
+- id: AAA-Proxy
+  name: 3GPP AAA Proxy
+  fullName: 3GPP Authentication, Authorization and Accounting Proxy
+  generations: [4G]
+  description: >-
+    A visited-network proxy that relays AAA signalling between local non-3GPP access nodes and the home
+    3GPP AAA Server over SWd. It can apply visited-network policy to roaming users.
+  replaces: []
+  aliases: [3GPP AAA Proxy]
+  spec: ["TS 23.402 §4.2"]
+
+- id: DRA
+  name: DRA
+  fullName: Diameter Routing Agent
+  generations: [4G, IMS]
+  description: >-
+    A Diameter agent that binds all Gx, Rx, and related sessions of one UE IP-CAN session to the same
+    PCRF when several PCRFs serve a network. It works as a proxy or redirect agent.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203", "TS 29.213"]
+
+- id: DEA
+  name: DEA
+  fullName: Diameter Edge Agent
+  generations: [4G, IMS]
+  description: >-
+    A Diameter relay or proxy at the border of a network that handles all Diameter traffic exchanged with
+    roaming partners. It hides internal topology and gives a single point for inter-network routing and
+    screening.
+  replaces: []
+  aliases: []
+  spec: ["TS 29.272"]
+
+- id: GMLC
+  name: GMLC
+  fullName: Gateway Mobile Location Centre
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The entry point for external clients that request a UE's location. It checks privacy, finds the
+    serving node from the HLR, HSS, or UDM, and asks the MSC, SGSN, MME, or AMF to run positioning.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.271", "TS 23.273"]
+
+- id: E-SMLC
+  name: E-SMLC
+  fullName: Evolved Serving Mobile Location Centre
+  generations: [4G]
+  description: >-
+    The LTE positioning server. On request from the MME over SLs, it selects a positioning method,
+    exchanges LPP messages with the UE and LPPa messages with the eNodeB, and computes the location
+    estimate.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.271", "TS 36.305"]
+
+- id: SCEF
+  name: SCEF
+  fullName: Service Capability Exposure Function
+  generations: [4G]
+  description: >-
+    The EPC function that exposes network capabilities to third-party servers through APIs. It supports
+    non-IP data delivery, monitoring events, and parameter provisioning, and talks to the HSS (S6t), the
+    MME and SGSN (T6a/T6b), and the PCRF (Nt).
+  replaces: []
+  aliases: []
+  spec: ["TS 23.682 §4.2"]
+
+- id: MTC-IWF
+  name: MTC-IWF
+  fullName: Machine Type Communications Interworking Function
+  generations: [4G]
+  description: >-
+    The function that lets a Services Capability Server send device triggers and other MTC requests into
+    the network over Tsp. It authorizes requests, resolves the device's identity and serving node through
+    the HSS over S6m, and delivers triggers by SMS over T4.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.682 §4.2"]
+
+- id: SCS
+  name: SCS
+  fullName: Services Capability Server
+  generations: [4G, 5G]
+  description: >-
+    A server, inside or outside the operator domain, that hosts machine-type application logic and
+    reaches devices through the MTC-IWF or SCEF. It requests device triggers and non-IP data delivery.
+  replaces: []
+  aliases: [AS (MTC)]
+  spec: ["TS 23.682 §4.2"]
+
+- id: BM-SC
+  name: BM-SC
+  fullName: Broadcast Multicast Service Centre
+  generations: [3G, 4G]
+  description: >-
+    The MBMS function that authorizes content providers, schedules broadcast sessions, and starts and
+    stops MBMS bearers. It feeds content to the MBMS-GW (or GGSN in 3G) and signals sessions over SGmb or
+    Gmb.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.246"]
+
+- id: MBMS-GW
+  name: MBMS-GW
+  fullName: MBMS Gateway
+  generations: [4G]
+  description: >-
+    The gateway that sends MBMS broadcast traffic from the BM-SC to eNodeBs using IP multicast. It
+    signals session start and stop to the MME over Sm.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.246"]
+
+- id: CBC
+  name: CBC
+  fullName: Cell Broadcast Centre
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The node that manages public warning and cell broadcast messages. It sends warning content to the
+    radio network through the BSC, RNC, MME (SBc), or AMF (N50) for broadcast in the target area.
+  replaces: []
+  aliases: [CBCF]
+  spec: ["TS 23.041"]
+
+- id: CSS
+  name: CSS
+  fullName: CSG Subscriber Server
+  generations: [3G, 4G]
+  description: >-
+    A visited-network database that holds closed subscriber group information for roaming users. It
+    supplements the home HSS data so that the MME or SGSN can control access to home cells.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.401 §4.4", "TS 29.272"]
+
+# --- IMS ---
+
+- id: P-CSCF
+  name: P-CSCF
+  fullName: Proxy Call Session Control Function
+  generations: [IMS]
+  description: >-
+    The first SIP contact point for the UE in IMS. It keeps the security association with the UE,
+    compresses and checks SIP, and acts as the AF toward the PCRF or PCF to set up media bearers. It
+    forwards requests to the I-CSCF or S-CSCF.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: I-CSCF
+  name: I-CSCF
+  fullName: Interrogating Call Session Control Function
+  generations: [IMS]
+  description: >-
+    The SIP entry point into a home IMS network. It queries the HSS to assign or locate the serving
+    S-CSCF during registration and routes incoming requests to it.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: S-CSCF
+  name: S-CSCF
+  fullName: Serving Call Session Control Function
+  generations: [IMS]
+  description: >-
+    The IMS registrar and session controller for a user. It authenticates the user with vectors from the
+    HSS, downloads the user profile over Cx, applies initial filter criteria to invoke application
+    servers over ISC, and routes sessions.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: E-CSCF
+  name: E-CSCF
+  fullName: Emergency Call Session Control Function
+  generations: [IMS]
+  description: >-
+    The CSCF that handles IMS emergency sessions. It receives emergency requests from the P-CSCF, obtains
+    location and routing information, and routes the call to the right emergency centre.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.167", "TS 23.228"]
+
+- id: BGCF
+  name: BGCF
+  fullName: Breakout Gateway Control Function
+  generations: [IMS]
+  description: >-
+    The IMS function that decides where to break out a session toward the circuit-switched network. It
+    picks a local MGCF or forwards the request to a BGCF in another network.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: MGCF
+  name: MGCF
+  fullName: Media Gateway Control Function
+  generations: [IMS]
+  description: >-
+    The signalling gateway between IMS and the CS network. It converts SIP to ISUP or BICC and controls
+    an IMS-MGW over Mn to convert the media.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: IMS-MGW
+  name: IMS-MGW
+  fullName: IMS Media Gateway
+  generations: [IMS]
+  description: >-
+    The media gateway that converts RTP media on the IMS side to TDM or other CS bearers, including codec
+    transcoding. It is controlled by an MGCF using H.248.
+  replaces: []
+  aliases: [MGW]
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: MRFC
+  name: MRFC
+  fullName: Multimedia Resource Function Controller
+  generations: [IMS]
+  description: >-
+    The controller for IMS media resources such as announcements, conferencing, and transcoding. It
+    receives SIP from the S-CSCF or application servers and controls an MRFP over Mp.
+  replaces: []
+  aliases: [MRF]
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: MRFP
+  name: MRFP
+  fullName: Multimedia Resource Function Processor
+  generations: [IMS]
+  description: >-
+    The media processing part of the MRF. It mixes, plays, records, and transcodes media streams under
+    control of the MRFC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: IBCF
+  name: IBCF
+  fullName: Interconnection Border Control Function
+  generations: [IMS]
+  description: >-
+    The SIP border function between IMS networks. It applies interconnect policy, hides topology, and can
+    control a transition gateway for media at the network edge.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: AS
+  name: AS
+  fullName: Application Server
+  generations: [IMS]
+  description: >-
+    A SIP application server that hosts IMS services such as telephony supplementary services, messaging,
+    or voice call continuity. The S-CSCF invokes it over ISC, and it can read and write user data in the
+    HSS over Sh.
+  replaces: []
+  aliases: [TAS, SCC-AS]
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: SLF
+  name: SLF
+  fullName: Subscription Locator Function
+  generations: [IMS]
+  description: >-
+    A lookup function that tells the CSCFs or application servers which HSS holds a user's data when the
+    network has more than one HSS. It answers over Dx and Dh.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.228 §4", "TS 23.002"]
+
+- id: IP-SM-GW
+  name: IP-SM-GW
+  fullName: IP Short Message Gateway
+  generations: [IMS]
+  description: >-
+    An application server that carries SMS over IMS. It converts between SIP-based messages and the
+    legacy SMS transport, and acts toward the SMS-GMSC like a serving MSC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.204"]
+
+- id: AF
+  name: AF
+  fullName: Application Function
+  generations: [4G, 5G, IMS]
+  description: >-
+    An application-layer function that needs policy control for its sessions, such as the P-CSCF for
+    IMS voice. It gives session and media information to the PCRF over Rx, or to the PCF or NEF in 5GC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.203 §6.2", "TS 23.501 §6.2.10"]
+
+- id: GBA-BSF
+  name: BSF (GBA)
+  fullName: Bootstrapping Server Function
+  generations: [3G, 4G, IMS]
+  description: >-
+    The GBA function that runs AKA with the UE to create a shared key and bootstrapping transaction
+    identifier. Application servers (NAFs) later fetch derived keys from it to authenticate the UE.
+  replaces: []
+  aliases: []
+  spec: ["TS 33.220"]
+
+- id: NAF
+  name: NAF
+  fullName: Network Application Function
+  generations: [3G, 4G, IMS]
+  description: >-
+    An application server that relies on GBA for UE authentication. It obtains application-specific keys
+    from the BSF over Zn, for example to secure XCAP over Ut.
+  replaces: []
+  aliases: []
+  spec: ["TS 33.220"]
+
+# --- 5GC ---
+
+- id: AMF
+  name: AMF
+  fullName: Access and Mobility Management Function
+  generations: [5G]
+  description: >-
+    The 5GC control node that terminates N1 NAS and N2 toward the access network. It handles
+    registration, connection and reachability management, mobility, and access authentication with the
+    AUSF, and relays session management messages to the SMF.
+  replaces: [MME]
+  aliases: []
+  spec: ["TS 23.501 §6.2.1"]
+
+- id: SMF
+  name: SMF
+  fullName: Session Management Function
+  generations: [5G]
+  description: >-
+    The 5GC function that sets up, modifies, and releases PDU sessions. It allocates UE IP addresses,
+    selects and controls UPFs over N4, applies policy from the PCF, and reports charging to the CHF.
+  replaces: [PGW, SGW]
+  aliases: []
+  spec: ["TS 23.501 §6.2.2"]
+
+- id: UPF
+  name: UPF
+  fullName: User Plane Function
+  generations: [5G]
+  description: >-
+    The 5GC user-plane node. It forwards and routes packets, acts as the anchor for mobility and the
+    connection point to the data network, applies QoS and usage reporting, and follows rules installed
+    by the SMF over N4.
+  replaces: [PGW, SGW]
+  aliases: []
+  spec: ["TS 23.501 §6.2.3"]
+
+- id: PCF
+  name: PCF
+  fullName: Policy Control Function
+  generations: [5G]
+  description: >-
+    The 5GC policy decision point. It provides session, access and mobility, and UE policies to the SMF,
+    AMF, and UE, and reads policy subscription data from the UDR.
+  replaces: [PCRF]
+  aliases: []
+  spec: ["TS 23.501 §6.2.4"]
+
+- id: NEF
+  name: NEF
+  fullName: Network Exposure Function
+  generations: [5G]
+  description: >-
+    The 5GC function that exposes network capabilities and events to external application functions in a
+    controlled way. It translates between external and internal identifiers and can store exposed data in
+    the UDR.
+  replaces: [SCEF]
+  aliases: []
+  spec: ["TS 23.501 §6.2.5"]
+
+- id: NRF
+  name: NRF
+  fullName: Network Repository Function
+  generations: [5G]
+  description: >-
+    The service registry of the 5GC. NFs register their profiles with it, and other NFs query it to
+    discover peers and obtain access tokens for service-based calls.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2.6"]
+
+- id: UDM
+  name: UDM
+  fullName: Unified Data Management
+  generations: [5G]
+  description: >-
+    The 5GC front end for subscriber data. It generates authentication credentials, holds the
+    registration of the serving AMF and SMF, and provides subscription data to other NFs, storing it in
+    the UDR.
+  replaces: [HSS]
+  aliases: []
+  spec: ["TS 23.501 §6.2.7"]
+
+- id: AUSF
+  name: AUSF
+  fullName: Authentication Server Function
+  generations: [5G]
+  description: >-
+    The home-network function that runs 5G AKA or EAP-AKA' for the UE on request from the AMF. It gets
+    vectors from the UDM and confirms the authentication result to the serving network.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2.8"]
+
+- id: N3IWF
+  name: N3IWF
+  fullName: Non-3GPP Interworking Function
+  generations: [5G]
+  description: >-
+    The 5GC gateway for UEs on untrusted non-3GPP access. It terminates the UE's IPsec tunnels over NWu,
+    relays NAS to the AMF over N2, and carries user data to the UPF over N3.
+  replaces: [ePDG]
+  aliases: []
+  spec: ["TS 23.501 §6.2.9"]
+
+- id: UDR
+  name: UDR
+  fullName: Unified Data Repository
+  generations: [5G]
+  description: >-
+    The 5GC database that stores subscription, policy, application, and exposure data. The UDM, PCF, and
+    NEF read and write it through the Nudr service.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2.11"]
+
+- id: UDSF
+  name: UDSF
+  fullName: Unstructured Data Storage Function
+  generations: [5G]
+  description: >-
+    An optional 5GC store that any NF can use to keep its unstructured context data, such as UE or
+    session context, outside the NF instance so that other instances can pick it up.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2.12"]
+
+- id: SMSF
+  name: SMSF
+  fullName: SMS Function
+  generations: [5G]
+  description: >-
+    The 5GC function that delivers SMS over NAS. It registers with the UDM, checks SMS subscription, and
+    relays messages between the AMF and the SMS-GMSC or SMS-IWMSC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 23.502"]
+
+- id: NSSF
+  name: NSSF
+  fullName: Network Slice Selection Function
+  generations: [5G]
+  description: >-
+    The 5GC function that selects the network slice instances to serve a UE. It works out the allowed
+    NSSAI and the AMF set or NRF to use during registration.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: 5G-EIR
+  name: 5G-EIR
+  fullName: 5G Equipment Identity Register
+  generations: [5G]
+  description: >-
+    The 5GC equipment identity check function. The AMF asks it whether a device's PEI is allowed or
+    blocked.
+  replaces: [EIR]
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: LMF
+  name: LMF
+  fullName: Location Management Function
+  generations: [5G]
+  description: >-
+    The 5G positioning server. It selects positioning methods, exchanges positioning protocol messages
+    with the UE and NG-RAN through the AMF, and computes the UE location.
+  replaces: [E-SMLC]
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 23.273"]
+
+- id: SEPP
+  name: SEPP
+  fullName: Security Edge Protection Proxy
+  generations: [5G]
+  description: >-
+    The border proxy for service-based signalling between PLMNs. It protects and filters inter-PLMN
+    messages, hides topology, and exchanges N32 traffic with the SEPP of the partner network.
+  replaces: [DEA]
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 33.501"]
+
+- id: NWDAF
+  name: NWDAF
+  fullName: Network Data Analytics Function
+  generations: [5G]
+  description: >-
+    The 5GC analytics function. It collects data from NFs and OAM, produces statistics and predictions
+    such as load or UE mobility, and provides them to NFs and AFs on request or subscription.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 23.288"]
+
+- id: CHF
+  name: CHF
+  fullName: Charging Function
+  generations: [5G]
+  description: >-
+    The 5G converged charging function. It provides online and offline charging over the Nchf service and
+    supplies spending limit status to the PCF.
+  replaces: [OCS, OFCS]
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 32.290"]
+
+- id: SCP
+  name: SCP
+  fullName: Service Communication Proxy
+  generations: [5G]
+  description: >-
+    An optional proxy for service-based signalling inside a PLMN. It routes requests, can perform
+    discovery and selection on behalf of consumers, and gives a point for load balancing.
+  replaces: [DRA]
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: BSF
+  name: BSF
+  fullName: Binding Support Function
+  generations: [5G]
+  description: >-
+    The 5GC function that stores which PCF serves a given PDU session, keyed by UE address, DNN, and
+    slice. AFs and other NFs query it to find the right PCF.
+  replaces: [DRA]
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: UCMF
+  name: UCMF
+  fullName: UE Radio Capability Management Function
+  generations: [5G]
+  description: >-
+    The function that stores UE radio capability sets and maps them to short UE radio capability IDs, so
+    that the network can avoid sending full capability information.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: NSSAAF
+  name: NSSAAF
+  fullName: Network Slice-Specific Authentication and Authorization Function
+  generations: [5G]
+  description: >-
+    The function that runs slice-specific authentication between the UE and an external AAA server,
+    relaying EAP between the AMF and the AAA server.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: NSACF
+  name: NSACF
+  fullName: Network Slice Admission Control Function
+  generations: [5G]
+  description: >-
+    The function that counts registered UEs and PDU sessions per network slice and checks them against
+    configured quotas. The AMF and SMF ask it before admitting a UE or session.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: TNGF
+  name: TNGF
+  fullName: Trusted Non-3GPP Gateway Function
+  generations: [5G]
+  description: >-
+    The 5GC gateway for UEs on trusted non-3GPP access. It terminates N2 and N3 toward the core and the
+    IPsec connections from the UE over NWt.
+  replaces: [TWAN]
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: TWIF
+  name: TWIF
+  fullName: Trusted WLAN Interworking Function
+  generations: [5G]
+  description: >-
+    The function that connects devices on trusted WLAN that cannot run 5GC NAS. It acts on the device's
+    behalf toward the AMF over N2 and the UPF over N3.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2"]
+
+- id: W-AGF
+  name: W-AGF
+  fullName: Wireline Access Gateway Function
+  generations: [5G]
+  description: >-
+    The function that connects wireline access networks, such as cable or fixed broadband, to the 5GC.
+    It terminates N2 and N3 on behalf of the wireline residential gateway.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.501 §6.2", "TS 23.316"]
+
+- id: DN
+  name: DN
+  fullName: Data Network
+  generations: [2G, 3G, 4G, 5G]
+  description: >-
+    The external or operator packet network a UE reaches through the core, such as the internet or an
+    IMS network. It is reached from the GGSN over Gi, the PGW over SGi, and the UPF over N6.
+  replaces: []
+  aliases: [PDN]
+  spec: ["TS 23.501 §4.2", "TS 23.401 §4.2"]

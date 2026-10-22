@@ -1,0 +1,9 @@
+# Names that spec ABNF uses for an AVP registered under another name, either a
+# spelling slip in the spec or an older name.
+avpNames:
+  Redirected-Host: Redirect-Host
+  Redirected-Host-Usage: Redirect-Host-Usage
+  Redirected-Host-Cache-Time: Redirect-Max-Cache-Time
+  Redirected-Max-Cache-Time: Redirect-Max-Cache-Time
+  Accounting-Interim-Interval: Acct-Interim-Interval
+  WiFi-P2P-Assistance-Iinfo: WiFi-P2P-Assistance-Info
