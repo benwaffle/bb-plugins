@@ -78,7 +78,8 @@ their Jira ticket, such as **ACME-21 Checkout backlog bug bash**, when the ticke
 has at least two threads or an open PR that has no review thread yet. The row
 shows the ticket key and summary, or only the key until the summary is read,
 and truncates in a narrow sidebar. Hover the ticket row for its summary and
-status. An open PR without a review thread is a muted row under its
+status. On bb builds that take a `labelHref`, clicking the ticket key opens the
+ticket in Jira. An open PR without a review thread is a muted row under its
 ticket, such as `#566 Keep the old task serving`, with a **Start** button; PRs
 without a ticket are under **No ticket**. When a group's PRs are in more than
 one repository, each PR row names its repository, such as `widgets#566`. The row says only `on #552` for a
@@ -133,7 +134,8 @@ Flat sidebar modes (Custom, By machine, Pinned, and cross-project rows) do
 not show the ticket groups. On bb builds with
 `app.slots.experimental_sidebarThreadDecoration` that take a per-thread
 decoration, a ticket thread's row there shows the ticket key on its second
-line and, when the thread reviews a PR, the same PR state icon and agent dot
+line, linked to the ticket in Jira on builds that take a `labelHref`, and,
+when the thread reviews a PR, the same PR state icon and agent dot
 as in its group, with the PR's state after the thread title: `draft`,
 `conflicts`, the number of failing checks (`3 failing`), and the review state
 (`changes requested` when anyone requested changes, else `approved` when

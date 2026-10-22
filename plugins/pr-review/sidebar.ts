@@ -19,6 +19,8 @@ export interface TicketGroup {
   ticketKey: string | null;
   /** The ticket summary, or null until it is read and for "No ticket". */
   summary: string | null;
+  /** The ticket's Jira page, or null for "No ticket". */
+  url: string | null;
   tooltip: string | null;
   threadIds: string[];
   /** Each entry's depth counts only the base PRs in this group. */
@@ -114,6 +116,8 @@ export function stackedThreadRow(threadId: string, entry: QueueEntry | null, rev
 export interface ThreadRowDecoration {
   icon?: SidebarRowIcon;
   label?: string;
+  /** The page bb opens when the label is clicked. */
+  labelHref?: string;
   description?: string;
   trailing?: SidebarRowTrailing;
   pullRequest?: SidebarRowPullRequest;
@@ -155,7 +159,8 @@ function unqueuedStatus(state: RelatedPullState): string {
 
 /**
  * Each ticket thread's decoration on a sidebar row outside its project's
- * header: the ticket key as the label and, for a thread that reviews a PR,
+ * header: the ticket key as the label, linked to the ticket's Jira page,
+ * and, for a thread that reviews a PR,
  * the PR state icon and agent dot it has in a ticket group, the PR's state
  * words as the description, and the PR's number and state. A queued PR's
  * review thread without a ticket gets only the PR's number and state.
@@ -163,6 +168,11 @@ function unqueuedStatus(state: RelatedPullState): string {
 export function threadRowDecorations(result: SidebarGroupsResult): Map<string, ThreadRowDecoration> {
   const reviewByThreadId = new Map(result.threadReviews.map(({ threadId, ...review }) => [threadId, review]));
   const pullByThreadId = new Map(result.threadPulls.map(({ threadId, entry }) => [threadId, entry]));
+  const urlByTicketKey = new Map(result.tickets.map(({ key, url }) => [key, url]));
+  const ticketLabel = (ticketKey: string): { label: string; labelHref?: string } => {
+    const url = urlByTicketKey.get(ticketKey);
+    return url === undefined ? { label: ticketKey } : { label: ticketKey, labelHref: url };
+  };
   const decorations = new Map<string, ThreadRowDecoration>(
     result.threadPulls.map(({ threadId, entry }) => [
       threadId,
@@ -172,14 +182,14 @@ export function threadRowDecorations(result: SidebarGroupsResult): Map<string, T
   for (const { threadId, ticketKey } of result.threadTickets) {
     const review = reviewByThreadId.get(threadId);
     if (review === undefined) {
-      decorations.set(threadId, { label: ticketKey });
+      decorations.set(threadId, ticketLabel(ticketKey));
       continue;
     }
     const entry = pullByThreadId.get(threadId);
     const description = entry === undefined ? unqueuedStatus(review.pullState) : pullStatus(entry);
     decorations.set(threadId, {
       ...iconFor(review.pullState),
-      label: ticketKey,
+      ...ticketLabel(ticketKey),
       ...(description === "" ? {} : { description }),
       ...trailingFor(review.agent),
       ...pullRequestFor(review),
@@ -270,6 +280,8 @@ export function pullActionLabel(look: SidebarLook, starting: boolean): string {
 export interface GroupHeaderLook {
   label: string;
   keyLabel?: string;
+  /** The page bb opens when the ticket key is clicked. */
+  labelHref?: string;
   icon?: string;
 }
 
@@ -277,13 +289,14 @@ export interface GroupHeaderLook {
  * A ticket group's header: on card and minimal hosts the ticket key in
  * `keyLabel` and the summary as the label, with the ticket icon on a card
  * host (a minimal host draws the key as a pill instead); on legacy hosts the
- * key and summary in one label.
+ * key and summary in one label. A ticket's header links to its Jira page.
  */
-export function groupHeaderLook({ ticketKey, summary }: TicketGroup, look: SidebarLook): GroupHeaderLook {
+export function groupHeaderLook({ ticketKey, summary, url }: TicketGroup, look: SidebarLook): GroupHeaderLook {
   const icon = look === "card" ? { icon: TICKET_ICON } : {};
   if (ticketKey === null) return { label: NO_TICKET_LABEL, ...icon };
-  if (look === "legacy") return { label: summary === null ? ticketKey : `${ticketKey} ${summary}` };
-  return { label: summary ?? "", keyLabel: ticketKey, ...icon };
+  const labelHref = url === null ? {} : { labelHref: url };
+  if (look === "legacy") return { label: summary === null ? ticketKey : `${ticketKey} ${summary}`, ...labelHref };
+  return { label: summary ?? "", keyLabel: ticketKey, ...labelHref, ...icon };
 }
 
 function isStacked(entry: QueueEntry): boolean {
@@ -358,12 +371,13 @@ export function ticketGroups(
     const key = `${projectId}:${ticketKey ?? ""}`;
     let group = groups.get(key);
     if (group === undefined) {
-      const summary = ticketKey === null ? null : (tickets.get(ticketKey)?.summary ?? null);
+      const ticket = ticketKey === null ? undefined : tickets.get(ticketKey);
       group = {
         projectId,
         key,
         ticketKey,
-        summary,
+        summary: ticket?.summary ?? null,
+        url: ticket?.url ?? null,
         tooltip: ticketKey === null ? null : ticketTooltip(ticketKey, tickets.get(ticketKey)),
         threadIds: [],
         items: [],
