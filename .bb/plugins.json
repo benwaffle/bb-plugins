@@ -22,6 +22,10 @@
     {
       "name": "claude-title",
       "source": "./plugins/claude-title"
+    },
+    {
+      "name": "usage-stats",
+      "source": "./plugins/usage-stats"
     }
   ]
 }

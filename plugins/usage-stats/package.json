@@ -1,0 +1,88 @@
+{
+  "name": "bb-plugin-usage-stats",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Usage page with token and API-equivalent cost history per day, model, project, and thread, from a turn ledger and Claude Code transcripts.",
+  "license": "MIT",
+  "author": "Ben Iofel",
+  "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/usage-stats#readme",
+  "bugs": {
+    "url": "https://github.com/benwaffle/bb-plugins/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benwaffle/bb-plugins.git",
+    "directory": "plugins/usage-stats"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "usage",
+    "tokens",
+    "cost",
+    "claude-code"
+  ],
+  "engines": {
+    "bb": ">=0.46",
+    "bbPluginSdk": ">=0.6.68"
+  },
+  "bb": {
+    "name": "Usage stats",
+    "description": "A Usage page with token and API-equivalent cost history per day, model, project, and thread, from a turn ledger and Claude Code transcripts.",
+    "branding": {
+      "icon": "ChartColumn"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/server.meta.json",
+    "dist/app.js",
+    "dist/app.css",
+    "dist/app.meta.json",
+    "README.md",
+    "skills",
+    "server.ts",
+    "app.tsx",
+    "aggregate.ts",
+    "channel.ts",
+    "charts.tsx",
+    "contract.ts",
+    "format.ts",
+    "importer.ts",
+    "ledger.ts",
+    "pricing.ts",
+    "summary.ts",
+    "styles.ts",
+    "drawer.tsx",
+    "threads.ts",
+    "transcripts.ts",
+    "view.ts"
+  ],
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "env -u BB_CLI bb plugin types --check .",
+    "types:refresh": "env -u BB_CLI bb plugin types .",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.68",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "bb-app": "0.46.2-nightly.39799382507.1",
+    "better-sqlite3": "13.0.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  }
+}

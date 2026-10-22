@@ -12,6 +12,7 @@ not add commits that have to be carried through every upstream sync.
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
+| `usage-stats` | [plugins/usage-stats](plugins/usage-stats) | A Usage page with token and API-equivalent cost history per day, model, project, and thread. |
 | `voice-whisper-local` | [plugins/voice-whisper-local](plugins/voice-whisper-local) | Transcribe voice input locally with whisper.cpp. |
 
 Install one at a time, naming the entry from `.bb/plugins.json`:
