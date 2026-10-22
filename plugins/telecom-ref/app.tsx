@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   definePluginApp,
+  experimental_Icon as Icon,
   experimental_usePluginId,
   useBbNavigate,
   type ExperimentalPageTitle,
@@ -8,31 +9,35 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { bundledDataset, entityInterfaces, entityShortName, entityTitle, KIND_LABELS, KINDS, type Dataset } from "./dataset";
 import { DetailPage } from "./detail";
-import { factLine, PANEL_PATH } from "./format";
+import { factLine, firstSentence, PANEL_PATH } from "./format";
 import { parseSubPath, querySubPath } from "./links";
 import { kindCounts, search, type SearchHit } from "./search";
-import { KindBadge, SECTION_HEADING, SpecChip, useOpenEntity } from "./ui";
+import type { Entity } from "./types";
+import { CodeBadge, KindBadge, SECTION_HEADING, SpecPill, useOpenEntity } from "./ui";
 import {
   getView,
   getWindowNavigate,
-  loadRecent,
+  loadPreferences,
+  moveSelection,
   openSearch,
+  setDensity,
   setView,
   setWindowNavigate,
   useView,
+  type Density,
   type ViewState,
 } from "./view";
 
 const RESULT_LIMIT = 100;
 const INTERFACE_FACET_LIMIT = 16;
 
-/** Hands the window's navigation to the palette commands, and loads recents once per window. */
+/** Hands the window's navigation to the palette commands, and loads preferences once per window. */
 function NavigationBridge() {
   const navigate = useBbNavigate();
   const pluginId = experimental_usePluginId();
   useEffect(() => {
     setWindowNavigate(navigate);
-    loadRecent(pluginId);
+    loadPreferences(pluginId);
     return () => {
       if (getWindowNavigate() === navigate) setWindowNavigate(null);
     };
@@ -43,15 +48,26 @@ function NavigationBridge() {
 // ---------------------------------------------------------------------------
 // Search page
 
+const EXAMPLE_QUERIES = ["ULR", "316", "Subscription-Data", "S6a", "HSS"];
+
+/** What a result row says under its name: the first sentence of the summary, else the facts line. */
+function rowSummary(entity: Entity, dataset: Dataset): string {
+  return entity.description ? firstSentence(entity.description) : factLine(entity, dataset);
+}
+
 function ResultRow({
   hit,
+  index,
   dataset,
+  density,
   selected,
   onOpen,
   onHover,
 }: {
   hit: SearchHit;
+  index: number;
   dataset: Dataset;
+  density: Density;
   selected: boolean;
   onOpen: () => void;
   onHover: () => void;
@@ -61,27 +77,98 @@ function ResultRow({
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const entity = hit.entity;
+  const compact = density === "compact";
   return (
     <li
       ref={ref}
+      id={optionId(index)}
       role="option"
       aria-selected={selected}
       onClick={onOpen}
       onMouseMove={onHover}
-      className={`cursor-pointer border-b border-border px-3 py-2 last:border-b-0 ${selected ? "bg-accent" : "hover:bg-accent/50"}`}
+      className={`grid cursor-pointer grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-3 ${compact ? "py-1.5" : "py-2.5"} ${selected ? "bg-foreground/[0.07]" : ""}`}
     >
-      <div className="flex items-baseline gap-2">
+      <span className="flex">
         <KindBadge kind={entity.kind} />
-        <span className="min-w-0 truncate font-medium">{entityTitle(entity)}</span>
-        {entity.spec[0] ? (
-          <span className="ml-auto">
-            <SpecChip spec={entity.spec[0]} />
-          </span>
-        ) : null}
+      </span>
+      <div className={compact ? "flex min-w-0 items-baseline gap-2" : "min-w-0"}>
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{entityTitle(entity)}</span>
+          <CodeBadge entity={entity} />
+        </div>
+        <p className={`truncate text-[13px] text-muted-foreground ${compact ? "min-w-0 flex-1" : "mt-0.5"}`}>{rowSummary(entity, dataset)}</p>
       </div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{factLine(entity, dataset)}</div>
-      {entity.description ? <p className="mt-1 line-clamp-2 text-sm">{entity.description}</p> : null}
+      <span className="hidden sm:block">{entity.spec[0] ? <SpecPill spec={entity.spec[0]} /> : null}</span>
     </li>
+  );
+}
+
+function optionId(index: number): string {
+  return `telecom-ref-option-${index}`;
+}
+
+function DensityToggle({ density }: { density: Density }) {
+  const pluginId = experimental_usePluginId();
+  const options: Array<{ value: Density; label: string }> = [
+    { value: "comfortable", label: "Comfortable" },
+    { value: "compact", label: "Compact" },
+  ];
+  return (
+    <div role="group" aria-label="Row density" className="flex items-center rounded-md bg-foreground/[0.05] p-0.5">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={density === option.value}
+          onClick={() => setDensity(pluginId, option.value)}
+          className={`h-5 rounded px-2 text-[11px] transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${density === option.value ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
+      {children}
+    </kbd>
+  );
+}
+
+function NoMatches({ query, filtered, onQuery, onClearFilters }: { query: string; filtered: boolean; onQuery: (query: string) => void; onClearFilters: () => void }) {
+  return (
+    <div className="py-10">
+      <p className="text-sm font-medium text-foreground">{query === "" ? "Nothing matches these filters" : `No entry matches \u201c${query}\u201d`}</p>
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        {filtered ? "The type or interface filter may be hiding it. " : ""}
+        Search by name, abbreviation, or code.
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        {filtered ? (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="h-7 rounded-md bg-foreground/[0.07] px-2.5 text-xs font-medium text-foreground transition-[background-color,transform] duration-150 hover:bg-foreground/10 active:scale-[0.97]"
+          >
+            Clear filters
+          </button>
+        ) : null}
+        <span className={`mr-1 text-xs text-muted-foreground ${filtered ? "ml-2" : ""}`}>{filtered ? "or try" : "Try"}</span>
+        {EXAMPLE_QUERIES.map((example) => (
+          <button
+            key={example}
+            type="button"
+            onClick={() => onQuery(example)}
+            className="h-7 rounded-md bg-foreground/[0.05] px-2.5 text-xs text-foreground transition-[background-color,transform] duration-150 hover:bg-foreground/10 active:scale-[0.97]"
+          >
+            {example}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -99,26 +186,30 @@ function SearchPage({ dataset, initialQuery }: { dataset: Dataset; initialQuery:
     inputRef.current?.focus();
   }, [view.focusTick]);
 
-  const { query, kind, interfaceId } = view;
+  const { query, kind, interfaceId, density } = view;
+  // Typing stays responsive while a long result list re-renders; the stale list dims until it catches up.
+  const deferredQuery = useDeferredValue(query);
+  const searching = deferredQuery !== query;
   const hits = useMemo(
-    () => search(dataset, query, { kinds: kind ? [kind] : [], interface: interfaceId }, RESULT_LIMIT),
-    [dataset, query, kind, interfaceId],
+    () => search(dataset, deferredQuery, { kinds: kind ? [kind] : [], interface: interfaceId }, RESULT_LIMIT),
+    [dataset, deferredQuery, kind, interfaceId],
   );
   useEffect(() => setSelected(0), [hits]);
+  // The reset above lands a render late, so a shrunken list is read through the clamped index.
+  const active = Math.min(selected, hits.length - 1);
 
   const setQuery = (next: string) => {
     setView({ query: next });
     navigate.toPluginPanel(PANEL_PATH, { subPath: querySubPath(next), replace: true });
   };
+  const clearFilters = () => setView({ kind: null, interfaceId: null });
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown") {
+    const next = moveSelection(event.key, active, hits.length);
+    if (next !== null) {
       event.preventDefault();
-      setSelected((index) => Math.max(0, Math.min(index + 1, hits.length - 1)));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setSelected((index) => Math.max(index - 1, 0));
+      setSelected(next);
     } else if (event.key === "Enter") {
-      const hit = hits[selected];
+      const hit = hits[active];
       if (hit) open(hit.id);
     } else if (event.key === "Escape" && query !== "") {
       // Escape clears the query first; bb's own Escape handling runs once it is empty.
@@ -128,60 +219,92 @@ function SearchPage({ dataset, initialQuery }: { dataset: Dataset; initialQuery:
   };
 
   const filterLabel = [kind ? KIND_LABELS[kind] : null, interfaceId ? dataset.byId.get(interfaceId)?.name : null].filter(Boolean);
+  const total = dataset.byId.size;
+  const countLabel =
+    deferredQuery === "" && filterLabel.length === 0
+      ? `Browsing ${Math.min(hits.length, RESULT_LIMIT)} of ${total.toLocaleString()} entries`
+      : hits.length >= RESULT_LIMIT
+        ? `Top ${RESULT_LIMIT} matches`
+        : `${hits.length} ${hits.length === 1 ? "match" : "matches"}`;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border p-3 md:px-5">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder='Search: "ULR", "316", "Subscription-Data", "AVP 1400", "S6a", "HSS"'
-            aria-label="Search the telecom reference"
-            aria-controls="telecom-ref-results"
-            spellCheck={false}
-            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <span className="shrink-0 text-xs text-muted-foreground">
-            Rel-{dataset.meta.release} · {dataset.meta.built}
-          </span>
-        </div>
-        {filterLabel.length > 0 ? (
-          <div className="mx-auto mt-2 flex w-full max-w-4xl items-center gap-2 text-xs text-muted-foreground">
-            <span>Filtered to {filterLabel.join(" on ")}</span>
-            <button
-              type="button"
-              className="underline underline-offset-2 hover:text-foreground"
-              onClick={() => setView({ kind: null, interfaceId: null })}
-            >
-              Clear
-            </button>
+      <div className="px-4 pt-6 pb-3 md:px-6">
+        <div className="mx-auto w-full max-w-4xl">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Telecom reference</h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            3GPP Release {dataset.meta.release} Diameter, EPC, and 5GC, built {dataset.meta.built}
+          </p>
+          <div className="relative mt-4">
+            <Icon
+              name={searching ? "Spinner" : "Search"}
+              className={`pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground ${searching ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Search by name, abbreviation, or code"
+              role="combobox"
+              aria-expanded={hits.length > 0}
+              aria-label="Search the telecom reference"
+              aria-controls="telecom-ref-results"
+              aria-activedescendant={hits.length > 0 ? optionId(active) : undefined}
+              spellCheck={false}
+              autoComplete="off"
+              className="h-10 w-full rounded-lg border border-transparent bg-foreground/[0.05] pr-3 pl-9 text-sm text-foreground outline-none transition-[background-color,border-color,box-shadow] duration-150 ease-out placeholder:text-muted-foreground/80 hover:bg-foreground/[0.07] focus:border-foreground/20 focus:bg-background focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--foreground)_7%,transparent)]"
+            />
           </div>
-        ) : null}
+          <div className="mt-3 flex min-h-6 items-center gap-3 text-xs text-muted-foreground">
+            <span aria-live="polite">{countLabel}</span>
+            {filterLabel.length > 0 ? (
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate">in {filterLabel.join(" on ")}</span>
+                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={clearFilters}>
+                  Clear
+                </button>
+              </span>
+            ) : null}
+            <span className="ml-auto hidden items-center gap-1 md:flex">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+              <span className="mr-1.5">move</span>
+              <Kbd>↵</Kbd>
+              <span>open</span>
+            </span>
+            <DensityToggle density={density} />
+          </div>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 md:px-6">
         <div className="mx-auto w-full max-w-4xl">
           {hits.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {query === "" ? "Nothing matches these filters." : `No entry matches "${query}".`}
-            </p>
+            <NoMatches query={deferredQuery} filtered={filterLabel.length > 0} onQuery={setQuery} onClearFilters={clearFilters} />
           ) : (
-            <ul id="telecom-ref-results" role="listbox" aria-label="Results" className="rounded-md border border-border">
+            <ul
+              id="telecom-ref-results"
+              role="listbox"
+              aria-label="Results"
+              aria-busy={searching}
+              className={`-mx-3 transition-opacity duration-150 ${searching ? "opacity-60" : ""}`}
+            >
               {hits.map((hit, index) => (
                 <ResultRow
                   key={hit.id}
                   hit={hit}
+                  index={index}
                   dataset={dataset}
-                  selected={index === selected}
+                  density={density}
+                  selected={index === active}
                   onOpen={() => open(hit.id)}
                   onHover={() => setSelected(index)}
                 />
               ))}
             </ul>
           )}
-          <p className="mt-4 text-xs text-muted-foreground">{dataset.meta.notice}</p>
+          <p className="mt-6 text-xs text-muted-foreground">{dataset.meta.notice}</p>
         </div>
       </div>
     </div>

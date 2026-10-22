@@ -12,6 +12,25 @@ export function specLabel(ref: SpecRef): string {
   return ref.clause ? `${ref.doc} §${ref.clause}` : ref.doc;
 }
 
+/** The number an entry is known by, for its code badge: 316, 1400, 16777251; null for interfaces and NFs. */
+export function codeLabel(entity: Entity): string | null {
+  switch (entity.kind) {
+    case "cmd":
+    case "avp":
+      return String(entity.code);
+    case "app":
+      return String(entity.appId);
+    default:
+      return null;
+  }
+}
+
+/** The first sentence of a description, for one-line summaries and link previews. */
+export function firstSentence(text: string): string {
+  const end = /[.!?](\s|$)/.exec(text);
+  return end ? text.slice(0, end.index + 1) : text;
+}
+
 export function flagsLabel(flags: AvpFlags | null): string | null {
   if (!flags) return null;
   const parts = [
