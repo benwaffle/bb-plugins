@@ -45,6 +45,15 @@ export interface SidebarRowIcon {
 
 export type SidebarRowTrailing = { kind: "dot"; tone: SidebarTone } | { kind: "text"; text: string };
 
+/**
+ * The PR a review thread reviews, which bb draws as "#number" with a state
+ * icon on the row's second line and leaves out of the start of the title.
+ */
+export interface SidebarRowPullRequest {
+  number: number;
+  state: NonNullable<RelatedPullState>;
+}
+
 /** The icon pr-review registers for ticket group headers. */
 export const TICKET_ICON = "pr-review/ticket";
 
@@ -65,6 +74,11 @@ function iconFor(state: RelatedPullState): { icon?: SidebarRowIcon } {
   return state === null ? {} : { icon: PULL_ICONS[state] };
 }
 
+/** The reviewed PR, absent while its state could not be read from GitHub. */
+function pullRequestFor({ number, pullState }: ThreadReview): { pullRequest?: SidebarRowPullRequest } {
+  return pullState === null ? {} : { pullRequest: { number, state: pullState } };
+}
+
 /**
  * The agent state as a trailing dot. A running agent has none, because the
  * host shows its own running indicator.
@@ -80,16 +94,19 @@ export interface StackedThreadRow {
   description?: string;
   icon?: SidebarRowIcon;
   trailing?: SidebarRowTrailing;
+  pullRequest?: SidebarRowPullRequest;
 }
 
 /**
  * A review thread's sidebar entry: the stack depth and "stacked on #N" of
  * its PR, absent when the PR is a stack base, not stacked, or not queued,
- * and its PR's state icon and agent dot, which bb builds without card or
- * minimal groups ignore. Thread rows look the same on card and minimal hosts.
+ * and its PR's state icon, agent dot, and number and state, which bb builds
+ * without card or minimal groups ignore. Thread rows look the same on card
+ * and minimal hosts.
  */
 export function stackedThreadRow(threadId: string, entry: QueueEntry | null, review: ThreadReview | null): StackedThreadRow {
-  const look = review === null ? {} : { ...iconFor(review.pullState), ...trailingFor(review.agent) };
+  const look =
+    review === null ? {} : { ...iconFor(review.pullState), ...trailingFor(review.agent), ...pullRequestFor(review) };
   if (entry === null || entry.parentNumber === null) return { threadId, ...look };
   return { threadId, depth: entry.depth, description: `stacked on #${entry.parentNumber}`, ...look };
 }
@@ -99,6 +116,7 @@ export interface ThreadRowDecoration {
   label?: string;
   description?: string;
   trailing?: SidebarRowTrailing;
+  pullRequest?: SidebarRowPullRequest;
 }
 
 function reviewWords(entry: QueueEntry): string | null {
@@ -138,29 +156,36 @@ function unqueuedStatus(state: RelatedPullState): string {
 /**
  * Each ticket thread's decoration on a sidebar row outside its project's
  * header: the ticket key as the label and, for a thread that reviews a PR,
- * the PR state icon and agent dot it has in a ticket group and the PR's
- * state words as the description.
+ * the PR state icon and agent dot it has in a ticket group, the PR's state
+ * words as the description, and the PR's number and state. A queued PR's
+ * review thread without a ticket gets only the PR's number and state.
  */
 export function threadRowDecorations(result: SidebarGroupsResult): Map<string, ThreadRowDecoration> {
   const reviewByThreadId = new Map(result.threadReviews.map(({ threadId, ...review }) => [threadId, review]));
   const pullByThreadId = new Map(result.threadPulls.map(({ threadId, entry }) => [threadId, entry]));
-  return new Map(
-    result.threadTickets.map(({ threadId, ticketKey }) => {
-      const review = reviewByThreadId.get(threadId);
-      if (review === undefined) return [threadId, { label: ticketKey }];
-      const entry = pullByThreadId.get(threadId);
-      const description = entry === undefined ? unqueuedStatus(review.pullState) : pullStatus(entry);
-      return [
-        threadId,
-        {
-          ...iconFor(review.pullState),
-          label: ticketKey,
-          ...(description === "" ? {} : { description }),
-          ...trailingFor(review.agent),
-        },
-      ];
-    }),
+  const decorations = new Map<string, ThreadRowDecoration>(
+    result.threadPulls.map(({ threadId, entry }) => [
+      threadId,
+      { pullRequest: { number: entry.number, state: queuedPullState(entry) } },
+    ]),
   );
+  for (const { threadId, ticketKey } of result.threadTickets) {
+    const review = reviewByThreadId.get(threadId);
+    if (review === undefined) {
+      decorations.set(threadId, { label: ticketKey });
+      continue;
+    }
+    const entry = pullByThreadId.get(threadId);
+    const description = entry === undefined ? unqueuedStatus(review.pullState) : pullStatus(entry);
+    decorations.set(threadId, {
+      ...iconFor(review.pullState),
+      label: ticketKey,
+      ...(description === "" ? {} : { description }),
+      ...trailingFor(review.agent),
+      ...pullRequestFor(review),
+    });
+  }
+  return decorations;
 }
 
 /** The sidebar style chosen in the plugin settings. */

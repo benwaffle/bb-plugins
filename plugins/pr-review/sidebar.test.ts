@@ -286,17 +286,20 @@ describe("styled looks", () => {
         label: "ACME-21",
         description: "merged",
         trailing: { kind: "dot", tone: "success" },
+        pullRequest: { number: 31, state: "merged" },
       },
       thr_followups: {
         icon: { name: "GitPullRequest", tone: "success" },
         label: "ACME-21",
         description: "conflicts · 3 failing",
         trailing: { kind: "dot", tone: "accent" },
+        pullRequest: { number: 32, state: "open" },
       },
       thr_running: {
         icon: { name: "GitPullRequestDraft", tone: "muted" },
         label: "ACME-21",
         description: "draft",
+        pullRequest: { number: 33, state: "draft" },
       },
       thr_notes: { label: "ACME-21" },
     });
@@ -308,6 +311,22 @@ describe("styled looks", () => {
     expect(decorations.get("thr_followups")).not.toHaveProperty("description");
   });
 
+  it("gives a queued PR's review thread without a ticket only the PR's number and state", () => {
+    const groups = result([]);
+    const queued: QueueEntry = { ...entry(40, null), isDraft: true };
+    const decorations = threadRowDecorations({ ...groups, threadPulls: [{ threadId: "thr_untracked", entry: queued }] });
+    expect(decorations.get("thr_untracked")).toEqual({ pullRequest: { number: 40, state: "draft" } });
+  });
+
+  it("leaves out the pull request of a review thread whose PR state could not be read", () => {
+    const groups = result([]);
+    const decorations = threadRowDecorations({
+      ...groups,
+      threadReviews: [{ threadId: "thr_merged", number: 31, pullState: null, agent: "reviewed" }],
+    });
+    expect(decorations.get("thr_merged")).not.toHaveProperty("pullRequest");
+  });
+
   it("gives review threads their PR icon and an agent dot unless the agent is running", () => {
     const [group] = ticketGroups(result([]), projects);
     expect(
@@ -317,13 +336,19 @@ describe("styled looks", () => {
         threadId: "thr_merged",
         icon: { name: "GitMerge", tone: "accent" },
         trailing: { kind: "dot", tone: "success" },
+        pullRequest: { number: 31, state: "merged" },
       },
       {
         threadId: "thr_followups",
         icon: { name: "GitPullRequest", tone: "success" },
         trailing: { kind: "dot", tone: "accent" },
+        pullRequest: { number: 32, state: "open" },
       },
-      { threadId: "thr_running", icon: { name: "GitPullRequestDraft", tone: "muted" } },
+      {
+        threadId: "thr_running",
+        icon: { name: "GitPullRequestDraft", tone: "muted" },
+        pullRequest: { number: 33, state: "draft" },
+      },
     ]);
   });
 

@@ -383,8 +383,8 @@ interface SidebarThreadGroupRow extends PullRowLook {
 }
 
 /**
- * A thread row the host decorates with a stack depth, description, icon, and
- * trailing dot. bb builds without these drop the entry and ignore
+ * A thread row the host decorates with a stack depth, description, icon,
+ * trailing dot, and pull request. bb builds without these drop the entry and ignore
  * `keepOrder`, so every thread is also listed in `threadIds`.
  */
 type SidebarThreadGroupThreadRow = StackedThreadRow;
