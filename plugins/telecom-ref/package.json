@@ -75,7 +75,7 @@
     "@radix-ui/react-hover-card": "^1.1.19",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "bb-app": "0.46.2-nightly.39799382507.1",
