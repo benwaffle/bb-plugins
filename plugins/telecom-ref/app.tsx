@@ -172,16 +172,19 @@ function NoMatches({ query, filtered, onQuery, onClearFilters }: { query: string
   );
 }
 
-function SearchPage({ dataset, initialQuery }: { dataset: Dataset; initialQuery: string | null }) {
+function SearchPage({ dataset, routeQuery }: { dataset: Dataset; routeQuery: string }) {
   const view = useView();
   const navigate = useBbNavigate();
   const open = useOpenEntity();
   const inputRef = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState(0);
 
+  // The route carries the query, so back/forward restores it and opening the panel root starts empty.
   useEffect(() => {
-    if (initialQuery !== null && initialQuery !== getView().query) setView({ query: initialQuery });
-  }, [initialQuery]);
+    if (routeQuery === getView().query) return;
+    setView({ query: routeQuery });
+    inputRef.current?.focus();
+  }, [routeQuery]);
   useEffect(() => {
     inputRef.current?.focus();
   }, [view.focusTick]);
@@ -317,7 +320,7 @@ function ReferencePanel({ subPath }: PluginNavPanelProps) {
   return route.kind === "entity" ? (
     <DetailPage dataset={dataset} id={route.id} />
   ) : (
-    <SearchPage dataset={dataset} initialQuery={route.query} />
+    <SearchPage dataset={dataset} routeQuery={route.query} />
   );
 }
 
@@ -443,7 +446,7 @@ export default definePluginApp((app) => {
     id: "search",
     title: "Telecom reference: search Diameter AVPs, commands, interfaces, network functions",
     defaultShortcut: { key: "k", mod: true, alt: true },
-    run: () => openSearch(getWindowNavigate()),
+    run: () => openSearch(getWindowNavigate(), ""),
   });
   app.commands.register({
     id: "lookup-selection",

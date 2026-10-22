@@ -17,6 +17,27 @@ function selectedOption(view: ReturnType<typeof renderSlot>): string | null {
   return view.getAllByRole("option").find((option) => option.getAttribute("aria-selected") === "true")?.textContent ?? null;
 }
 
+describe("search query lifetime", () => {
+  it("starts an empty, focused search when the panel opens at its root", () => {
+    const earlier = renderSlot(panel, { subPath: "q/ULR" });
+    expect((earlier.getByRole("combobox") as HTMLInputElement).value).toBe("ULR");
+    earlier.unmount();
+
+    const view = renderSlot(panel, { subPath: "" });
+    const input = view.getByRole("combobox") as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect(document.activeElement).toBe(input);
+    view.unmount();
+  });
+
+  it("restores the query from the route, as back from a detail page does", () => {
+    renderSlot(panel, { subPath: "diam.avp/10415/1405" }).unmount();
+    const view = renderSlot(panel, { subPath: "q/ULR" });
+    expect((view.getByRole("combobox") as HTMLInputElement).value).toBe("ULR");
+    view.unmount();
+  });
+});
+
 describe("search keyboard navigation", () => {
   it("moves the selection with the arrows and opens it with Enter", () => {
     const view = renderSlot(panel, { subPath: "q/ULR" });
