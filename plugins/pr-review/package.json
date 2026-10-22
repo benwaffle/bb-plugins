@@ -69,11 +69,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.6.49",
+    "@get-bb/plugin-sdk": "0.6.68",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "bb-app": "0.46.1",
+    "bb-app": "0.46.2-nightly.39799382507.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sonner": "^1.7.4",
