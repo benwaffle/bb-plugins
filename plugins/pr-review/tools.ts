@@ -65,8 +65,14 @@ export const OPEN_PULLS_QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
-        number title body url isDraft headRefName headRefOid baseRefName isCrossRepository additions deletions changedFiles updatedAt
+        number title body url isDraft headRefName headRefOid baseRefName isCrossRepository additions deletions changedFiles updatedAt mergeable
         author { login avatarUrl(size: 32) }
+        commits(last: 1) {
+          nodes { commit { statusCheckRollup { contexts(first: 1) {
+            checkRunCountsByState { state count }
+            statusContextCountsByState { state count }
+          } } } }
+        }
         reviewRequests(first: 30) {
           nodes { requestedReviewer { __typename ... on User { login } ... on Team { combinedSlug } } }
         }
@@ -81,6 +87,22 @@ export const OPEN_PULLS_QUERY = `query($owner: String!, $name: String!) {
 const reviewerSchema = z
   .object({ __typename: z.string(), login: z.string().optional(), combinedSlug: z.string().optional() })
   .nullable();
+
+const countsByStateSchema = z.array(z.object({ state: z.string(), count: z.number() }));
+
+/** Check run and commit status states that count as a failing check. */
+const FAILING_CHECK_STATES = new Set([
+  "ACTION_REQUIRED",
+  "CANCELLED",
+  "ERROR",
+  "FAILURE",
+  "STARTUP_FAILURE",
+  "TIMED_OUT",
+]);
+
+function failingCount(counts: z.infer<typeof countsByStateSchema>): number {
+  return counts.reduce((sum, { state, count }) => sum + (FAILING_CHECK_STATES.has(state) ? count : 0), 0);
+}
 
 const openPullsSchema = z.object({
   data: z.object({
@@ -101,7 +123,24 @@ const openPullsSchema = z.object({
             deletions: z.number(),
             changedFiles: z.number(),
             updatedAt: z.string(),
+            mergeable: z.string(),
             author: z.object({ login: z.string(), avatarUrl: z.string() }).nullable(),
+            commits: z.object({
+              nodes: z.array(
+                z.object({
+                  commit: z.object({
+                    statusCheckRollup: z
+                      .object({
+                        contexts: z.object({
+                          checkRunCountsByState: countsByStateSchema,
+                          statusContextCountsByState: countsByStateSchema,
+                        }),
+                      })
+                      .nullable(),
+                  }),
+                }),
+              ),
+            }),
             reviewRequests: z.object({
               nodes: z.array(z.object({ requestedReviewer: reviewerSchema })),
             }),
@@ -140,6 +179,7 @@ export function parseOpenPulls(repo: string, raw: string): PullSnapshot[] {
             },
           ],
     );
+    const checks = node.commits.nodes.at(-1)?.commit.statusCheckRollup?.contexts;
     return {
       repo,
       number: node.number,
@@ -157,6 +197,11 @@ export function parseOpenPulls(repo: string, raw: string): PullSnapshot[] {
       deletions: node.deletions,
       changedFiles: node.changedFiles,
       updatedAt: node.updatedAt,
+      conflicting: node.mergeable === "CONFLICTING",
+      failingChecks:
+        checks === undefined
+          ? 0
+          : failingCount(checks.checkRunCountsByState) + failingCount(checks.statusContextCountsByState),
       requestedUsers: reviewers.flatMap((reviewer) =>
         reviewer?.__typename === "User" && reviewer.login !== undefined ? [reviewer.login] : [],
       ),

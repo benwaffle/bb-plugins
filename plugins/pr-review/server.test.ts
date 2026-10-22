@@ -11,7 +11,16 @@ interface Call {
   cwd: string | undefined;
 }
 
+type CheckCounts = Array<{ state: string; count: number }>;
+
+interface CheckRollup {
+  contexts: { checkRunCountsByState: CheckCounts; statusContextCountsByState: CheckCounts };
+}
+
 function graphqlNode(number: number, title: string, body: string, baseRefName = "main") {
+  const rollup: CheckRollup = {
+    contexts: { checkRunCountsByState: [{ state: "SUCCESS", count: 3 }], statusContextCountsByState: [] },
+  };
   return {
     number,
     title,
@@ -26,7 +35,9 @@ function graphqlNode(number: number, title: string, body: string, baseRefName = 
     deletions: 1,
     changedFiles: 2,
     updatedAt: "2026-10-01T00:00:00Z",
+    mergeable: "MERGEABLE",
     author: { login: "bob", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=32" },
+    commits: { nodes: [{ commit: { statusCheckRollup: rollup as CheckRollup | null } }] },
     reviewRequests: {
       nodes: [{ requestedReviewer: { __typename: "Team", combinedSlug: "acme/platform" } }],
     },
@@ -375,6 +386,46 @@ describe("reviewQueue", () => {
     expect(queue.entries[0]?.authorAvatarUrl).toBe("https://avatars.githubusercontent.com/u/1?s=32");
   });
 
+  it("counts merge conflicts, failing checks and commit statuses, and requested reviewers", async () => {
+    const conflicted = {
+      ...graphqlNode(601, "ACME-51: Shard the catalog", ""),
+      mergeable: "CONFLICTING",
+      commits: {
+        nodes: [
+          {
+            commit: {
+              statusCheckRollup: {
+                contexts: {
+                  checkRunCountsByState: [
+                    { state: "FAILURE", count: 2 },
+                    { state: "TIMED_OUT", count: 1 },
+                    { state: "SUCCESS", count: 4 },
+                    { state: "SKIPPED", count: 1 },
+                  ],
+                  statusContextCountsByState: [
+                    { state: "ERROR", count: 1 },
+                    { state: "PENDING", count: 1 },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    };
+    const unchecked = { ...graphqlNode(602, "Tidy the catalog", ""), commits: { nodes: [{ commit: { statusCheckRollup: null } }] } };
+    const { harness } = await load([conflicted, unchecked]);
+    const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as {
+      entries: Array<{ number: number; conflicting: boolean; failingChecks: number; pendingReviewers: number }>;
+    };
+    expect(
+      queue.entries.map((entry) => [entry.number, entry.conflicting, entry.failingChecks, entry.pendingReviewers]),
+    ).toEqual([
+      [601, true, 4, 1],
+      [602, false, 0, 1],
+    ]);
+  });
+
   it("is empty with setup hints until the repositories and Jira settings are set", async () => {
     const { harness, runner } = await load(OPEN_PULL_NODES, {});
     const queue = (await harness.callRpc("reviewQueue", { refresh: true })) as { entries: unknown[]; setup: string[] };
@@ -448,11 +499,11 @@ describe("sidebarGroups", () => {
       updatedAt: 1,
     }));
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
-      threadReviews: Array<{ threadId: string; number: number; title: string | null; pullState: string | null; agent: string }>;
+      threadReviews: Array<{ threadId: string; number: number; pullState: string | null; agent: string }>;
     };
     expect([...groups.threadReviews].sort((left, right) => left.threadId.localeCompare(right.threadId))).toEqual([
-      { threadId: "thr_1", number: 596, title: "ACME-51: Cache the widget catalog per tenant", pullState: "open", agent: "opened" },
-      { threadId: "thr_merged", number: 534, title: "ACME-51: Drop the old cache", pullState: "merged", agent: "opened" },
+      { threadId: "thr_1", number: 596, pullState: "open", agent: "opened" },
+      { threadId: "thr_merged", number: 534, pullState: "merged", agent: "opened" },
     ]);
   });
 });

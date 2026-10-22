@@ -4,6 +4,7 @@ import {
   groupHeaderLook,
   pullActionLabel,
   pullRowLook,
+  pullStatus,
   sidebarLook,
   sidebarStyle,
   stackedThreadRow,
@@ -39,6 +40,9 @@ function entry(
     additions: 1,
     deletions: 1,
     changedFiles: 1,
+    conflicting: false,
+    failingChecks: 0,
+    pendingReviewers: 0,
     me: "requested",
     bucket: "requested",
     otherReviews: [],
@@ -85,14 +89,14 @@ describe("ticketGroups", () => {
         items: group.items.map(itemLabel),
       })),
     ).toEqual([
-      { project: "proj_widgets", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], items: ["#8", "thr_a", "thr_b"] },
+      { project: "proj_widgets", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_a", "thr_b"], items: ["thr_a", "thr_b", "#8"] },
       { project: "proj_widgets", label: "ACME-30", tooltip: "ACME-30 (loading title)", threads: [], items: ["#9"] },
       { project: "proj_web", label: "ACME-21 Speed up the importer", tooltip: "ACME-21: Speed up the importer (In Progress)", threads: ["thr_other_project"], items: ["thr_other_project"] },
       { project: "proj_widgets", label: "No ticket", tooltip: null, threads: [], items: ["#7"] },
     ]);
   });
 
-  it("orders review threads and unstarted PRs together, stacks first, with unqueued threads last", () => {
+  it("orders review threads before unstarted PRs, stacks first, with each dependent after its base PR", () => {
     const withThread = (pull: QueueEntry, threadId: string): QueueEntry => ({
       ...pull,
       agent: { state: "reviewing", threadId },
@@ -127,7 +131,7 @@ describe("ticketGroups", () => {
     );
 
     expect(group?.threadIds).toEqual(["thr_old", "thr_564", "thr_552"]);
-    expect(group?.items.map(itemLabel)).toEqual(["thr_552", "#553", "thr_564", "#570", "#560", "thr_old"]);
+    expect(group?.items.map(itemLabel)).toEqual(["thr_552", "#553", "thr_564", "#570", "thr_old", "#560"]);
     expect(
       group?.items.flatMap((item) => (item.kind === "thread" ? [stackedThreadRow(item.threadId, item.entry, item.review)] : [])),
     ).toEqual([
@@ -202,6 +206,29 @@ describe("stackFirst", () => {
   });
 });
 
+describe("pullStatus", () => {
+  const pull = (overrides: Partial<QueueEntry>): QueueEntry => ({ ...entry(600, "ACME-21"), ...overrides });
+  const review = (state: QueueEntry["otherReviews"][number]["state"]) => ({ login: "ana", avatarUrl: null, state });
+
+  it("lists draft, conflicts, and failing checks before the review state", () => {
+    expect(pullStatus(pull({ isDraft: true, conflicting: true, failingChecks: 1, pendingReviewers: 2 }))).toBe(
+      "draft · conflicts · 1 failing · 2 reviews pending",
+    );
+    expect(pullStatus(pull({ pendingReviewers: 1 }))).toBe("1 review pending");
+    expect(pullStatus(pull({}))).toBe("");
+  });
+
+  it("puts requested changes, from anyone, ahead of approvals and pending reviews", () => {
+    expect(pullStatus(pull({ otherReviews: [review("APPROVED"), review("CHANGES_REQUESTED")], pendingReviewers: 1 }))).toBe(
+      "changes requested",
+    );
+    expect(pullStatus(pull({ me: "changes-requested", otherReviews: [review("APPROVED")] }))).toBe("changes requested");
+    expect(pullStatus(pull({ otherReviews: [review("APPROVED")], pendingReviewers: 1 }))).toBe("approved");
+    expect(pullStatus(pull({ me: "approved" }))).toBe("approved");
+    expect(pullStatus(pull({ otherReviews: [review("COMMENTED")] }))).toBe("");
+  });
+});
+
 describe("stackPrefix", () => {
   it("indents a tree glyph with non-breaking spaces per stack level", () => {
     expect(stackPrefix(0)).toBe("");
@@ -221,9 +248,9 @@ describe("styled looks", () => {
     pulls: pulls.map((pull) => ({ projectId: "proj_widgets", entry: pull })),
     threadPulls: [],
     threadReviews: [
-      { threadId: "thr_merged", number: 31, title: "ACME-21: Drop the old cache", pullState: "merged", agent: "reviewed" },
-      { threadId: "thr_followups", number: 32, title: null, pullState: "open", agent: "follow-ups" },
-      { threadId: "thr_running", number: 33, title: "Stream rows", pullState: "draft", agent: "reviewing" },
+      { threadId: "thr_merged", number: 31, pullState: "merged", agent: "reviewed" },
+      { threadId: "thr_followups", number: 32, pullState: "open", agent: "follow-ups" },
+      { threadId: "thr_running", number: 33, pullState: "draft", agent: "reviewing" },
     ],
   });
   const projects = new Map([
@@ -245,32 +272,40 @@ describe("styled looks", () => {
     expect(ticket && groupHeaderLook(ticket, "legacy")).toEqual({ label: "ACME-21 Speed up the importer" });
   });
 
-  it("decorates flat thread rows with the ticket key, the grouped row's icon and dot, and the PR", () => {
+  it("decorates flat thread rows with the ticket key, the grouped row's icon and dot, and the PR state", () => {
     const groups = result([]);
+    const queued: QueueEntry = { ...entry(32, "ACME-21"), conflicting: true, failingChecks: 3 };
     const decorations = threadRowDecorations({
       ...groups,
       threadTickets: [...groups.threadTickets, { threadId: "thr_notes", ticketKey: "ACME-21" }],
+      threadPulls: [{ threadId: "thr_followups", entry: queued }],
     });
     expect(Object.fromEntries(decorations)).toEqual({
       thr_merged: {
         icon: { name: "GitMerge", tone: "accent" },
         label: "ACME-21",
-        description: "#31 Drop the old cache",
+        description: "merged",
         trailing: { kind: "dot", tone: "success" },
       },
       thr_followups: {
         icon: { name: "GitPullRequest", tone: "success" },
         label: "ACME-21",
-        description: "#32",
+        description: "conflicts · 3 failing",
         trailing: { kind: "dot", tone: "accent" },
       },
       thr_running: {
         icon: { name: "GitPullRequestDraft", tone: "muted" },
         label: "ACME-21",
-        description: "#33 Stream rows",
+        description: "draft",
       },
       thr_notes: { label: "ACME-21" },
     });
+  });
+
+  it("describes an unqueued open PR with no state words", () => {
+    const groups = result([]);
+    const decorations = threadRowDecorations({ ...groups, threadTickets: [{ threadId: "thr_followups", ticketKey: "ACME-21" }] });
+    expect(decorations.get("thr_followups")).not.toHaveProperty("description");
   });
 
   it("gives review threads their PR icon and an agent dot unless the agent is running", () => {

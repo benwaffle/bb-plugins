@@ -92,10 +92,11 @@ listed. Threads keep their own rows, so pinning, archiving, renaming, and
 dragging work as usual. A thread's ticket is its PR's ticket, or else the
 first Jira ref recorded for it. Threads without a ticket are not grouped.
 On bb builds whose sidebar groups take thread decorations and `keepOrder`,
-review threads follow the same stack-first order as PR rows, so a stacked PR's
-thread sits right after its base PR's row or thread, with the tree glyph and
-`stacked on #552` after its title; threads whose PR is not in the queue come
-last. Older bb builds sort the review threads by their own thread order and
+review threads come before the unstarted PR rows, each in the same
+stack-first order, then threads whose PR is not in the queue, then the PR
+rows. A stacked PR still follows its base PR, so a thread whose base PR has
+no thread sits right after that PR's row, with the tree glyph and
+`stacked on #552` after its title. Older bb builds sort the review threads by their own thread order and
 show them before the PR rows, so a thread's position and title do not show its
 stack there.
 
@@ -133,8 +134,12 @@ not show the ticket groups. On bb builds with
 `app.slots.experimental_sidebarThreadDecoration` that take a per-thread
 decoration, a ticket thread's row there shows the ticket key on its second
 line and, when the thread reviews a PR, the same PR state icon and agent dot
-as in its group, with the PR number and title (`#552 Drop the old cache`)
-after the thread title.
+as in its group, with the PR's state after the thread title: `draft`,
+`conflicts`, the number of failing checks (`3 failing`), and the review state
+(`changes requested` when anyone requested changes, else `approved` when
+anyone approved, else `2 reviews pending` for requested reviews), joined with
+` · `. A thread whose PR left the queue shows `merged` or `closed`. The
+ticket summary stays in the group header's tooltip.
 
 ## Review threads
 

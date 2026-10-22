@@ -26,6 +26,10 @@ export interface PullSnapshot {
   deletions: number;
   changedFiles: number;
   updatedAt: string;
+  /** Whether the PR has merge conflicts with its base branch. */
+  conflicting: boolean;
+  /** Failing checks and commit statuses on the head commit. */
+  failingChecks: number;
   requestedUsers: string[];
   requestedTeams: string[];
   latestReviews: PullReview[];

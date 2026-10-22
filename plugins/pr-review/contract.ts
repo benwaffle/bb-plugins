@@ -57,6 +57,10 @@ export const queueEntrySchema = z.object({
   additions: z.number().int(),
   deletions: z.number().int(),
   changedFiles: z.number().int(),
+  conflicting: z.boolean(),
+  failingChecks: z.number().int().nonnegative(),
+  /** Users and teams whose review is requested and not yet given. */
+  pendingReviewers: z.number().int().nonnegative(),
   me: z.enum([
     "author",
     "requested",
@@ -131,14 +135,13 @@ const sidebarGroupsResultSchema = z.object({
   pulls: z.array(z.object({ projectId: z.string(), entry: queueEntrySchema })),
   threadPulls: z.array(z.object({ threadId: threadIdSchema, entry: queueEntrySchema })),
   /**
-   * The PR number, PR title (null when unknown), PR state, and agent state
-   * of each thread in `threadTickets` that reviews a PR.
+   * The PR number, PR state, and agent state of each thread in
+   * `threadTickets` that reviews a PR.
    */
   threadReviews: z.array(
     z.object({
       threadId: threadIdSchema,
       number: z.number().int().positive(),
-      title: z.string().nullable(),
       pullState: pullStateSchema.nullable(),
       agent: agentStateSchema,
     }),

@@ -365,6 +365,9 @@ export function createPlugin(deps: PluginDeps) {
           additions: pull.additions,
           deletions: pull.deletions,
           changedFiles: pull.changedFiles,
+          conflicting: pull.conflicting,
+          failingChecks: pull.failingChecks,
+          pendingReviewers: pull.requestedUsers.length + pull.requestedTeams.length,
           me: classified.me,
           bucket: classified.bucket,
           otherReviews: classified.otherReviews,
@@ -504,9 +507,9 @@ export function createPlugin(deps: PluginDeps) {
       const threadReviews = (
         await Promise.all(
           [...threadTickets.keys()].map(async (threadId) => {
-            const { pull, title, agent } = await threadReview(threadId, queued);
+            const { pull, agent } = await threadReview(threadId, queued);
             if (pull === null) return null;
-            return { threadId, number: pull.number, title, pullState: pull.state, agent: agent.state };
+            return { threadId, number: pull.number, pullState: pull.state, agent: agent.state };
           }),
         )
       ).filter((review) => review !== null);

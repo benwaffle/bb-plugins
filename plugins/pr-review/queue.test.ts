@@ -32,6 +32,8 @@ function pull(number: number, overrides: Partial<PullSnapshot> = {}): PullSnapsh
     additions: 10,
     deletions: 2,
     changedFiles: 1,
+    conflicting: false,
+    failingChecks: 0,
     updatedAt: "2026-10-01T00:00:00Z",
     requestedUsers: [],
     requestedTeams: [],

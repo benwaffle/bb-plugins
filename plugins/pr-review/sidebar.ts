@@ -101,25 +101,61 @@ export interface ThreadRowDecoration {
   trailing?: SidebarRowTrailing;
 }
 
+function reviewWords(entry: QueueEntry): string | null {
+  const states = new Set(entry.otherReviews.map((review) => review.state));
+  if (entry.me === "changes-requested" || states.has("CHANGES_REQUESTED")) return "changes requested";
+  if (entry.me === "approved" || states.has("APPROVED")) return "approved";
+  if (entry.pendingReviewers === 0) return null;
+  return `${entry.pendingReviewers} ${entry.pendingReviewers === 1 ? "review" : "reviews"} pending`;
+}
+
+/**
+ * A queued PR's state in a few words, such as "conflicts · 3 failing" or
+ * "draft · approved": draft, merge conflicts, failing checks, then the
+ * review state, which is "changes requested" when any reviewer, the viewer
+ * included, requested changes, else "approved" when any approved, else how
+ * many requested reviews are pending. Empty when none of these apply.
+ */
+export function pullStatus(entry: QueueEntry): string {
+  return [
+    entry.isDraft ? "draft" : null,
+    entry.conflicting ? "conflicts" : null,
+    entry.failingChecks === 0 ? null : `${entry.failingChecks} failing`,
+    reviewWords(entry),
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
+}
+
+/**
+ * The state words of a reviewed PR that is not queued, which bb reads from
+ * GitHub: "merged" or "closed", or "draft". An open PR has none.
+ */
+function unqueuedStatus(state: RelatedPullState): string {
+  return state === "merged" || state === "closed" || state === "draft" ? state : "";
+}
+
 /**
  * Each ticket thread's decoration on a sidebar row outside its project's
  * header: the ticket key as the label and, for a thread that reviews a PR,
- * the PR state icon and agent dot it has in a ticket group and the PR number
- * and title as the description.
+ * the PR state icon and agent dot it has in a ticket group and the PR's
+ * state words as the description.
  */
 export function threadRowDecorations(result: SidebarGroupsResult): Map<string, ThreadRowDecoration> {
   const reviewByThreadId = new Map(result.threadReviews.map(({ threadId, ...review }) => [threadId, review]));
+  const pullByThreadId = new Map(result.threadPulls.map(({ threadId, entry }) => [threadId, entry]));
   return new Map(
     result.threadTickets.map(({ threadId, ticketKey }) => {
       const review = reviewByThreadId.get(threadId);
       if (review === undefined) return [threadId, { label: ticketKey }];
-      const title = review.title === null ? "" : ` ${titleWithoutTicket(review.title, ticketKey)}`;
+      const entry = pullByThreadId.get(threadId);
+      const description = entry === undefined ? unqueuedStatus(review.pullState) : pullStatus(entry);
       return [
         threadId,
         {
           ...iconFor(review.pullState),
           label: ticketKey,
-          description: `#${review.number}${title}`,
+          ...(description === "" ? {} : { description }),
           ...trailingFor(review.agent),
         },
       ];
@@ -242,25 +278,37 @@ export function stackFirst(pulls: readonly QueueEntry[]): QueueEntry[] {
   return [...ordered.filter(isStacked), ...ordered.filter((entry) => !isStacked(entry))];
 }
 
+function itemKey(item: TicketGroupItem): string {
+  if (item.kind === "pull") return pullKey(item.entry.repo, item.entry.number);
+  return item.entry === null ? item.threadId : pullKey(item.entry.repo, item.entry.number);
+}
+
+function itemParentKey({ entry }: TicketGroupItem): string | null {
+  return entry === null || entry.parentNumber === null ? null : pullKey(entry.repo, entry.parentNumber);
+}
+
 /**
- * Unstarted PRs and review threads in one stack-first order, so a dependent
- * follows its base PR whether either has a thread. Threads whose PR is not in
- * the queue come last.
+ * Review threads before unstarted PRs, each part stack-first, with threads
+ * whose PR is not in the queue after the other threads. A dependent still
+ * follows its base PR, so a thread whose base PR has no thread sits after
+ * that PR's row.
  */
-function stackFirstItems(items: readonly TicketGroupItem[]): TicketGroupItem[] {
+function threadsFirstItems(items: readonly TicketGroupItem[]): TicketGroupItem[] {
   const byEntry = new Map<QueueEntry, TicketGroupItem>();
   const unknown: TicketGroupItem[] = [];
   for (const item of items) {
     if (item.entry === null) unknown.push(item);
     else byEntry.set(item.entry, item);
   }
-  return [...stackFirst([...byEntry.keys()]).flatMap((entry) => byEntry.get(entry) ?? []), ...unknown];
+  const stacked = stackFirst([...byEntry.keys()]).flatMap((entry) => byEntry.get(entry) ?? []);
+  const threads = [...stacked.filter((item) => item.kind === "thread"), ...unknown];
+  return stackOrder([...threads, ...stacked.filter((item) => item.kind === "pull")], itemKey, itemParentKey);
 }
 
 /**
  * `items` with each entry's depth counting only the base PRs among `items`,
  * so a PR whose base PR sits in another group starts at depth 0. `items`
- * must list each base PR before its dependents, as `stackFirstItems` does.
+ * must list each base PR before its dependents, as `threadsFirstItems` does.
  */
 function withVisibleDepth(items: readonly TicketGroupItem[]): TicketGroupItem[] {
   const depthByKey = new Map<string, number>();
@@ -318,7 +366,7 @@ export function ticketGroups(
     });
   }
   for (const group of groups.values()) {
-    group.items = withVisibleDepth(stackFirstItems(group.items));
+    group.items = withVisibleDepth(threadsFirstItems(group.items));
     group.pullLabel = pullLabeler(group.items.flatMap((item) => (item.entry === null ? [] : [item.entry.repo])));
   }
   return [...groups.values()].sort(
