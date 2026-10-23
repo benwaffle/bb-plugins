@@ -1,0 +1,141 @@
+# Summaries written for telecom-ref, not specification text.
+# Commands of the SMS (S6c, SGd/Gdd) and MTC (S6m/S6n, S6t, Tsp, T4, T6a/T6b) applications.
+commands:
+  8388639:
+    description: >-
+      A Services Capability Server asks the MTC-IWF to act on a device, in practice to send, replace, or
+      recall a device trigger. Device-Action names the target by external identifier or MSISDN and
+      carries the action type, the trigger payload, its validity, priority, and application port. The
+      answer can return an immediate Device-Notification.
+    spec: ["TS 29.368 §5.5", "TS 29.368 §6.6.2"]
+    flow:
+      request: {from: [SCS], to: [MTC-IWF]}
+  8388640:
+    description: >-
+      The MTC-IWF reports back to the SCS on an earlier device action, for example whether a device
+      trigger was delivered, failed, replaced, or recalled. Device-Notification carries the reference
+      number of the original request and the outcome.
+    spec: ["TS 29.368 §5.6", "TS 29.368 §6.6.4"]
+    flow:
+      request: {from: [MTC-IWF], to: [SCS]}
+  8388641:
+    description: >-
+      Asks the HSS to map between a device's identities. On S6m the MTC-IWF sends an external identifier
+      or MSISDN, the HSS checks that the SCS may trigger that device, and answers with the IMSI or MSISDN
+      and, for device triggering, the serving nodes in T4-Data. On S6n the MTC-AAA sends the IMSI and
+      gets back the external identifiers. SIR-Flags select what is asked for.
+    spec: ["TS 29.336 §5.2.1", "TS 29.336 §6.2.3"]
+    flow:
+      request: {from: [MTC-IWF, MTC-AAA], to: [HSS]}
+  8388643:
+    description: >-
+      The MTC-IWF hands a device trigger to the SMS-SC for delivery to the UE as a short message. The
+      request carries the target IMSI or MSISDN, the trigger payload, its reference number and validity
+      time, priority, application port, and the serving nodes learned from the HSS. Trigger-Action lets
+      it also replace or recall an earlier trigger.
+    spec: ["TS 29.337 §5.2.1", "TS 29.337 §6.2.3"]
+    flow:
+      request: {from: [MTC-IWF], to: [SMS-SC]}
+  8388644:
+    description: >-
+      The SMS-SC tells the MTC-IWF how delivery of a device trigger short message ended, with the
+      outcome, an absent-subscriber diagnostic when the UE could not be reached, and the reference
+      number that ties the report to the original trigger.
+    spec: ["TS 29.337 §5.2.2", "TS 29.337 §6.2.5"]
+    flow:
+      request: {from: [SMS-SC], to: [MTC-IWF]}
+  8388645:
+    description: >-
+      Carries a mobile-originated short message from the MME (SGd) or SGSN (Gdd) to the SMS-IWMSC, which
+      passes it to the SMS-SC named in SC-Address. The TPDU travels in SM-RP-UI and the answer returns the
+      SMS-SC's report or a failure cause. The same command also runs over T4 from the SMS-IWMSC to the
+      MTC-IWF for MO SMS towards an SCS.
+    spec: ["TS 29.338 §6.2.1", "TS 29.338 §6.3.2.3"]
+    flow:
+      request: {from: [MME, SGSN, SMS-IWMSC], to: [SMS-IWMSC, MTC-IWF]}
+  8388646:
+    description: >-
+      Carries a mobile-terminated short message from the SMS-GMSC to the serving MME (SGd) or SGSN (Gdd),
+      through an SMS Router when one is used, for delivery to the UE identified by IMSI. The answer reports
+      success or a failure cause and absent-user diagnostic, and can ask the SMS-GMSC to retry later with
+      Requested-Retransmission-Time.
+    spec: ["TS 29.338 §6.2.2", "TS 29.338 §6.3.2.5"]
+    flow:
+      request: {from: [SMS-GMSC, SMS-Router], to: [MME, SGSN, SMS-Router]}
+  8388647:
+    description: >-
+      The SMS-GMSC asks the HSS, directly or through an SMS Router, where to deliver a mobile-terminated
+      short message. The HSS answers with the IMSI and the serving MME, SGSN, MSC, IP-SM-GW, or SMSF
+      addresses, plus message waiting status and absent-user diagnostics when the UE is not reachable.
+      With an SMS Router, the answer points the SMS-GMSC at the router instead.
+    spec: ["TS 29.338 §5.2.1", "TS 29.338 §5.3.2.3"]
+    flow:
+      request: {from: [SMS-GMSC, SMS-Router], to: [HSS, SMS-Router]}
+  8388648:
+    description: >-
+      Tells an SMS centre that a UE with waiting short messages can now receive them. The HSS sends it on
+      S6c to the SMS-IWMSC once the UE becomes reachable or has memory again, naming the SMS-SC in
+      SC-Address. Over SGd/Gdd the MME or SGSN sends it to the SMS-GMSC, possibly through an SMS Router,
+      when the UE is available after a requested retransmission or has moved to another serving node.
+    spec: ["TS 29.338 §5.2.2", "TS 29.338 §6.2.3", "TS 29.338 §5.3.2.5"]
+    flow:
+      request: {from: [HSS, MME, SGSN], to: [SMS-IWMSC, SMS-GMSC]}
+  8388649:
+    description: >-
+      After a mobile-terminated delivery attempt, the SMS-GMSC or IP-SM-GW reports the outcome per
+      serving node to the HSS. On an absent subscriber or full memory the HSS adds the SMS-SC to the
+      message waiting data and sets the matching not-reachable flags, so it can later trigger an
+      Alert-Service-Centre; on success it clears them. The answer can return the MSISDN.
+    spec: ["TS 29.338 §5.2.3", "TS 29.338 §5.3.2.7"]
+    flow:
+      request: {from: [SMS-GMSC, IP-SM-GW], to: [HSS]}
+  8388718:
+    description: >-
+      Sets up, changes, or deletes monitoring event configurations for a UE or a group of UEs. On S6t the
+      SCEF sends it to the HSS, which may also store communication patterns, enhanced coverage
+      restrictions, and suggested network configuration; on T6a/T6b the SCEF sends it directly to the
+      MME or SGSN. The answer reports per-event status and any immediately available reports.
+    spec: ["TS 29.336 §7.2.1", "TS 29.336 §8.2.3", "TS 29.128 §5.3", "TS 29.128 §6.2.3"]
+    flow:
+      request: {from: [SCEF], to: [HSS, MME, SGSN]}
+  8388719:
+    description: >-
+      Delivers monitoring event reports to the SCEF. On S6t the HSS sends them, for single UEs or batched
+      into group reports, and also signals changes such as revoked authorization or updated network
+      configuration; on T6a/T6b the MME or SGSN sends them. The answer returns per-report status.
+    spec: ["TS 29.336 §7.2.2", "TS 29.336 §8.2.5", "TS 29.128 §5.2", "TS 29.128 §6.2.5"]
+    flow:
+      request: {from: [HSS, MME, SGSN], to: [SCEF]}
+  8388726:
+    description: >-
+      The SCEF asks the HSS to authorize non-IP data delivery for a UE or group and APN, and to map an
+      external identifier to the IMSI and MSISDN. When both sides support NIDD authorization updates, the
+      HSS can also send it to tell the SCEF that a granted authorization has changed or been revoked.
+    spec: ["TS 29.336 §7.2.3", "TS 29.336 §8.2.7"]
+    flow:
+      request: {from: [SCEF, HSS], to: [HSS, SCEF]}
+  8388732:
+    description: >-
+      Manages the T6a/T6b connection that carries non-IP data for a PDN connection. The MME or SGSN uses it
+      to establish, update, or release the connection with the SCEF, reporting the APN, bearer, rate
+      control, and serving PLMN; the SCEF can also update or release it. Connection-Action says which.
+    spec: ["TS 29.128 §5.7", "TS 29.128 §5.8", "TS 29.128 §6.2.7"]
+    flow:
+      request: {from: [MME, SGSN, SCEF], to: [SCEF, MME, SGSN]}
+  8388733:
+    description: >-
+      Carries a mobile-originated non-IP data packet from the MME or SGSN to the SCEF over an established
+      T6a/T6b connection, identified by user and bearer. It can also report RRC establishment cause
+      counters for the UE.
+    spec: ["TS 29.128 §5.5", "TS 29.128 §6.2.9"]
+    flow:
+      request: {from: [MME, SGSN], to: [SCEF]}
+  8388734:
+    description: >-
+      Carries a mobile-terminated non-IP data packet from the SCEF to the MME or SGSN for delivery to the
+      UE. The SCEF can say how long it is willing to wait for the UE to become reachable. When the UE is
+      not reachable now, the answer can give a time at which to retransmit, and TDA-Flags can confirm that
+      the eNodeB acknowledged delivery.
+    spec: ["TS 29.128 §5.6", "TS 29.128 §6.2.11"]
+    flow:
+      request: {from: [SCEF], to: [MME, SGSN]}

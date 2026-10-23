@@ -747,6 +747,18 @@
     and returns serving node information for device triggering.
   spec: ["TS 23.682 §4.2", "TS 29.336"]
 
+- id: S6n
+  name: S6n
+  generations: [4G]
+  endpoints: [MTC-AAA, HSS]
+  protocol: Diameter
+  apps: [16777310]
+  aliases: []
+  description: >-
+    The interface between the MTC-AAA and the HSS. It maps a device's IMSI to its external identifiers
+    for authentication and authorization of machine-type devices on non-3GPP access.
+  spec: ["TS 23.682 §4.2", "TS 29.336 §5"]
+
 - id: Tsp
   name: Tsp
   generations: [4G]
@@ -762,38 +774,54 @@
 - id: T4
   name: T4
   generations: [4G]
-  endpoints: [MTC-IWF, SMS-SC]
+  endpoints: [MTC-IWF, SMS-SC, SMS-IWMSC]
   protocol: Diameter
-  apps: [16777311]
+  apps: [16777311, 16777313]
   aliases: []
   description: >-
     The interface between the MTC-IWF and the SMS-SC. It submits device trigger requests for delivery
-    to the UE as short messages and returns delivery reports.
+    to the UE as short messages and returns delivery reports. The SMS-IWMSC also uses it to pass
+    MSISDN-less MO SMS to the MTC-IWF with the SGd application.
   spec: ["TS 23.682 §4.2", "TS 29.337"]
 
 - id: S6c
   name: S6c
   generations: [4G]
-  endpoints: [SMS-GMSC, HSS]
+  endpoints: [SMS-GMSC, SMS-IWMSC, SMS-Router, IP-SM-GW, HSS]
   protocol: Diameter
   apps: [16777312]
   aliases: []
   description: >-
-    The interface between the HSS and the central SMS functions. It returns routing information for
-    mobile-terminated SMS and handles alerting when a UE becomes reachable.
+    The interface between the HSS and the central SMS functions: the SMS-GMSC, SMS-IWMSC, and SMS
+    Router, with the IP-SM-GW also reporting delivery status. It returns routing information for
+    mobile-terminated SMS, records delivery failures as message waiting data, and alerts the SMS centre
+    when a UE becomes reachable.
   spec: ["TS 23.272", "TS 29.338"]
 
 - id: SGd
   name: SGd
   generations: [4G]
-  endpoints: [MME, SMS-IWMSC]
+  endpoints: [MME, SMS-GMSC, SMS-IWMSC, SMS-Router]
   protocol: Diameter
-  apps: [16777313]
+  apps: [16777313, 16777312]
   aliases: []
   description: >-
-    The interface between the MME and the SMS-GMSC or SMS-IWMSC. It carries mobile-originated and
-    mobile-terminated short messages for UEs without CS fallback.
+    The interface between the MME and the SMS-GMSC, SMS-IWMSC, or an SMS Router, for SMS in MME. It
+    carries mobile-originated and mobile-terminated short messages without CS fallback, and the MME
+    uses it to alert the SMS-GMSC when a UE with pending MT SMS becomes available.
   spec: ["TS 23.272", "TS 29.338"]
+
+- id: Gdd
+  name: Gdd
+  generations: [2G, 3G, 4G]
+  endpoints: [SGSN, SMS-GMSC, SMS-IWMSC, SMS-Router]
+  protocol: Diameter
+  apps: [16777313, 16777312]
+  aliases: []
+  description: >-
+    The Diameter equivalent of Gd between the SGSN and the SMS-GMSC, SMS-IWMSC, or an SMS Router. It
+    carries MO and MT short messages for UEs served by the SGSN and lets the SGSN alert the SMS-GMSC.
+  spec: ["TS 23.060", "TS 29.338 §6"]
 
 # --- MBMS ---
 

@@ -124,6 +124,8 @@ export interface Meta {
   counts: Record<string, number>;
   specVersions: Record<string, string>;
   sources: Array<{ name: string; url: string }>;
+  /** Applications whose commands and carried AVPs all have curated descriptions. */
+  inScopeApps: string[];
   notice: string;
 }
 

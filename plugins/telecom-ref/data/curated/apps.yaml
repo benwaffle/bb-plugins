@@ -93,6 +93,58 @@ apps:
       location services: the address of the MME, SGSN, MSC, or AMF serving
       the target UE.
     spec: ["TS 29.173 §5", "TS 29.173 §6"]
+  16777309:
+    short: Tsp
+    description: >-
+      The device trigger application between a Services Capability Server and the MTC-IWF. The SCS asks
+      the MTC-IWF to send, replace, or recall a trigger towards a device named by external identifier or
+      MSISDN, and the MTC-IWF reports the outcome back. It also delivers MSISDN-less MO SMS to the SCS.
+    spec: ["TS 29.368 §5", "TS 29.368 §6"]
+  16777310:
+    short: S6m/S6n
+    description: >-
+      The subscriber information application towards the HSS for machine-type communication. The
+      MTC-IWF (S6m) resolves an external identifier or MSISDN to the IMSI, checks the SCS is allowed to
+      trigger the device, and fetches serving node data for T4 triggering; the MTC-AAA (S6n) maps an
+      IMSI to the device's external identifiers.
+    spec: ["TS 29.336 §5", "TS 29.336 §6"]
+  16777311:
+    short: T4
+    description: >-
+      The device trigger delivery application between the MTC-IWF and the SMS-SC. The MTC-IWF submits a
+      trigger, or a recall or replace of one, for delivery to the UE as a short message, and the SMS-SC
+      reports how delivery ended.
+    spec: ["TS 29.337 §5", "TS 29.337 §6"]
+  16777312:
+    short: S6c
+    description: >-
+      The SMS application between the HSS and the central SMS functions: the SMS-GMSC, the SMS-IWMSC,
+      and an SMS Router. The SMS-GMSC asks for routing information to deliver an MT SMS, reports the
+      delivery outcome so the HSS can keep message waiting data, and the HSS alerts the SMS centre when
+      the UE becomes reachable again.
+    spec: ["TS 29.338 §5"]
+  16777313:
+    short: SGd/Gdd
+    description: >-
+      The application that carries short messages between the MME (SGd) or SGSN (Gdd) and the SMS-GMSC,
+      SMS-IWMSC, or an SMS Router, as SMS in MME and its SGSN equivalent without CS fallback. MO messages
+      go to the SMS-IWMSC and MT messages come from the SMS-GMSC. T4 also uses it, from the SMS-IWMSC to
+      the MTC-IWF, and the alerting of the SMS-GMSC reuses the S6c Alert-Service-Centre command.
+    spec: ["TS 29.338 §6"]
+  16777345:
+    short: S6t
+    description: >-
+      The application between the SCEF and the HSS for service capability exposure. The SCEF configures
+      monitoring events and communication patterns for a UE or group, the HSS reports events back, and
+      the SCEF gets non-IP data delivery authorized and external identifiers mapped to the IMSI.
+    spec: ["TS 29.336 §7", "TS 29.336 §8"]
+  16777346:
+    short: T6a/T6b
+    description: >-
+      The application between the SCEF and the MME (T6a) or SGSN (T6b), and via the IWK-SCEF for roaming.
+      It configures and reports monitoring events and carries non-IP data: the serving node sets up a
+      connection per PDN connection, and MO and MT data packets travel over it.
+    spec: ["TS 29.128 §5", "TS 29.128 §6"]
 
 formatClauses:
   TS 29.212: {"5": 16777238, "5a": 16777266, "5b": 16777303, "5c": 16777349, "E": 16777318}

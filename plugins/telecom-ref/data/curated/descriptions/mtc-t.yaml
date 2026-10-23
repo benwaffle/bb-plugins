@@ -1,0 +1,136 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/3001":
+    description: >-
+      The SCS's request on Tsp, carried in Device-Action-Request (DAR). It names the target device
+      (External-Id or MSISDN), the SCS, the Action-Type, and the Reference-Number for the request.
+      A recall or replace also carries Old-Reference-Number, and a new trigger carries Trigger-Data
+      and a Validity-Time.
+    spec: ["TS 29.368 §6.4.2"]
+  "10415/3002":
+    description: >-
+      The MTC-IWF's report back to the SCS on Tsp. It goes in Device-Action-Answer (DAA) to
+      confirm a request, and in Device-Notification-Request (DNR) for delivery reports and
+      MSISDN-less MO-SMS. It echoes the Reference-Number and Action-Type, and it can add
+      Request-Status, Delivery-Outcome, MTC-Error-Diagnostic, SM-RP-UI and the application port.
+    spec: ["TS 29.368 §6.4.3"]
+  "10415/3004":
+    description: >-
+      The application data that a device trigger delivers to the UE. On Tsp it sits inside
+      Trigger-Data in a DAR. The MTC-IWF then passes it to the SMS-SC as a top-level AVP of the T4
+      Device-Trigger-Request (DTR).
+    spec: ["TS 29.368 §6.4.5"]
+  "10415/3006":
+    description: >-
+      Marks a device trigger as Non-Priority (0) or Priority (1). The SCS sets it in Trigger-Data on
+      Tsp. It also appears in the T4 Device-Trigger-Request and in T4-Parameters on S6m.
+    spec: ["TS 29.368 §6.4.7"]
+  "10415/3007":
+    description: >-
+      A number that the party starting a transaction picks to identify it, then repeats in every
+      related message. It is in Device-Action and Device-Notification on Tsp. On T4 it goes in DTR
+      and DRR, so a delivery report can be matched to its trigger.
+    spec: ["TS 29.368 §6.4.8"]
+  "10415/3010":
+    description: >-
+      Identifies the application on the UE that a trigger is for (the SMS application port, see TS
+      23.040). On Tsp it is in Trigger-Data and in the Device-Notification of an MSISDN-less MO-SMS
+      DNR. On S6m it sits in Service-Parameters, and the T4 Device-Trigger-Request carries it under the
+      name SMS-Application-Port-ID.
+    spec: ["TS 29.368 §6.4.11"]
+  "10415/3011":
+    description: >-
+      The Reference-Number of an earlier, still-pending trigger that a recall or replace targets.
+      It is in Device-Action and Device-Notification on Tsp. On T4 it goes in the DTR and comes
+      back in the DTA. Part of the Device-Trigger-Recall-Replace feature.
+    spec: ["TS 29.368 §6.4.12"]
+  "10415/3012":
+    description: >-
+      A bitmask in the Tsp Device-Action-Answer (DAA) that tells the SCS which features the final
+      target node supports. Bit 0 is Device-Trigger-Recall-Replace supported in SMS-SC. If this bit
+      is not set, the SCS does not send recalls and handles a replace as a new trigger.
+    spec: ["TS 29.368 §6.4.13"]
+  "10415/3200":
+    description: >-
+      The SMS-SC's result for a device trigger, carried in the T4 Delivery-Report-Request (DRR).
+      Values are ABSENT_SUBSCRIBER (0), UE_MEMORY_CAPACITY_EXCEEDED (1), SUCCESSFUL_TRANSFER (2),
+      and VALIDITY_TIME_EXPIRED (3). The MTC-IWF maps it to Delivery-Outcome on Tsp.
+  "10415/3201":
+    description: >-
+      Gives the reason the UE was absent when a trigger failed with ABSENT_SUBSCRIBER, carried in
+      the T4 DRR. Values are NO_PAGING_RESPONSE (0), UE_DETACHED (1), UE_DEREGISTERED (2),
+      UE_PURGED (3), ROAMING_RESTRICTION (4), and UNIDENTIFIED_SUBSCRIBER (5). It does not go on
+      to the SCS.
+  "10415/3202":
+    description: >-
+      Tells the SMS-SC what to do with a trigger in the T4 Device-Trigger-Request, and comes back
+      in the DTA. Values are TRIGGER (0) to store and send a new trigger, RECALL (1) to delete a
+      pending one, and REPLACE (2) to swap a pending one for a new one.
+  "10415/3203":
+    description: >-
+      Gives more detail when an SMS-SC trigger replace fails. It is carried in the T4
+      Device-Trigger-Answer (DTA) and passed on to the SCS in Device-Notification on Tsp. Values
+      are ORIGINAL_MESSAGE_NOT_DELETED (0) and NEW_MESSAGE_NOT_STORED (1).
+  "10415/4310":
+    description: >-
+      The serving PLMN rate control limits for a UE, which the MME or SGSN sends to the SCEF in a
+      T6a/T6b Connection-Management-Request (CMR) so that the SCEF can enforce them. It holds an
+      Uplink-Rate-Limit and a Downlink-Rate-Limit. A limit of 0 means rate control is off in that
+      direction. An active limit is at least 10.
+  "10415/4311":
+    description: >-
+      The maximum number of uplink NAS data PDUs that the UE can send per deci-hour (6 minutes).
+      It is part of Serving-PLMN-Rate-Control in a T6a/T6b CMR. 0 turns uplink rate control off.
+  "10415/4312":
+    description: >-
+      The maximum number of downlink NAS data PDUs that the UE can receive per deci-hour (6
+      minutes). It is part of Serving-PLMN-Rate-Control in a T6a/T6b CMR. 0 turns downlink rate
+      control off.
+  "10415/4313":
+    description: >-
+      The contents of the extended protocol configuration options (ePCO) IE from TS 24.301, from
+      octet 4 onward. It is exchanged in T6a/T6b CMR and CMA, and the MME or SGSN relays it
+      transparently to and from the UE. A common use is to give the UE APN rate control
+      information.
+  "10415/4314":
+    description: >-
+      Says what a T6a/T6b Connection-Management-Request (CMR) does to the SCEF connection. Values
+      are CONNECTION_ESTABLISHMENT (0), CONNECTION_RELEASE (1), and CONNECTION_UPDATE (2).
+  "10415/4315":
+    description: >-
+      The non-IP user data (NIDD) payload that goes between the MME or SGSN and the SCEF. It is
+      carried in MO-Data-Request (ODR) for uplink and MT-Data-Request (TDR) for downlink on
+      T6a/T6b.
+  "10415/4316":
+    description: >-
+      A UTC time in the T6a/T6b MT-Data-Request (TDR). It tells the MME or SGSN how long the SCEF
+      will wait for an answer about the downlink non-IP data delivery.
+  "10415/4317":
+    description: >-
+      A bitmask in the T6a/T6b Connection-Management-Request (CMR). Bit 0 is
+      UE-Reachable-Indicator, which shows that the UE has become reachable or soon will be. Other
+      bits are cleared when sent and ignored when received.
+  "10415/4318":
+    description: >-
+      Counts how often the RRC establishment cause "MO Exception data" was seen, and when it was
+      first seen. The MME or SGSN reports it to the SCEF in the T6a/T6b MO-Data-Request (ODR).
+      It holds Counter-Value and RRC-Counter-Timestamp.
+  "10415/4319":
+    description: >-
+      The number of times that the RRC cause "MO Exception data" has been received for the UE. It
+      is part of RRC-Cause-Counter in a T6a/T6b ODR.
+  "10415/4320":
+    description: >-
+      A timestamp in RRC-Cause-Counter that records when the RRC cause "MO Exception data" was
+      first received. It is carried in a T6a/T6b ODR.
+  "10415/4321":
+    description: >-
+      A bitmask in the T6a/T6b MT-Data-Answer (TDA). Bit 0 is Acknowledged Delivery, which shows
+      that the eNodeB has confirmed the downlink non-IP data was delivered. Other bits are cleared
+      when sent and ignored when received.
+  "10415/4326":
+    description: >-
+      Saved APN rate control state for a UE, in the TS 29.274 encoding. It holds the allowed uplink
+      and downlink packet counts, the number of additional exception reports, and a validity time.
+      The SCEF returns it in the T6a/T6b CMA on connection release. The MME or SGSN can send it
+      back in a CMR on establishment.

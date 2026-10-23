@@ -7,3 +7,8 @@ avpNames:
   Redirected-Max-Cache-Time: Redirect-Max-Cache-Time
   Accounting-Interim-Interval: Acct-Interim-Interval
   WiFi-P2P-Assistance-Iinfo: WiFi-P2P-Assistance-Info
+  MME-Absent-User-Diagnostic-SM: MME-Absent-User-Subscriber-Diagnostic-SM
+  MSC-Absent-User-Diagnostic-SM: MSC-Absent-User-Subscriber-Diagnostic-SM
+  SGSN-Absent-User-Diagnostic-SM: SGSN-Absent-User-Subscriber-Diagnostic-SM
+  SMS-Application-Port-ID: Application-Port-Identifier
+  Old-Rference-Number: Old-Reference-Number

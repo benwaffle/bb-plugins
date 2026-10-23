@@ -78,8 +78,9 @@ VENDOR_IETF = 0
 VENDOR_3GPP = 10415
 VENDOR_NAMES = {VENDOR_IETF: "IETF", VENDOR_3GPP: "3GPP"}
 
-# Applications whose AVPs carry full descriptions in phase 1.
-IN_SCOPE_APPS = {0, 3, 4, 16777216, 16777217, 16777236, 16777238, 16777251, 16777252, 16777255, 16777291}
+# Applications whose commands and AVPs carry full descriptions.
+IN_SCOPE_APPS = {0, 3, 4, 16777216, 16777217, 16777236, 16777238, 16777251, 16777252, 16777255, 16777291,
+                 16777309, 16777310, 16777311, 16777312, 16777313, 16777345, 16777346}
 
 # The application an RFC's command formats belong to when the header omits it.
 RFC_DEFAULT_APP = {6733: 0, 8506: 4, 7155: 1, 4072: 5, 4004: 2, 4740: 6}
@@ -444,23 +445,33 @@ def first_ref(refs: list[str]) -> str | None:
     return None
 
 
-def resolve_name_index(model: Model) -> dict[str, list[tuple[int, int]]]:
-    index: dict[str, list[tuple[int, int]]] = {}
+# Normalized AVP name -> (vendor, code) and registered name of each AVP that normalizes to it.
+NameIndex = dict[str, list[tuple[tuple[int, int], str]]]
+
+
+def resolve_name_index(model: Model) -> NameIndex:
+    index: NameIndex = {}
     for key, avp in model.avps.items():
-        index.setdefault(norm_key(avp["name"]), []).append(key)
+        index.setdefault(norm_key(avp["name"]), []).append((key, avp["name"]))
     return index
 
 
-def resolve(name: str, doc: str, index: dict[str, list[tuple[int, int]]], aliases: dict[str, str]) -> str | None:
+def resolve(name: str, doc: str, index: NameIndex, aliases: dict[str, str]) -> str | None:
     name = aliases.get(name, name)
-    keys = index.get(norm_key(name), [])
-    if not keys:
+    entries = index.get(norm_key(name), [])
+    if not entries:
         return None
     preferred = VENDOR_IETF if doc.startswith("RFC") else VENDOR_3GPP
-    # A RADIUS attribute (code < 256) can share a name with a Diameter-native AVP, as
-    # Service-Selection 146 and 493 do; Diameter command formats mean the latter.
-    keys = sorted(keys, key=lambda k: (k[0] != preferred, k[1] < 256, k))
-    return avp_id(*keys[0])
+
+    # Names that differ only in case, as Service-Id 855 and Service-ID 3103 do, go to the
+    # exact match. A RADIUS attribute (code < 256) can share a name with a Diameter-native
+    # AVP, as Service-Selection 146 and 493 do; Diameter command formats mean the latter.
+    def rank(entry: tuple[tuple[int, int], str]) -> tuple:
+        (vendor, code), registered = entry
+        return (registered != name, vendor != preferred, code < 256, vendor, code)
+
+    key, _ = min(entries, key=rank)
+    return avp_id(*key)
 
 
 def assemble(model: Model) -> dict[str, list[dict]]:
@@ -873,6 +884,7 @@ def main() -> None:
         "counts": counts,
         "specVersions": {k: v for k, v in sorted(model.spec_versions.items()) if v},
         "sources": sorted({s["url"]: s for s in model.sources}.values(), key=lambda s: s["name"]),
+        "inScopeApps": [app_id(a) for a in sorted(IN_SCOPE_APPS)],
         "notice": "Descriptions are summaries written for this reference, not specification text. "
                   "See the cited clause for the normative definition.",
     }

@@ -1,0 +1,198 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/855":
+    description: >-
+      A charging string naming the service a node is providing, such as the service an MRFC hosts
+      or an advice-of-charge service; for conferences it holds the conference ID. It sits in
+      IMS-Information. The S6m SIR's Service-ID is a separate Enumerated AVP, code 3103.
+    spec: ["TS 32.299 §7.2.190"]
+  "10415/3102":
+    description: >-
+      Groups the identities the HSS knows a UE by: IMSI in User-Name, MSISDN, External-Identifier,
+      and on S6m/S6n also LMSI. It names the target in SIR and comes back in SIA. On S6t it names
+      the UE or group in CIR and NIR and adds Type-Of-External-Identifier.
+  "10415/3103":
+    description: >-
+      Names the service the MTC-IWF or MTC-AAA wants in an S6m/S6n SIR, so the HSS can check
+      authorization and return the right data. Values are DEVICE_TRIGGER (0) and SMS_MO (1).
+  "10415/3104":
+    description: >-
+      Identity of the SCS (or UE) that asked the MTC-IWF for a service, sent to the HSS in SIR so it
+      can authorize the request. Encoding depends on the service; for device triggering it is the
+      SCS's international E.164 number as a TBCD string, with no nature-of-address prefix.
+  "10415/3105":
+    description: >-
+      Service-specific inputs the MTC-IWF passes to the HSS in SIR for the service named by
+      Service-ID. It holds T4-Parameters for device triggering over SMS and an
+      Application-Port-Identifier.
+  "10415/3106":
+    description: >-
+      Device-trigger inputs inside Service-Parameters of an S6m SIR. It holds Priority-Indication,
+      which says whether the trigger is priority or non-priority, and SM-RP-SMEA, the SMS address of
+      the originating SME.
+  "10415/3107":
+    description: >-
+      Service-specific results the HSS returns to the MTC-IWF in SIA for a device triggering
+      request. In this release it only wraps T4-Data.
+  "10415/3108":
+    description: >-
+      Tells the MTC-IWF in SIA where an SMS-based trigger can be delivered: the serving node (MSC,
+      MME, SGSN, or IP-SM-GW) plus any additional serving nodes. It may instead carry HSS-Cause; when
+      the subscriber is absent the serving node AVPs are left out.
+  "10415/3109":
+    description: >-
+      Bit mask in T4-Data of an S6m SIA explaining why the HSS cannot offer a trigger path. Bit 0
+      Absent Subscriber (no suitable serving node registered), bit 1 Teleservice Not Provisioned,
+      bit 2 Call Barred. Other bits are cleared by the HSS and ignored by the MTC-IWF.
+  "10415/3110":
+    description: >-
+      Mandatory bit mask in SIR. Bit 0, S6m/S6n Indicator, is set when an MTC-IWF sends the request
+      over S6m and cleared when an MTC-AAA sends it over S6n. Other bits are cleared by the sender
+      and ignored by the HSS.
+  "10415/3120":
+    description: >-
+      Per-pattern outcome the HSS returns in an S6t CIA for a communication pattern request. It
+      names the pattern by SCEF-Reference-ID (or the Ext form), optionally SCEF-ID, and carries an
+      AESE-Error-Report when handling failed.
+  "10415/3121":
+    description: >-
+      Error detail for a failed communication pattern request, nested in
+      AESE-Communication-Pattern-Config-Status of an S6t CIA. It wraps a Service-Result with the
+      result code the HSS hit.
+  "10415/3145":
+    description: >-
+      Bit mask in an S6t CIR that asks the HSS for bulk or query actions. Bit 0 delete all
+      monitoring events, bit 1 query Enhanced Coverage restriction, bit 2 retrieve the IMSI Group Id
+      for an External Group Identifier, bit 3 delete all communication patterns, bit 4 delete all
+      network parameter configurations.
+  "10415/3150":
+    description: >-
+      SCEF request in an S6t NIR to authorize non-IP data delivery (NIDD) for a UE. It holds the APN
+      in Service-Selection and an optional Requested-Validity-Time for the authorization.
+  "10415/3151":
+    description: >-
+      HSS reply in an S6t NIA to a NIDD authorization request. It returns the UE's MSISDN, IMSI (in
+      User-Name), and External-Identifier as available, plus a Granted-Validity-Time when the HSS
+      limits how long the authorization lasts.
+  "10415/3154":
+    description: >-
+      Bit mask the HSS sends to the SCEF in CIA or inside a Group-Report-Item. Bit 0 Absent
+      Subscriber: the configuration could not reach a serving node or the UE is not reachable there.
+      Bit 1 Group Event Monitoring Partially Cancel: group monitoring was cancelled for this member.
+  "10415/3155":
+    description: >-
+      Enhanced Coverage restriction settings the SCEF sends to the HSS in an S6t CIR. It carries
+      either a Restricted-PLMN-List or an Allowed-PLMN-List, each a complete and possibly empty set
+      of serving PLMNs.
+  "10415/3156":
+    description: >-
+      Current Enhanced Coverage restriction state the HSS returns in an S6t CIA when the SCEF set
+      the Enhanced Coverage Query bit of CIR-Flags. It holds the Enhanced-Coverage-Restriction
+      setting and the current Visited-PLMN-Id if any.
+  "10415/3157":
+    description: >-
+      Inside Enhanced-Coverage-Restriction, the full set of serving PLMNs where Enhanced Coverage is
+      restricted, as Visited-PLMN-Id entries. An empty list means Enhanced Coverage is allowed in
+      every serving PLMN.
+  "10415/3158":
+    description: >-
+      Inside Enhanced-Coverage-Restriction, the full set of serving PLMNs where Enhanced Coverage is
+      allowed, as Visited-PLMN-Id entries. An empty list means Enhanced Coverage is restricted in
+      every serving PLMN.
+  "10415/3159":
+    description: >-
+      Time the SCEF proposes in NIDD-Authorization-Request of an S6t NIR, after which it will treat
+      the granted NIDD authorization as revoked without further signalling.
+  "10415/3160":
+    description: >-
+      Expiry time of a NIDD authorization, set by the HSS in NIDD-Authorization-Response or
+      APN-Validity-Time. After it, the HSS drops the stored authorization and the SCEF treats it as
+      revoked; a time in the past means immediate revocation.
+  "10415/3161":
+    description: >-
+      Carried in an S6t NIR sent by the HSS to the SCEF to change or revoke NIDD authorizations it
+      granted earlier, when both support NIDD Authorization Update. It holds one or more
+      APN-Validity-Time entries.
+  "10415/3163":
+    description: >-
+      Interval in seconds the SCEF sets in an S6t CIR for group monitoring. The HSS must send the
+      aggregated reports and status for group members in RIR no later than this. Required when the
+      target is an External Group Identifier.
+  "10415/3164":
+    description: >-
+      Bit mask in an S6t CIA. Bit 0, Group-Configuration-In-Progress, means the HSS is still
+      handling a group monitoring configuration and will send further status in later RIR
+      commands. Other bits are cleared and ignored.
+  "10415/3165":
+    description: >-
+      Aggregated report the HSS sends to the SCEF in an S6t RIR for a group-based monitoring event
+      or network configuration. It names the request by SCEF-Reference-ID (or Ext) and SCEF-ID and
+      holds one Group-Report-Item per member UE.
+  "10415/3166":
+    description: >-
+      One member UE's entry in a Group-Report. It names the UE in User-Identifier and can carry the
+      same event data as a Monitoring-Event-Report (location, reachability, roaming, IMEI change,
+      and so on) plus S6t-HSS-Cause, a Reporting-Time-Stamp, and Updated-Network-Configuration.
+  "10415/3167":
+    description: >-
+      Bit mask in an S6t RIR from the HSS. Bit 0 Group-Configuration-In-Progress, bit 1
+      All-Monitoring-Events-Cancelled, bit 2 Change-Of-Authorized-Monitoring-Events, bit 3
+      All-Communication-Pattern-Cancelled, bit 4 All-Suggested-Network-Configuration-Cancelled.
+  "10415/3168":
+    description: >-
+      Says what the External-Identifier next to it in User-Identifier names.
+      EXTERNAL-UE-IDENTIFIER-TYPE (0) is a single UE and EXTERNAL-GROUP-IDENTIFIER-TYPE (1) is a
+      group of UEs. When absent, the identifier is for a single UE.
+  "10415/3169":
+    description: >-
+      One entry of NIDD-Authorization-Update giving a new Granted-Validity-Time for the NIDD
+      authorization on the APN in Service-Selection. Without an APN the time applies to every NIDD
+      authorization the UE holds, and only one such entry may be sent.
+  "10415/3170":
+    description: >-
+      Network parameter configuration the SCEF suggests in an S6t CIR, such as periodic RAU/TAU
+      timer, active time, and suggested downlink buffering packet count, keyed by SCEF-ID and
+      reference ID. The HSS can return the active values in CIA.
+  "10415/3171":
+    description: >-
+      SCEF's per-report result in an S6t RIA, telling the HSS how each received monitoring event
+      report was handled. It names the report by SCEF-Reference-ID (or Ext) and SCEF-ID and gives a
+      Result-Code or Experimental-Result-Code.
+  "10415/3173":
+    description: >-
+      Extra External Group Identifiers the SCEF adds to an S6t CIR when it wants IMSI Group IDs for
+      several groups at once. The first group goes in User-Identifier and the rest go here.
+  "10415/3174":
+    description: >-
+      Bit mask in an S6t NIR. Bit 0, Incomplete Group-User-Identifier-List, is set while more
+      segments of a group's member list will follow in later NIR commands and cleared on the last
+      segment.
+  "10415/3175":
+    description: >-
+      Time a report for one group member was produced, carried in a Group-Report-Item of an S6t
+      RIR so the SCEF can tell when each member's event happened.
+  "10415/3176":
+    description: >-
+      One member of a UE group, listed in S6t NIA (or later HSS-sent NIR segments) after a NIDD
+      authorization for an External Group Identifier. It gives the member's IMSI in User-Name and
+      its MSISDN or External-Identifier.
+      TS 29.230 assigns it code 3176; TS 29.336 lists it as 3177.
+    spec: ["TS 29.336 §8.4.73"]
+  "10415/3177":
+    description: >-
+      Bit mask in an S6t NIA. Bit 0, Incomplete Group-User-Identifier-List, means the HSS could not
+      fit the whole group member list and will send the remaining segments in later NIR commands.
+      Other bits are cleared and ignored.
+      TS 29.230 assigns it code 3177; TS 29.336 lists it as 3176.
+    spec: ["TS 29.336 §8.4.72"]
+  "10415/3184":
+    description: >-
+      Network parameter values the HSS reports to the SCEF in an S6t RIR when a stored
+      configuration changed because of a later CIR. Inside a Group-Report-Item it gives the values
+      in force for that member. It holds periodic RAU/TAU timer, active time, and buffering count.
+  "10415/4209":
+    description: >-
+      A count of UEs. On Nt the SCEF sends the expected number of UEs for a background data
+      transfer request to the PCRF. On S6t the HSS returns it in CIA as the size of the group when
+      the CIR targeted an External Group Identifier.
+    spec: ["TS 29.154 §5.3.10"]

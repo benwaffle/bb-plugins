@@ -53,9 +53,14 @@ bb plugin install path:. --plugin telecom-ref
 Every AVP that the in-scope applications carry, directly or inside a grouped
 AVP, has a summary: S6a/S6d and S13 (TS 29.272), Cx/Dx (TS 29.229), Sh
 (TS 29.329), Gx (TS 29.212), Rx (TS 29.214), SLh (TS 29.173), SLg
-(TS 29.172), and the Diameter base protocol (RFC 6733) with credit control
-(RFC 8506). Other AVPs are stubs with code, vendor, type, flag rules, and
-spec reference.
+(TS 29.172), the SMS applications S6c and SGd/Gdd (TS 29.338), the MTC
+applications S6m/S6n and S6t (TS 29.336), Tsp (TS 29.368), T4 (TS 29.337),
+and T6a/T6b (TS 29.128), and the Diameter base protocol (RFC 6733) with credit
+control (RFC 8506). Every command of these applications has a summary too.
+Other AVPs are stubs with code, vendor, type, flag rules, and spec reference.
+
+TS 29.230 and TS 29.336 disagree on AVP codes 3176 and 3177; the reference
+follows TS 29.230, the code registry, and notes the difference.
 
 Known gaps: TS 32.299 ships as a Word 97 file whose AVP tables do not convert,
 so its charging AVPs have types (from TS 29.230) but no flag rules. Some IETF

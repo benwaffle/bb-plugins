@@ -225,6 +225,18 @@
   aliases: []
   spec: ["TS 23.040"]
 
+- id: SMS-Router
+  name: SMS Router
+  fullName: SMS Router
+  generations: [2G, 3G, 4G]
+  description: >-
+    An optional home-network node on the MT SMS path. It answers routing queries from the SMS-GMSC in
+    place of the HSS, so the GMSC sends the message to the router, which then forwards it to the real
+    serving MSC, SGSN, or MME. Operators use it for SMS home routing and for SMS in MME.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.040", "TS 29.338 §5"]
+
 # --- EPC ---
 
 - id: MME
@@ -467,6 +479,18 @@
     The function that lets a Services Capability Server send device triggers and other MTC requests into
     the network over Tsp. It authorizes requests, resolves the device's identity and serving node through
     the HSS over S6m, and delivers triggers by SMS over T4.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.682 §4.2"]
+
+- id: MTC-AAA
+  name: MTC-AAA
+  fullName: Machine Type Communications AAA
+  generations: [4G]
+  description: >-
+    An AAA function for machine-type devices that authenticate over non-3GPP access. It sits with the
+    3GPP AAA Server or proxy and asks the HSS over S6n for the external identifiers that belong to a
+    device's IMSI.
   replaces: []
   aliases: []
   spec: ["TS 23.682 §4.2"]

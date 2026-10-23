@@ -49,7 +49,8 @@ def norm_type(text: str | None) -> str | None:
     text = text.replace("\xa0", " ").strip()
     if not text or text in {"-", "—"}:
         return None
-    aliases = {"DiamIdent": "DiameterIdentity", "DiamURI": "DiameterURI", "Unsigned 32": "Unsigned32"}
+    aliases = {"DiamIdent": "DiameterIdentity", "DiamURI": "DiameterURI", "Unsigned 32": "Unsigned32",
+               "OctetSstring": "OctetString"}
     text = aliases.get(text, text)
     return re.sub(r"\s+", "", text)
 
@@ -161,7 +162,10 @@ def parse_abnf(lines: list[tuple[str, str | None]], doc: str, version: str | Non
             flags = [f.strip().upper() for f in cmd.group(3).split(",") if f.strip()]
             code = int(cmd.group(2))
             app = int(cmd.group(4)) if cmd.group(4) else (app_overrides or {}).get(code, default_app)
-            commands.append(CommandFormat(clean_name(cmd.group(1)), code, "REQ" in flags, "PXY" in flags,
+            name = clean_name(cmd.group(1))
+            # TS 29.336 §8.2.5 prints the S6t RIR header without REQ; the message name settles it.
+            request = "REQ" in flags or name.endswith("-Request")
+            commands.append(CommandFormat(name, code, request, "PXY" in flags,
                                           "ERR" in flags, app, refs, doc, version, clause))
         else:
             vendor = int(grp.group(3)) if grp.group(3) else None

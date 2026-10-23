@@ -1,0 +1,210 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/3300":
+    description: >-
+      E.164 number of the service centre (SMS-SC) or MTC-IWF the short message belongs to, carried as
+      bare TBCD digits with no nature-of-address or numbering-plan prefix. It appears in SRR, ALR and
+      RDR on S6c and in OFR and TFR on SGd/Gdd.
+  "10415/3301":
+    description: >-
+      The SMS TPDU itself (TS 23.040), i.e. the relay-layer user data, capped at 200 octets. It is
+      mandatory in OFR and TFR, and an OFA or TFA can return one carrying the delivery
+      acknowledgement.
+  "10415/3302":
+    description: >-
+      Bit mask the SMS-GMSC sends in a TFR toward the MME or SGSN. Only bit 0,
+      More-Messages-To-Send, is defined: when set, the service centre has further short messages
+      queued for the same UE. Undefined bits are sent as zero and ignored.
+  "10415/3303":
+    description: >-
+      Why an MO or MT short message could not be delivered, returned in OFA or TFA when the result
+      is DIAMETER_ERROR_SM_DELIVERY_FAILURE. The group holds a mandatory
+      SM-Enumerated-Delivery-Failure-Cause and an optional SM-Diagnostic-Info.
+  "10415/3304":
+    description: >-
+      Failure reason inside SM-Delivery-Failure-Cause, mirroring the MAP SM-EnumeratedDeliveryFailureCause.
+      Values are MEMORY_CAPACITY_EXCEEDED (0), EQUIPMENT_PROTOCOL_ERROR (1), EQUIPMENT_NOT_SM-EQUIPPED
+      (2), UNKNOWN_SERVICE_CENTRE (3), SC-CONGESTION (4), INVALID_SME-ADDRESS (5), and USER_NOT_SC-USER
+      (6).
+  "10415/3305":
+    description: >-
+      Optional extra diagnostic octets that accompany the enumerated cause inside
+      SM-Delivery-Failure-Cause, giving more detail about a failed delivery in OFA or TFA.
+  "10415/3306":
+    description: >-
+      Length in seconds of the SM delivery supervision timer the SMS-GMSC runs for this message. The
+      SMS-GMSC puts it in TFR so an MME or S4-SGSN serving a UE in extended idle mode DRX can judge
+      whether paging can finish in time.
+  "10415/3307":
+    description: >-
+      UTC timestamp at which the SMS-GMSC started its SM delivery supervision timer, sent in TFR
+      alongside SM-Delivery-Timer so the MME or SGSN knows how much of the delivery window remains.
+  "10415/3308":
+    description: >-
+      RP message type of the short message the SMS-GMSC is about to deliver, sent in SRR so the HSS
+      can tell a status report apart from an ordinary MT message. Values are SM_DELIVER (0) and
+      SM_STATUS_REPORT (1).
+  "10415/3309":
+    description: >-
+      Address of the short message entity that originated the SM (the RP originating SME address),
+      formatted per the TS 23.040 address rules. The SMS-GMSC includes it in SRR on S6c; other
+      SMS-related applications reuse it.
+  "10415/3310":
+    description: >-
+      Bit mask the SMS-GMSC sends in SRR. Bit 0 GPRS-Indicator says it can take two serving node
+      addresses back; bit 1 SM-RP-PRI asks for delivery even if a service centre address is already in
+      Message Waiting Data; bit 2 Single-Attempt-Delivery limits the SM to one try.
+  "10415/3311":
+    description: >-
+      Present in SRR when the requester only wants routing data and does not plan to deliver a
+      message. Values are ONLY_IMSI_REQUESTED (0) and ONLY_MCC_MNC_REQUESTED (1). The SMS Router must
+      act on it; the HSS may.
+  "10415/3312":
+    description: >-
+      Bit mask in SRA reporting Message Waiting Data state in the HSS. Bit 0 SC-Address Not included,
+      bit 1 MNRF-Set, bit 2 MCEF-Set, bit 3 MNRG-Set, and bit 4 MNR5G-Set (waiting for the UE to
+      become reachable via a 5G serving node).
+  "10415/3313":
+    description: >-
+      Reason the MME last gave for the user being absent, as stored in the HSS and returned to the
+      SMS-GMSC in SRA. The spec names it MME-Absent-User-Diagnostic-SM; values come from TS 23.040
+      clause 3.3.2.
+    spec: ["TS 29.338 §5.3.3.9"]
+  "10415/3314":
+    description: >-
+      Reason the MSC last gave for the user being absent, as stored in the HSS and returned to the
+      SMS-GMSC in SRA. The spec names it MSC-Absent-User-Diagnostic-SM; values come from TS 23.040
+      clause 3.3.2.
+    spec: ["TS 29.338 §5.3.3.10"]
+  "10415/3315":
+    description: >-
+      Reason the SGSN last gave for the user being absent, as stored in the HSS and returned to the
+      SMS-GMSC in SRA. The spec names it SGSN-Absent-User-Diagnostic-SM (heading
+      SGSN-Absent-Subscriber-Diagnostic-SM); values come from TS 23.040 clause 3.3.2.
+    spec: ["TS 29.338 §5.3.3.11"]
+  "10415/3316":
+    description: >-
+      Result of an SM delivery attempt, used so the HSS can update Message Waiting Data. Mandatory in
+      RDR and, for MSISDN-less IMS delivery, sent in OFR. It holds one per-node outcome group for the
+      MME, MSC, SGSN, IP-SM-GW, or SMSF over 3GPP or non-3GPP access.
+  "10415/3317":
+    description: >-
+      Delivery outcome for an attempt made through an MME, carried inside SM-Delivery-Outcome. It
+      holds an SM-Delivery-Cause and, when the user was absent, an Absent-User-Diagnostic-SM.
+  "10415/3318":
+    description: >-
+      Delivery outcome for an attempt made through an MSC, carried inside SM-Delivery-Outcome. It
+      holds an SM-Delivery-Cause and, when the user was absent, an Absent-User-Diagnostic-SM.
+  "10415/3319":
+    description: >-
+      Delivery outcome for an attempt made through an SGSN, carried inside SM-Delivery-Outcome. It
+      holds an SM-Delivery-Cause and, when the user was absent, an Absent-User-Diagnostic-SM.
+  "10415/3320":
+    description: >-
+      Delivery outcome for an attempt made through an IP-SM-GW, carried inside SM-Delivery-Outcome in
+      RDR or OFR. It holds an SM-Delivery-Cause and, when the user was absent, an
+      Absent-User-Diagnostic-SM.
+  "10415/3321":
+    description: >-
+      Outcome code inside each per-node delivery outcome group, telling the HSS how to set Message
+      Waiting Data. Values are UE_MEMORY_CAPACITY_EXCEEDED (0), ABSENT_USER (1), and
+      SUCCESSFUL_TRANSFER (2).
+  "10415/3322":
+    description: >-
+      Diagnostic code explaining why the subscriber was absent, with values from TS 23.040 clause
+      3.3.2. It sits inside the per-node delivery outcome groups in RDR and can be returned by the MME
+      or SGSN in TFA with DIAMETER_ERROR_ABSENT_USER.
+  "10415/3323":
+    description: >-
+      Bit mask the SMS-GMSC or IP-SM-GW sends in RDR. Only bit 0, Single-Attempt-Delivery, is
+      defined: when set, the message was meant for a single delivery attempt. Undefined bits are sent
+      as zero and ignored.
+  "10415/3324":
+    description: >-
+      Identifiers for MSISDN-less SMS delivery in IMS (TS 23.204), carried in SRR, ALR, RDR, OFR and
+      TFR. The group holds an optional HSS-ID plus Originating-SIP-URI and Destination-SIP-URI naming
+      the sending and receiving IMS users.
+  "10415/3328":
+    description: >-
+      Bit mask the MME or SGSN sends in OFR. Only bit 0, S6a/S6d-Indicator, is defined: set means the
+      request went over Gdd from an SGSN; clear means it went over SGd from an MME.
+  "10415/3330":
+    description: >-
+      UTC time until which the SMS-GMSC is able to retry an MT short message, sent in TFR. Its presence
+      lets an MME or SGSN serving a power-saving UE answer with a Requested-Retransmission-Time instead
+      of a plain failure; SMS-GMSC-Address must accompany it.
+  "10415/3331":
+    description: >-
+      UTC time at which the MME or SGSN asks the SMS-GMSC to resend the MT short message, returned in
+      TFA with DIAMETER_ERROR_ABSENT_USER when the UE uses a power-saving mode and the TFR carried a
+      Maximum-Retransmission-Time.
+  "10415/3332":
+    description: >-
+      E.164 number of the SMS-GMSC, or of the SMS Router when it relays the request, as bare TBCD
+      digits. It goes in TFR whenever Maximum-Retransmission-Time is present so the MME or SGSN knows
+      where to send a later alert.
+  "10415/3333":
+    description: >-
+      Bit mask in an ALR from the MME or SGSN to the SMS-GMSC saying what triggered the alert. Bit 0
+      UE-Available-For-MT-SMS means the UE can now receive; bit 1 UE-Under-New-Serving-Node means it
+      moved to another MME or SGSN.
+  "10415/3334":
+    description: >-
+      Reason the SMSF registered for 3GPP access gave for the user being absent, returned by the HSS
+      in SRA when the requester supports the SMSF-Support feature. Values come from TS 23.040 clause
+      3.3.2.
+  "10415/3335":
+    description: >-
+      Reason the SMSF registered for non-3GPP access gave for the user being absent, returned by the
+      HSS in SRA when the requester supports the SMSF-Support feature. Values come from TS 23.040
+      clause 3.3.2.
+  "10415/3336":
+    description: >-
+      Delivery outcome for an attempt made through the SMSF registered for 3GPP access, carried inside
+      SM-Delivery-Outcome. It holds an SM-Delivery-Cause and, when the user was absent, an
+      Absent-User-Diagnostic-SM.
+  "10415/3337":
+    description: >-
+      Delivery outcome for an attempt made through the SMSF registered for non-3GPP access, carried
+      inside SM-Delivery-Outcome. It holds an SM-Delivery-Cause and, when the user was absent, an
+      Absent-User-Diagnostic-SM.
+  "10415/3338":
+    description: >-
+      ISDN (E.164) number of the SMSF registered for 3GPP access, encoded as bare TBCD digits without
+      address-type prefix. It is carried inside SMSF-3GPP-Address in SRA.
+  "10415/3339":
+    description: >-
+      ISDN (E.164) number of the SMSF registered for non-3GPP access, encoded as bare TBCD digits
+      without address-type prefix. It is carried inside SMSF-Non-3GPP-Address in SRA.
+  "10415/3340":
+    description: >-
+      Diameter identity (host name) of the SMSF serving the user over 3GPP access, carried inside
+      SMSF-3GPP-Address in SRA so the SMS-GMSC can reach that SMSF.
+  "10415/3341":
+    description: >-
+      Diameter identity (host name) of the SMSF serving the user over non-3GPP access, carried inside
+      SMSF-Non-3GPP-Address in SRA so the SMS-GMSC can reach that SMSF.
+  "10415/3342":
+    description: >-
+      Diameter realm of the SMSF serving the user over 3GPP access, carried inside SMSF-3GPP-Address in
+      SRA alongside the SMSF name and number.
+  "10415/3343":
+    description: >-
+      Diameter realm of the SMSF serving the user over non-3GPP access, carried inside
+      SMSF-Non-3GPP-Address in SRA alongside the SMSF name and number.
+  "10415/3344":
+    description: >-
+      The SMSF serving the user over 3GPP access, returned by the HSS in SRA when delivery is intended
+      and SMSF-Support is negotiated. The group holds the SMSF number, name, realm, and its SBI support
+      indicator.
+  "10415/3345":
+    description: >-
+      The SMSF serving the user over non-3GPP access, returned by the HSS in SRA when delivery is
+      intended and SMSF-Support is negotiated. The group holds the SMSF number, name, realm, and its
+      SBI support indicator.
+  "10415/3346":
+    description: >-
+      Inside SMSF-3GPP-Address, says whether that SMSF supports the service-based interface. Values are NOT_SUPPORT_SBI (0) and SUPPORT_SBI (1).
+  "10415/3347":
+    description: >-
+      Inside SMSF-Non-3GPP-Address, says whether that SMSF supports the service-based interface. Values are NOT_SUPPORT_SBI (0) and SUPPORT_SBI (1).

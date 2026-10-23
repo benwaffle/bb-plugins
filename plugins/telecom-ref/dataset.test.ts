@@ -6,7 +6,7 @@ import { validateDataset } from "./validate";
 /** A small consistent dataset: S6a carries ULR, which carries Subscription-Data, which groups MSISDN. */
 function fixture(): RawDataset {
   return {
-    meta: { release: 18, built: "2026-10-22", counts: {}, specVersions: {}, sources: [], notice: "" },
+    meta: { release: 18, built: "2026-10-22", counts: {}, specVersions: {}, sources: [], inScopeApps: [], notice: "" },
     apps: [
       {
         id: "diam.app/16777251",
@@ -192,6 +192,16 @@ describe("the committed dataset", () => {
   it("describes every AVP the in-scope applications carry", () => {
     const missing = raw.avps.filter((avp) => avp.inScope && !avp.description).map((avp) => avp.id);
     expect(missing).toEqual([]);
+  });
+
+  it("describes every command of every in-scope application", () => {
+    const inScope = new Set(raw.meta.inScopeApps);
+    const missing = raw.apps
+      .filter((app) => inScope.has(app.id))
+      .flatMap((app) => app.commands)
+      .filter((id) => !raw.commands.find((cmd) => cmd.id === id)?.description);
+    expect(raw.meta.inScopeApps).toContain("diam.app/16777312");
+    expect([...new Set(missing)]).toEqual([]);
   });
 
   it("matches the counts in meta.json", () => {
