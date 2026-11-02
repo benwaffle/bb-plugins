@@ -30,7 +30,7 @@ import {
   type KeyInput,
   type LeaderState,
 } from "./machine";
-import { indexCommands, isMacPlatform, shortcutFits, type CommandEntry } from "./shortcuts";
+import { indexCommands, shortcutFits, type CommandEntry } from "./shortcuts";
 import { describeAction, type ActionView } from "./actions";
 
 const CHEAT_SHEET_PATH = "cheat-sheet";
@@ -142,12 +142,10 @@ function applyDisposition(event: KeyboardEvent, disposition: Disposition): void 
 // ---------------------------------------------------------------------------
 // Availability, shared by which-key and the cheat sheet.
 
-const MAC = typeof navigator !== "undefined" && isMacPlatform(navigator.platform);
-
 function commandIndex(commands: HostAppCommands | null): Map<string, CommandEntry> {
   if (commands === null) return new Map();
   try {
-    return indexCommands(commands.list(), MAC);
+    return indexCommands(commands.list());
   } catch (error) {
     console.warn("leader-keys: could not list bb commands", error);
     return new Map();

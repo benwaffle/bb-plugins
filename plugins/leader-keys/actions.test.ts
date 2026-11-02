@@ -5,14 +5,14 @@ import type { CommandEntry } from "./shortcuts";
 
 const commands: HostAppCommands = { execute: () => true, list: () => [] };
 const index = new Map<string, CommandEntry>([
-  ["thread.new", { available: true, shortcut: "⌘ N" }],
+  ["thread.new", { available: true, shortcut: "⌘N" }],
   ["pane.focus.left", { available: true, shortcut: null }],
-  ["thread.archive", { available: false, shortcut: "⌘ ⌫" }],
+  ["thread.archive", { available: false, shortcut: "⌘⌫" }],
 ]);
 
 describe("describeAction", () => {
   it("shows a bb command's native shortcut", () => {
-    expect(describeAction("thread.new", commands, index)).toEqual({ status: "ok", note: null, shortcut: "⌘ N" });
+    expect(describeAction("thread.new", commands, index)).toEqual({ status: "ok", note: null, shortcut: "⌘N" });
   });
 
   it("says no shortcut when bb reports none", () => {
@@ -25,7 +25,7 @@ describe("describeAction", () => {
   });
 
   it("keeps the shortcut on unavailable commands", () => {
-    expect(describeAction("thread.archive", commands, index)).toMatchObject({ status: "unavailable", shortcut: "⌘ ⌫" });
+    expect(describeAction("thread.archive", commands, index)).toMatchObject({ status: "unavailable", shortcut: "⌘⌫" });
   });
 
   it("marks bb commands as needing the fork without a command API", () => {

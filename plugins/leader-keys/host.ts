@@ -4,24 +4,12 @@
  * provide them, so each is null there and the plugin runs only its own
  * leader actions.
  */
-export interface HostAppShortcut {
-  key: string;
-  mod: boolean;
-  meta: boolean;
-  control: boolean;
-  alt: boolean;
-  shift: boolean;
-}
-
 export interface HostAppCommandInfo {
   id: string;
   title: string;
   available: boolean;
-  /**
-   * The command's active keybinding, read when the host reports it. The
-   * fork's list() at bi/leader-keys-sdk returns only id, title and available.
-   */
-  shortcut?: HostAppShortcut | null;
+  /** The command's active keybinding as bb's command palette labels it (e.g. "⌘K"); absent when it has none. */
+  shortcut?: string;
 }
 
 export interface HostAppCommands {

@@ -48,7 +48,7 @@ stay dimmed on both.
   down) or after `SPC u` (`SPC u 3 f j`). Only movement commands repeat.
 - **SPC h b** or **Leader keys** in the navigation opens the cheat sheet, with
   each entry's command and status. Entries that run a bb or plugin command
-  also show its native shortcut (⌘ N and so on) when bb reports one, and "no
+  also show its native shortcut (⌘N and so on, as bb's command palette shows it) when bb reports one, and "no
   shortcut" otherwise; the which-key popup shows it too when the row has room. **SPC h k** describes the next sequence
   instead of running it.
 
