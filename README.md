@@ -10,6 +10,7 @@ not add commits that have to be carried through every upstream sync.
 | --- | --- | --- |
 | `claude-title` | [plugins/claude-title](plugins/claude-title) | Thread titles and commit messages from your Claude Code login, with a small model. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
+| `leader-keys` | [plugins/leader-keys](plugins/leader-keys) | Doom Emacs style leader keys with a which-key popup and a cheat sheet. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
 | `telecom-ref` | [plugins/telecom-ref](plugins/telecom-ref) | Searchable 3GPP Rel-18 reference: Diameter apps, commands, and AVPs, EPC/5GC interfaces, and network functions. |

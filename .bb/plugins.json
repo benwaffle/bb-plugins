@@ -30,6 +30,10 @@
     {
       "name": "telecom-ref",
       "source": "./plugins/telecom-ref"
+    },
+    {
+      "name": "leader-keys",
+      "source": "./plugins/leader-keys"
     }
   ]
 }
