@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   definePluginApp,
   useBbNavigate,
@@ -17,7 +17,6 @@ import {
   sortedChildren,
   type FlatBinding,
   type Keymap,
-  type LeaderAction,
   type PrefixNode,
 } from "./keymap";
 import {
@@ -31,6 +30,8 @@ import {
   type KeyInput,
   type LeaderState,
 } from "./machine";
+import { indexCommands, isMacPlatform, shortcutFits, type CommandEntry } from "./shortcuts";
+import { describeAction, type ActionView } from "./actions";
 
 const CHEAT_SHEET_PATH = "cheat-sheet";
 const FLASH_MS = 2500;
@@ -141,27 +142,12 @@ function applyDisposition(event: KeyboardEvent, disposition: Disposition): void 
 // ---------------------------------------------------------------------------
 // Availability, shared by which-key and the cheat sheet.
 
-type EntryStatus = "ok" | "unavailable" | "needs-fork" | "needs-api";
+const MAC = typeof navigator !== "undefined" && isMacPlatform(navigator.platform);
 
-function entryStatus(action: LeaderAction, commands: HostAppCommands | null, available: ReadonlyMap<string, boolean>): EntryStatus {
-  const kind = actionKind(action);
-  if (kind === "leader") return "ok";
-  if (kind === "missing") return "needs-api";
-  if (commands === null) return "needs-fork";
-  return available.get(action) === true ? "ok" : "unavailable";
-}
-
-const STATUS_NOTE: Record<EntryStatus, string | null> = {
-  ok: null,
-  unavailable: "not available here",
-  "needs-fork": "needs fork",
-  "needs-api": "needs a bb API",
-};
-
-function availabilityMap(commands: HostAppCommands | null): Map<string, boolean> {
+function commandIndex(commands: HostAppCommands | null): Map<string, CommandEntry> {
   if (commands === null) return new Map();
   try {
-    return new Map(commands.list().map((info) => [info.id, info.available]));
+    return indexCommands(commands.list(), MAC);
   } catch (error) {
     console.warn("leader-keys: could not list bb commands", error);
     return new Map();
@@ -356,37 +342,47 @@ function LeaderOverlay() {
   );
 }
 
+const PREFIX_VIEW: ActionView = { status: "ok", note: null, shortcut: null };
+
 function WhichKey({ node, keys, commands }: { node: PrefixNode; keys: string[]; commands: HostAppCommands | null }) {
-  const available = useMemo(() => availabilityMap(commands), [commands, node]);
+  const index = useMemo(() => commandIndex(commands), [commands, node]);
   const entries = sortedChildren(node);
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[2147482999] border-t border-border bg-popover px-5 pt-2.5 pb-3 text-popover-foreground shadow-lg"
+      className="pointer-events-none fixed bottom-3 left-1/2 z-[2147482999] w-max max-w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-lg border border-border bg-popover px-3 pt-2 pb-2.5 text-popover-foreground shadow-lg"
     >
-      <div className="mb-2 flex items-baseline gap-2.5 text-xs text-muted-foreground">
-        <span className="font-mono font-semibold text-foreground">SPC {formatKeyPath(keys)}</span>
-        <span>{node.label}</span>
+      <div className="mb-1.5 flex min-w-0 items-baseline gap-2 text-xs text-muted-foreground">
+        <span className="shrink-0 font-mono font-semibold text-foreground">SPC {formatKeyPath(keys)}</span>
+        <span className="truncate">{node.label}</span>
       </div>
-      <div className="grid grid-cols-4 gap-x-6 gap-y-1 text-xs">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2.5 gap-y-0.5 text-xs">
         {entries.map(([key, child]) => {
-          const status = child.kind === "leaf" ? entryStatus(child.action, commands, available) : "ok";
-          const note = STATUS_NOTE[status];
+          const { status, note, shortcut } =
+            child.kind === "leaf" ? describeAction(child.action, commands, index) : PREFIX_VIEW;
+          const label = child.kind === "prefix" ? `+${child.label}` : child.label;
+          const description = note === null ? label : `${label} (${note})`;
+          const showShortcut = shortcut !== null && shortcut !== "no shortcut" && shortcutFits(description, shortcut);
+          const dim = status === "ok" ? "" : "opacity-40";
           return (
-            <div key={key} className={`flex items-baseline gap-2 whitespace-nowrap ${status === "ok" ? "" : "opacity-40"}`}>
-              <span className="min-w-6 text-right font-mono font-semibold">{key}</span>
-              <span className="text-muted-foreground">→</span>
-              <span className={`truncate ${child.kind === "prefix" ? "text-primary" : ""}`}>
-                {child.kind === "prefix" ? `+${child.label}` : child.label}
-                {note === null ? null : <span className="text-muted-foreground"> ({note})</span>}
+            <Fragment key={key}>
+              <span className={`text-right font-mono font-semibold ${dim}`}>{key}</span>
+              <span className={`pointer-events-auto flex min-w-0 items-baseline gap-2 ${dim}`} title={showShortcut || shortcut === null ? description : `${description} · ${shortcut}`}>
+                <span className={`line-clamp-2 min-w-0 break-words ${child.kind === "prefix" ? "text-primary" : ""}`}>
+                  {label}
+                  {note === null ? null : <span className="text-muted-foreground"> ({note})</span>}
+                </span>
+                {showShortcut ? (
+                  <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">{shortcut}</span>
+                ) : null}
               </span>
-            </div>
+            </Fragment>
           );
         })}
       </div>
-      <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
         <span>ESC cancel</span>
-        <span>BS up one level</span>
+        <span>BS up</span>
         <span>? cheat sheet</span>
       </div>
     </div>
@@ -419,7 +415,7 @@ function CheatSheetPanel() {
   const { keymap, path } = useKeymapSnapshot();
   const commands = useOptionalAppCommands();
   const [query, setQuery] = useState("");
-  const available = useMemo(() => availabilityMap(commands), [commands, keymap]);
+  const index = useMemo(() => commandIndex(commands), [commands, keymap]);
   const rows = useMemo(() => flattenKeymap(keymap.root), [keymap]);
   const needle = query.trim().toLowerCase();
   const filtered = needle === ""
@@ -468,11 +464,19 @@ function CheatSheetPanel() {
             <table className="w-full border-collapse text-xs">
               <tbody>
                 {group.rows.map((row) => {
-                  const status = entryStatus(row.action, commands, available);
-                  const note = STATUS_NOTE[status];
+                  const { status, note, shortcut } = describeAction(row.action, commands, index);
                   return (
                     <tr key={formatKeyPath(row.keys)} className="border-b border-border">
-                      <td className="w-20 py-1 font-mono">{formatKeyPath(row.keys)}</td>
+                      <td className="py-1 pr-2 whitespace-nowrap font-mono">
+                        {formatKeyPath(row.keys)}
+                        {shortcut === null ? null : (
+                          <span
+                            className={`ml-2 text-[11px] text-muted-foreground ${status === "needs-fork" ? "opacity-50" : ""}`}
+                          >
+                            {shortcut}
+                          </span>
+                        )}
+                      </td>
                       <td className={`py-1 ${status === "ok" || status === "unavailable" ? "" : "opacity-50"}`}>
                         {row.label}
                         {row.custom ? <span className="text-muted-foreground"> • custom</span> : null}

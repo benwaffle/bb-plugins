@@ -47,7 +47,9 @@ stay dimmed on both.
 - **Counts**: type digits before the leader (`3 SPC f j` moves three threads
   down) or after `SPC u` (`SPC u 3 f j`). Only movement commands repeat.
 - **SPC h b** or **Leader keys** in the navigation opens the cheat sheet, with
-  each entry's command and status. **SPC h k** describes the next sequence
+  each entry's command and status. Entries that run a bb or plugin command
+  also show its native shortcut (⌘ N and so on) when bb reports one, and "no
+  shortcut" otherwise; the which-key popup shows it too when the row has room. **SPC h k** describes the next sequence
   instead of running it.
 
 The full map is on the cheat sheet; `bb leader-keys list` prints it too.

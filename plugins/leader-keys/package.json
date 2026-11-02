@@ -47,7 +47,9 @@
     "contract.ts",
     "host.ts",
     "keymap.ts",
-    "machine.ts"
+    "machine.ts",
+    "shortcuts.ts",
+    "actions.ts"
   ],
   "scripts": {
     "build": "env -u BB_CLI bb plugin build .",
