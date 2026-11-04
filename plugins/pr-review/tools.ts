@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -12,26 +12,68 @@ export interface RunOptions {
 
 export type Runner = (command: string, args: readonly string[], options: RunOptions) => Promise<string>;
 
+const MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Runs `command` in its own process group with stdin closed. When
+ * `timeoutMs` passes, or stdout outgrows `MAX_OUTPUT_BYTES`, the whole group
+ * is sent SIGKILL and the promise rejects at once, without waiting for
+ * grandchildren that still hold the output pipes.
+ */
 export const runCommand: Runner = (command, args, options) =>
   new Promise((resolve, reject) => {
-    execFile(
-      command,
-      [...args],
-      {
-        cwd: options.cwd,
-        timeout: options.timeoutMs,
-        maxBuffer: 32 * 1024 * 1024,
-        env: { ...process.env, GH_PROMPT_DISABLED: "1", NO_COLOR: "1" },
-      },
-      (error, stdout, stderr) => {
-        if (error !== null) {
-          const detail = stderr.trim() || error.message;
-          reject(new Error(`${command} ${args.slice(0, 3).join(" ")}: ${detail}`));
-          return;
-        }
-        resolve(stdout);
-      },
-    );
+    const label = `${command} ${args.slice(0, 3).join(" ")}`;
+    const child = spawn(command, [...args], {
+      cwd: options.cwd,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0", NO_COLOR: "1" },
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let stdoutBytes = 0;
+    let settled = false;
+
+    const killGroup = () => {
+      try {
+        if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        child.kill("SIGKILL");
+      }
+      child.stdout.destroy();
+      child.stderr.destroy();
+    };
+    const finish = (error: Error | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error === null) resolve(Buffer.concat(stdout).toString("utf8"));
+      else reject(error);
+    };
+    const timer = setTimeout(() => {
+      killGroup();
+      finish(new Error(`${label}: timed out after ${options.timeoutMs}ms`));
+    }, options.timeoutMs);
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > MAX_OUTPUT_BYTES) {
+        killGroup();
+        finish(new Error(`${label}: output exceeded ${MAX_OUTPUT_BYTES} bytes`));
+        return;
+      }
+      stdout.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", (error) => finish(new Error(`${label}: ${error.message}`)));
+    child.on("close", (code, signal) => {
+      if (code === 0) {
+        finish(null);
+        return;
+      }
+      const detail = Buffer.concat(stderr).toString("utf8").trim() || `exited with ${code ?? signal}`;
+      finish(new Error(`${label}: ${detail}`));
+    });
   });
 
 const TOOL_CANDIDATES: Record<"gh" | "twg", string[]> = {

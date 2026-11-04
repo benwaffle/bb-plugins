@@ -267,6 +267,12 @@ newest message checked for it.
   other repositories are not found.
 - The queue caches GitHub results for 30 seconds. **Refresh** and `--refresh`
   skip that cache.
+- Each `gh` call is killed after 10 seconds (30 for the open-PR query, two
+  minutes for `gh pr checkout`). The GitHub login is read once per process.
+- The sidebar groups are kept in memory for a minute and refreshed in the
+  background, one refresh at a time. While GitHub is unreachable the sidebar
+  keeps showing the last groups read, or none before the first, and the plugin
+  logs one warning until a refresh succeeds.
 - Ticket summaries are read with one `twg jira workitem get` call for all the
   keys in view and kept in the plugin's database. After an hour the cached
   summary is shown while it is read again. Until a ticket is read, its sidebar

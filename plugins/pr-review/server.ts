@@ -5,7 +5,14 @@ import {
   type BbPluginApi,
 } from "@get-bb/plugin-sdk";
 import { REFS_CHANNEL } from "./channel.js";
-import { rpcContract, type QueueEntry, type RelatedResult, type ThreadRef, type Ticket } from "./contract.js";
+import {
+  rpcContract,
+  type QueueEntry,
+  type RelatedResult,
+  type SidebarGroupsResult,
+  type ThreadRef,
+  type Ticket,
+} from "./contract.js";
 import {
   githubRefs,
   githubUrl,
@@ -56,7 +63,20 @@ const QUEUE_TTL_MS = 30_000;
 const TICKET_TTL_MS = 60 * 60_000;
 const TICKET_RETRY_MS = 5 * 60_000;
 const TWG_TIMEOUT_MS = 20_000;
-const VIEWER_TTL_MS = 60 * 60_000;
+const TEAMS_TTL_MS = 60 * 60_000;
+/** Hard limit on one gh call; the call's process group is killed when it passes. */
+const GH_TIMEOUT_MS = 10_000;
+/** The open-PR GraphQL query fetches up to 100 PRs with their reviews and checks. */
+const OPEN_PULLS_TIMEOUT_MS = 30_000;
+const CHECKOUT_TIMEOUT_MS = 120_000;
+/** How long a `sidebarGroups` result is served before it is refreshed. */
+const SIDEBAR_TTL_MS = 60_000;
+/** How long a sidebar call with no result yet waits for the first refresh. */
+const SIDEBAR_FIRST_WAIT_MS = 10_000;
+/** How long a sidebar call with a stale result waits for its refresh. */
+const SIDEBAR_STALE_WAIT_MS = 2_000;
+/** Refreshes a result whose inputs change during its refresh at most this many times in a row. */
+const SIDEBAR_MAX_REFRESH_PASSES = 3;
 const ENVIRONMENT_READY_TIMEOUT_MS = 5 * 60_000;
 const ENVIRONMENT_POLL_MS = 2_000;
 const PULL_LINK_TIMEOUT_MS = 30_000;
@@ -76,8 +96,8 @@ function setupHints(reposConfigured: boolean, jiraConfigured: boolean): string[]
   return [...(reposConfigured ? [] : [REPOS_SETUP_HINT]), ...(jiraConfigured ? [] : [JIRA_SETUP_HINT])];
 }
 
-function fresh<T>(entry: Cached<T> | undefined, ttlMs: number): entry is Cached<T> {
-  return entry !== undefined && Date.now() - entry.at < ttlMs;
+function fresh<T>(entry: Cached<T> | undefined, ttlMs: number, now: number): entry is Cached<T> {
+  return entry !== undefined && now - entry.at < ttlMs;
 }
 
 function distinct(values: Iterable<string | null>): string[] {
@@ -151,6 +171,35 @@ const defaultDeps: PluginDeps = {
   now: Date.now,
 };
 
+const NO_SIDEBAR_GROUPS: SidebarGroupsResult = {
+  tickets: [],
+  threadTickets: [],
+  pulls: [],
+  threadPulls: [],
+  threadReviews: [],
+};
+
+type Settled<T> = { kind: "resolved"; value: T } | { kind: "rejected" } | { kind: "pending" };
+
+/** How `promise` settles within `ms`. */
+async function settleWithin<T>(promise: Promise<T>, ms: number): Promise<Settled<T>> {
+  let timer: NodeJS.Timeout | undefined;
+  const pending = new Promise<Settled<T>>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: "pending" }), ms);
+  });
+  try {
+    return await Promise.race([
+      promise.then(
+        (value): Settled<T> => ({ kind: "resolved", value }),
+        (): Settled<T> => ({ kind: "rejected" }),
+      ),
+      pending,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -203,7 +252,7 @@ export function createPlugin(deps: PluginDeps) {
       return path;
     }
 
-    async function gh(args: readonly string[], timeoutMs = 30_000, cwd?: string): Promise<string> {
+    async function gh(args: readonly string[], timeoutMs = GH_TIMEOUT_MS, cwd?: string): Promise<string> {
       return deps.run(await tool("gh"), args, { timeoutMs, ...(cwd === undefined ? {} : { cwd }) });
     }
 
@@ -222,12 +271,32 @@ export function createPlugin(deps: PluginDeps) {
       };
     }
 
-    let viewerCache: Cached<Viewer> | undefined;
-    async function viewer(): Promise<Viewer> {
-      if (fresh(viewerCache, VIEWER_TTL_MS)) return viewerCache.value;
-      const login = (await gh(["api", "user", "--jq", ".login"])).trim();
-      if (login.length === 0) throw new Error("gh api user returned no login");
-      let teams: string[] = [];
+    let login: string | undefined;
+    let teamsCache: Cached<string[]> | undefined;
+    let viewerLookup: Promise<Viewer> | null = null;
+
+    /**
+     * The GitHub login, read once per process, and the login's teams, read
+     * hourly. A failed team lookup keeps the teams read last and is retried
+     * an hour later. Concurrent callers share one lookup.
+     */
+    function viewer(): Promise<Viewer> {
+      if (login !== undefined && fresh(teamsCache, TEAMS_TTL_MS, deps.now())) {
+        return Promise.resolve({ login, teams: teamsCache.value });
+      }
+      viewerLookup ??= lookUpViewer().finally(() => {
+        viewerLookup = null;
+      });
+      return viewerLookup;
+    }
+
+    async function lookUpViewer(): Promise<Viewer> {
+      if (login === undefined) {
+        const read = (await gh(["api", "user", "--jq", ".login"])).trim();
+        if (read.length === 0) throw new Error("gh api user returned no login");
+        login = read;
+      }
+      let teams = teamsCache?.value ?? [];
       try {
         const raw = await gh([
           "api",
@@ -238,29 +307,29 @@ export function createPlugin(deps: PluginDeps) {
         ]);
         teams = raw.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
       } catch (error) {
-        bb.log.warn(`could not list GitHub teams; team review requests are ignored: ${errorMessage(error)}`);
+        bb.log.warn(`could not list GitHub teams; team review requests use the last list read: ${errorMessage(error)}`);
       }
-      viewerCache = { value: { login, teams }, at: Date.now() };
-      return viewerCache.value;
+      teamsCache = { value: teams, at: deps.now() };
+      return { login, teams };
     }
 
     const pullsCache = new Map<string, Cached<PullSnapshot[]>>();
     async function openPulls(repo: string, refresh: boolean): Promise<PullSnapshot[]> {
       const cached = pullsCache.get(repo);
-      if (!refresh && fresh(cached, QUEUE_TTL_MS)) return cached.value;
+      if (!refresh && fresh(cached, QUEUE_TTL_MS, deps.now())) return cached.value;
       const [owner, name] = repo.split("/");
       const raw = await gh(
         ["api", "graphql", "-f", `owner=${owner}`, "-f", `name=${name}`, "-f", `query=${OPEN_PULLS_QUERY}`],
-        60_000,
+        OPEN_PULLS_TIMEOUT_MS,
       );
       const pulls = parseOpenPulls(repo, raw);
-      pullsCache.set(repo, { value: pulls, at: Date.now() });
+      pullsCache.set(repo, { value: pulls, at: deps.now() });
       return pulls;
     }
 
     let githubPanelCache: Cached<boolean> | undefined;
     async function githubPanel(): Promise<boolean> {
-      if (fresh(githubPanelCache, QUEUE_TTL_MS)) return githubPanelCache.value;
+      if (fresh(githubPanelCache, QUEUE_TTL_MS, deps.now())) return githubPanelCache.value;
       let available = false;
       try {
         const { plugins } = await bb.sdk.plugins.list();
@@ -270,7 +339,7 @@ export function createPlugin(deps: PluginDeps) {
       } catch (error) {
         bb.log.warn(`could not list plugins: ${errorMessage(error)}`);
       }
-      githubPanelCache = { value: available, at: Date.now() };
+      githubPanelCache = { value: available, at: deps.now() };
       return available;
     }
 
@@ -327,7 +396,12 @@ export function createPlugin(deps: PluginDeps) {
       return { state: agentState({ userMessages: messages, reviewedAt, isRunning }), threadId };
     }
 
-    async function reviewQueue(refresh: boolean) {
+    /**
+     * The review queue. A repository whose open PRs cannot be read is listed
+     * in `errors`, and contributes its last PRs read when `staleOnError` is
+     * set, or none.
+     */
+    async function reviewQueue(refresh: boolean, staleOnError = false) {
       const { repos, projectKeys, setup } = await config();
       const me = await viewer();
       const errors: Array<{ repo: string; message: string }> = [];
@@ -338,7 +412,7 @@ export function createPlugin(deps: PluginDeps) {
               return await openPulls(repo, refresh);
             } catch (error) {
               errors.push({ repo, message: errorMessage(error) });
-              return [];
+              return staleOnError ? (pullsCache.get(repo)?.value ?? []) : [];
             }
           }),
         )
@@ -413,7 +487,7 @@ export function createPlugin(deps: PluginDeps) {
         if (found.has(key)) ticketFailures.delete(key);
         else ticketFailures.set(key, now);
       }
-      if (found.size > 0) bb.realtime.publish(REFS_CHANNEL, { tickets: [...found.keys()] });
+      if (found.size > 0) publishRefs({ tickets: [...found.keys()] });
     }
 
     /**
@@ -473,8 +547,8 @@ export function createPlugin(deps: PluginDeps) {
       );
     }
 
-    async function sidebarGroups() {
-      const queue = await reviewQueue(false);
+    async function computeSidebarGroups(): Promise<{ value: SidebarGroupsResult; errors: string[] }> {
+      const queue = await reviewQueue(false, true);
       const threadTickets = store.ticketThreads();
       for (const entry of queue.entries) {
         if (entry.agent.threadId !== null && entry.ticketKey !== null) {
@@ -513,7 +587,7 @@ export function createPlugin(deps: PluginDeps) {
           }),
         )
       ).filter((review) => review !== null);
-      return {
+      const result: SidebarGroupsResult = {
         tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
         threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
         pulls,
@@ -522,6 +596,87 @@ export function createPlugin(deps: PluginDeps) {
         ),
         threadReviews,
       };
+      return {
+        value: result,
+        errors: queue.errors.map((error) => `${error.repo}: ${error.message}`),
+      };
+    }
+
+    let sidebarCache: (Cached<SidebarGroupsResult> & { generation: number }) | undefined;
+    let sidebarRefresh: Promise<SidebarGroupsResult> | null = null;
+    let sidebarGeneration = 0;
+    let sidebarFailing = false;
+    let sidebarThrewAt: number | null = null;
+
+    /** Marks the sidebar result stale and tells the app's views that refs changed. */
+    function publishRefs(payload: Record<string, unknown>): void {
+      sidebarGeneration++;
+      bb.realtime.publish(REFS_CHANNEL, payload);
+    }
+
+    function sidebarFailure(message: string): void {
+      if (!sidebarFailing) bb.log.warn(`sidebar groups are serving the last result read: ${message}`);
+      sidebarFailing = true;
+    }
+
+    /**
+     * Refreshes the sidebar result. Concurrent callers share one refresh. A
+     * refresh whose inputs change while it runs runs again, so it resolves
+     * with a result as new as the call. A failure is logged once until a
+     * refresh succeeds.
+     */
+    function refreshSidebarGroups(): Promise<SidebarGroupsResult> {
+      sidebarRefresh ??= (async () => {
+        try {
+          for (let pass = 1; ; pass++) {
+            const generation = sidebarGeneration;
+            const { value, errors } = await computeSidebarGroups();
+            sidebarCache = { value, at: deps.now(), generation };
+            sidebarThrewAt = null;
+            if (errors.length > 0) sidebarFailure(errors.join("; "));
+            else if (sidebarFailing) {
+              bb.log.info("sidebar groups refreshed after GitHub errors");
+              sidebarFailing = false;
+            }
+            if (generation === sidebarGeneration || pass === SIDEBAR_MAX_REFRESH_PASSES) return value;
+          }
+        } catch (error) {
+          sidebarFailure(errorMessage(error));
+          sidebarThrewAt = deps.now();
+          throw error;
+        } finally {
+          sidebarRefresh = null;
+        }
+      })();
+      return sidebarRefresh;
+    }
+
+    /**
+     * The sidebar result, from memory while it is fresh. A stale or missing
+     * result is refreshed in the background; the call waits for that refresh
+     * only briefly, then returns the last result, or no groups, and publishes
+     * `REFS_CHANNEL` once the refresh lands. After a failed refresh, calls
+     * return the last result without retrying until `SIDEBAR_TTL_MS` passes.
+     */
+    async function sidebarGroups(): Promise<SidebarGroupsResult> {
+      const cached = sidebarCache;
+      const now = deps.now();
+      if (cached !== undefined && cached.generation === sidebarGeneration && now - cached.at < SIDEBAR_TTL_MS) {
+        return cached.value;
+      }
+      const fallback = cached?.value ?? NO_SIDEBAR_GROUPS;
+      if (sidebarRefresh === null && sidebarThrewAt !== null && now - sidebarThrewAt < SIDEBAR_TTL_MS) {
+        return fallback;
+      }
+      const refresh = refreshSidebarGroups();
+      const outcome = await settleWithin(refresh, cached === undefined ? SIDEBAR_FIRST_WAIT_MS : SIDEBAR_STALE_WAIT_MS);
+      if (outcome.kind === "pending") {
+        refresh.then(
+          () => bb.realtime.publish(REFS_CHANNEL, {}),
+          () => undefined,
+        );
+      }
+      return outcome.kind === "resolved" ? outcome.value : fallback;
     }
 
     async function issueTitle(key: string): Promise<string | null> {
@@ -529,7 +684,7 @@ export function createPlugin(deps: PluginDeps) {
       if (parsed === null) return null;
       try {
         return parseIssueTitle(
-          await gh(["issue", "view", String(parsed.number), "-R", parsed.repo, "--json", "title"], 15_000),
+          await gh(["issue", "view", String(parsed.number), "-R", parsed.repo, "--json", "title"]),
         );
       } catch {
         return null;
@@ -604,11 +759,11 @@ export function createPlugin(deps: PluginDeps) {
 
     async function checkoutPull(path: string, repo: string, pull: PullView): Promise<void> {
       try {
-        await gh(["pr", "checkout", String(pull.number), "-R", repo], 120_000, path);
+        await gh(["pr", "checkout", String(pull.number), "-R", repo], CHECKOUT_TIMEOUT_MS, path);
       } catch (error) {
         const branch = `review/pr-${pull.number}`;
         bb.log.info(`gh pr checkout ${pull.number} failed (${errorMessage(error)}); retrying as ${branch}`);
-        await gh(["pr", "checkout", String(pull.number), "-R", repo, "--branch", branch, "--force"], 120_000, path);
+        await gh(["pr", "checkout", String(pull.number), "-R", repo, "--branch", branch, "--force"], CHECKOUT_TIMEOUT_MS, path);
       }
       const branch = (
         await deps.run("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: path, timeoutMs: 15_000 })
@@ -680,7 +835,7 @@ export function createPlugin(deps: PluginDeps) {
         pluginMetadata: { repo, number },
       });
       store.record(thread.id, resolved.refs);
-      bb.realtime.publish(REFS_CHANNEL, { threadId: thread.id });
+      publishRefs({ threadId: thread.id });
       await prepareWorktree(thread.id, repo, resolved.pull).catch((error: unknown) =>
         bb.log.warn(`could not check out ${pullKey(repo, number)} for ${thread.id}: ${errorMessage(error)}`),
       );
@@ -695,14 +850,14 @@ export function createPlugin(deps: PluginDeps) {
         input: [{ type: "text", text: reviewCommand(number), mentions: [] }],
       });
       store.recordReview(threadId, deps.now(), 0);
-      bb.realtime.publish(REFS_CHANNEL, { threadId });
+      publishRefs({ threadId });
       return { delivery: result.delivery };
     }
 
     const environmentLookups = new Map<string, Cached<null>>();
     async function refsFromEnvironment(threadId: string, environmentId: string): Promise<ThreadRef[]> {
-      if (fresh(environmentLookups.get(threadId), QUEUE_TTL_MS * 20)) return [];
-      environmentLookups.set(threadId, { value: null, at: Date.now() });
+      if (fresh(environmentLookups.get(threadId), QUEUE_TTL_MS * 20, deps.now())) return [];
+      environmentLookups.set(threadId, { value: null, at: deps.now() });
       const { repos } = await config();
       const result = await bb.sdk.environments.pullRequest({ environmentId }).catch(() => null);
       if (result === null || result.outcome !== "available") return [];
@@ -745,12 +900,12 @@ export function createPlugin(deps: PluginDeps) {
     async function pullState(repo: string, number: number): Promise<RelatedPullState> {
       const key = pullKey(repo, number);
       const cached = pullStates.get(key);
-      if (cached !== undefined && (cached.value === "merged" || cached.value === "closed" || fresh(cached, QUEUE_TTL_MS))) {
+      if (cached !== undefined && (cached.value === "merged" || cached.value === "closed" || fresh(cached, QUEUE_TTL_MS, deps.now()))) {
         return cached.value;
       }
       try {
-        const state = parsePullState(await gh(["pr", "view", String(number), "-R", repo, "--json", PULL_STATE_FIELDS], 15_000));
-        pullStates.set(key, { value: state, at: Date.now() });
+        const state = parsePullState(await gh(["pr", "view", String(number), "-R", repo, "--json", PULL_STATE_FIELDS]));
+        pullStates.set(key, { value: state, at: deps.now() });
         return state;
       } catch (error) {
         bb.log.warn(`could not read the state of ${key}: ${errorMessage(error)}`);

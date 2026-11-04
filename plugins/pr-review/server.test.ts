@@ -9,6 +9,7 @@ interface Call {
   command: string;
   args: readonly string[];
   cwd: string | undefined;
+  timeoutMs: number;
 }
 
 type CheckCounts = Array<{ state: string; count: number }>;
@@ -110,10 +111,15 @@ const PULL_VIEW = JSON.stringify({
 function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
   const calls: Call[] = [];
   const twg: { jira: typeof JIRA; fail: boolean; gate: Promise<void> | null } = { jira: JIRA, fail: false, gate: null };
+  const github: { down: boolean; gate: Promise<void> | null } = { down: false, gate: null };
   const run = async (command: string, args: readonly string[], options: RunOptions): Promise<string> => {
-    calls.push({ command, args, cwd: options.cwd });
+    calls.push({ command, args, cwd: options.cwd, timeoutMs: options.timeoutMs });
     const line = [command, ...args].join(" ");
     if (args[0] === "--version") return "1.0\n";
+    if (command === "gh") {
+      await github.gate;
+      if (github.down) throw new Error(`${line.split(" ").slice(0, 4).join(" ")}: error connecting to api.github.com`);
+    }
     if (line.startsWith("gh api user --jq")) return "benwaffle\n";
     if (line.startsWith("gh api user/teams")) return "acme/platform\n";
     if (line.startsWith("gh api graphql")) return openPulls(nodes);
@@ -132,7 +138,7 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
     if (line === "git rev-parse --abbrev-ref HEAD") return "bob/catalog-cache\n";
     throw new Error(`unexpected command: ${line}`);
   };
-  return { calls, twg, run };
+  return { calls, twg, github, run };
 }
 
 const SETTINGS = { repos: REPO, jiraProjectKeys: "ACME", jiraSite: "https://example.atlassian.net/" };
@@ -642,5 +648,92 @@ describe("ticket summaries", () => {
       expect.objectContaining({ key: "ACME-51", summary: "Cache the widget catalog", status: "In Progress" }),
     ]);
     expect(twgCalls(runner)).toHaveLength(1);
+  });
+});
+
+describe("sidebarGroups when GitHub is slow or unreachable", () => {
+  type Groups = { pulls: Array<{ entry: { number: number } }> };
+  const ghCalls = (runner: { calls: Call[] }, prefix: string) =>
+    runner.calls.filter((call) => call.command === "gh" && call.args.join(" ").startsWith(prefix));
+  const sidebarWarnings = (logEntries: ReadonlyArray<{ level: string; message: string }>) =>
+    logEntries.filter((entry) => entry.level === "warn" && entry.message.startsWith("sidebar groups"));
+
+  it("gives every gh call a hard timeout of at most 30 seconds, and 10 seconds by default", async () => {
+    const { harness, runner } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    await harness.callRpc("sidebarGroups", {});
+    const gh = runner.calls.filter((call) => call.command === "gh" && call.args[0] !== "--version");
+    const reads = gh.filter((call) => call.args[1] !== "checkout");
+    expect(reads.length).toBeGreaterThan(0);
+    for (const call of reads) expect(call.timeoutMs).toBeLessThanOrEqual(30_000);
+    expect(ghCalls(runner, "api user --jq").map((call) => call.timeoutMs)).toEqual([10_000]);
+    expect(ghCalls(runner, "pr view 596").map((call) => call.timeoutMs)).toEqual([10_000]);
+  });
+
+  it("shares one refresh between concurrent calls, so they make one set of gh calls", async () => {
+    const { harness, runner } = await load();
+    let release = () => {};
+    runner.github.gate = new Promise((resolve) => (release = resolve));
+    const calls = Array.from({ length: 5 }, () => harness.callRpc("sidebarGroups", {}) as Promise<Groups>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    const results = await Promise.all(calls);
+    for (const result of results) expect(result).toEqual(results[0]);
+    expect(results[0]!.pulls.map(({ entry }) => entry.number)).toEqual([590, 596, 599]);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(ghCalls(runner, "api graphql")).toHaveLength(1);
+
+    await harness.callRpc("sidebarGroups", {});
+    expect(ghCalls(runner, "api graphql")).toHaveLength(1);
+  });
+
+  it("serves the last result while GitHub is unreachable, logs once per failure streak, and keeps the login", async () => {
+    const { harness, runner, clock } = await load();
+    const first = (await harness.callRpc("sidebarGroups", {})) as Groups;
+    expect(first.pulls).toHaveLength(3);
+
+    runner.github.down = true;
+    for (let minute = 1; minute <= 3; minute++) {
+      clock.now += 61_000;
+      expect(await harness.callRpc("sidebarGroups", {})).toEqual(first);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(ghCalls(runner, "api graphql").length).toBeGreaterThan(1);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(sidebarWarnings(harness.logEntries)).toEqual([
+      { level: "warn", message: expect.stringContaining("error connecting to api.github.com") },
+    ]);
+
+    runner.github.down = false;
+    clock.now += 61_000;
+    await harness.callRpc("sidebarGroups", {});
+    expect(harness.logEntries).toContainEqual({ level: "info", message: "sidebar groups refreshed after GitHub errors" });
+    runner.github.down = true;
+    clock.now += 61_000;
+    await harness.callRpc("sidebarGroups", {});
+    expect(sidebarWarnings(harness.logEntries)).toHaveLength(2);
+  });
+
+  it("returns no groups when GitHub is unreachable before any result, and waits a minute to retry", async () => {
+    const { harness, runner, clock } = await load();
+    runner.github.down = true;
+    const empty = { tickets: [], threadTickets: [], pulls: [], threadPulls: [], threadReviews: [] };
+    expect(await harness.callRpc("sidebarGroups", {})).toEqual(empty);
+    expect(await harness.callRpc("sidebarGroups", {})).toEqual(empty);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(sidebarWarnings(harness.logEntries)).toHaveLength(1);
+
+    runner.github.down = false;
+    clock.now += 61_000;
+    expect(((await harness.callRpc("sidebarGroups", {})) as Groups).pulls).toHaveLength(3);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(2);
+  });
+
+  it("refreshes a cached result when a review starts, so the new thread shows on the next call", async () => {
+    const { harness } = await load();
+    await harness.callRpc("sidebarGroups", {});
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const groups = (await harness.callRpc("sidebarGroups", {})) as { threadTickets: unknown[] };
+    expect(groups.threadTickets).toEqual([{ threadId: "thr_1", ticketKey: "ACME-51" }]);
   });
 });
