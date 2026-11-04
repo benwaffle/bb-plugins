@@ -98,6 +98,8 @@ export const MIGRATIONS = [
        OR NOT EXISTS (
          SELECT 1 FROM usage t WHERE t.source = 'transcript' AND t.session_id = u.session_id
        )`,
+  `ALTER TABLE transcript_files ADD COLUMN line_start INTEGER`,
+  `ALTER TABLE transcript_files ADD COLUMN line_hash TEXT`,
 ];
 
 export interface ThreadFacts {
@@ -136,9 +138,18 @@ export interface WindowSample {
 }
 
 export interface FileCursor {
+  /** The file size this cursor accounts for: the stat size once read to the end, else `offset`. */
   size: number;
   mtimeMs: number;
+  /** Byte offset just past the last complete line read. */
   offset: number;
+  /**
+   * The last complete line read, as bytes [`lineStart`, `offset`) and their
+   * hash. A resume first checks the hash, so a file rewritten in place is
+   * read again from the start. Null when no line has been read.
+   */
+  lineStart: number | null;
+  lineHash: string | null;
 }
 
 interface UsageRow {
@@ -242,13 +253,15 @@ export function openLedger(db: Database.Database) {
        cost_usd = CASE WHEN cost_usd IS NULL OR excluded.cost_usd IS NULL THEN NULL
                        ELSE cost_usd + excluded.cost_usd END`,
   );
-  const selectCursor = db.prepare<[string, string], { size: number; mtime_ms: number; offset: number }>(
-    `SELECT size, mtime_ms, offset FROM transcript_files WHERE machine = ? AND path = ?`,
-  );
+  const selectCursor = db.prepare<
+    [string, string],
+    { size: number; mtime_ms: number; offset: number; line_start: number | null; line_hash: string | null }
+  >(`SELECT size, mtime_ms, offset, line_start, line_hash FROM transcript_files WHERE machine = ? AND path = ?`);
   const upsertCursor = db.prepare(
-    `INSERT INTO transcript_files (machine, path, size, mtime_ms, offset) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO transcript_files (machine, path, size, mtime_ms, offset, line_start, line_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (machine, path) DO UPDATE SET size = excluded.size, mtime_ms = excluded.mtime_ms,
-       offset = excluded.offset`,
+       offset = excluded.offset, line_start = excluded.line_start, line_hash = excluded.line_hash`,
   );
   const insertSample = db.prepare(
     `INSERT OR REPLACE INTO window_samples (provider, label, ts, used_percent, resets_at, plan)
@@ -359,11 +372,18 @@ export function openLedger(db: Database.Database) {
 
     cursor(machine: string, path: string): FileCursor | null {
       const row = selectCursor.get(machine, path);
-      return row === undefined ? null : { size: row.size, mtimeMs: row.mtime_ms, offset: row.offset };
+      if (row === undefined) return null;
+      return {
+        size: row.size,
+        mtimeMs: row.mtime_ms,
+        offset: row.offset,
+        lineStart: row.line_start,
+        lineHash: row.line_hash,
+      };
     },
 
     saveCursor(machine: string, path: string, cursor: FileCursor): void {
-      upsertCursor.run(machine, path, cursor.size, cursor.mtimeMs, cursor.offset);
+      upsertCursor.run(machine, path, cursor.size, cursor.mtimeMs, cursor.offset, cursor.lineStart, cursor.lineHash);
     },
 
     addWindowSample(sample: WindowSample): void {

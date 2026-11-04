@@ -40,7 +40,11 @@ the same Anthropic list prices bb uses. Other providers use the cost bb
 reports, which is empty for models bb has no price for.
 
 The transcript import runs at startup and every 5 minutes, and reads only the
-bytes appended since the last run. Subscription windows are sampled every 10
+bytes appended since the last run. Each file keeps a cursor: its size, mtime,
+byte offset, and a hash of the last line read. A file that shrank or whose
+last read line changed is read again from the start. The import works in
+slices of at most 200 files or 2 seconds, so a large catch-up never holds the
+ledger for long, and an unreadable file is retried once it changes. Subscription windows are sampled every 10
 minutes so their line has history. On startup the plugin records every bb
 thread that changed while it was not running. On bb builds without the
 thread cost call, the ledger prices the thread's latest token event itself.

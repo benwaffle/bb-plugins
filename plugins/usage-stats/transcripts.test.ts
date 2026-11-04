@@ -83,4 +83,16 @@ describe("splitLines", () => {
       { text: "cé", endOffset: 17 },
     ]);
   });
+
+  it("joins a line spread over many chunks", async () => {
+    const long = "x".repeat(1_000);
+    const chunks = [Buffer.from("a\n"), ...Array.from({ length: 100 }, () => Buffer.from(long.slice(0, 10))), Buffer.from("\nb\n")];
+    const lines = [];
+    for await (const entry of splitLines(chunks, 0)) lines.push(entry);
+    expect(lines).toEqual([
+      { text: "a", endOffset: 2 },
+      { text: long, endOffset: 1_003 },
+      { text: "b", endOffset: 1_005 },
+    ]);
+  });
 });

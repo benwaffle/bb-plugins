@@ -10,7 +10,15 @@ import {
 } from "./aggregate.js";
 import { USAGE_CHANNEL } from "./channel.js";
 import { rpcContract } from "./contract.js";
-import { importTranscripts, projectResolver, type ImportCounts, type ProjectPath } from "./importer.js";
+import {
+  DEFAULT_IMPORT_BUDGET,
+  emptyImportCounts,
+  importTranscripts,
+  projectResolver,
+  type ImportBudget,
+  type ImportCounts,
+  type ProjectPath,
+} from "./importer.js";
 import { MIGRATIONS, openLedger } from "./ledger.js";
 import { formatSummary } from "./summary.js";
 import { createThreadRecorder } from "./threads.js";
@@ -21,6 +29,22 @@ export { rpcContract };
 export interface UsageStatsOptions {
   reader?: TranscriptReader;
   now?: () => number;
+  importBudget?: ImportBudget;
+}
+
+/** Pause between import slices, so turns recorded on `thread.idle` and other handlers run in between. */
+const SLICE_PAUSE_MS = 250;
+
+function addCounts(total: ImportCounts, slice: ImportCounts): void {
+  total.files = slice.files;
+  total.filesRead += slice.filesRead;
+  total.filesFailed += slice.filesFailed;
+  total.filesRestarted += slice.filesRestarted;
+  total.filesPending = slice.filesPending;
+  total.messages += slice.messages;
+  total.repeatedLines += slice.repeatedLines;
+  total.prompts += slice.prompts;
+  total.sessions = slice.sessions;
 }
 
 export interface BackfillCounts {
@@ -32,6 +56,7 @@ export interface BackfillCounts {
 export function createUsageStats(options: UsageStatsOptions = {}) {
   const reader = options.reader ?? localTranscriptReader();
   const now = options.now ?? Date.now;
+  const importBudget = options.importBudget ?? DEFAULT_IMPORT_BUDGET;
 
   return async function plugin(bb: BbPluginApi) {
     const db = bb.storage.database();
@@ -56,21 +81,49 @@ export function createUsageStats(options: UsageStatsOptions = {}) {
       return { names, paths };
     }
 
-    async function importNow(projectPaths?: readonly ProjectPath[]): Promise<ImportCounts> {
-      const paths = projectPaths ?? (await listProjects()).paths;
-      const counts = await importTranscripts(ledger, reader, projectResolver(paths));
-      ledger.setMeta("importedAt", String(now()));
-      if (counts.messages > 0 || counts.prompts > 0) bb.realtime.publish(USAGE_CHANNEL, { reason: "import" });
-      return counts;
+    let disposed = false;
+    bb.onDispose(() => {
+      disposed = true;
+    });
+
+    let draining: Promise<ImportCounts> | null = null;
+    /**
+     * Imports every unread transcript byte, one budgeted slice at a time. Each
+     * slice takes the ledger queue on its own, so no handler waits on more
+     * than one slice. Concurrent callers share the drain in progress.
+     */
+    function drainImport(projectPaths?: readonly ProjectPath[]): Promise<ImportCounts> {
+      draining ??= (async () => {
+        const total = emptyImportCounts();
+        const sessions = new Set<string>();
+        try {
+          const projectOf = projectResolver(projectPaths ?? (await listProjects()).paths);
+          for (;;) {
+            const slice = await serial(() => importTranscripts(ledger, reader, projectOf, { budget: importBudget, sessions }));
+            addCounts(total, slice);
+            if (slice.messages > 0 || slice.prompts > 0) bb.realtime.publish(USAGE_CHANNEL, { reason: "import" });
+            if (slice.filesPending === 0) {
+              ledger.setMeta("importedAt", String(now()));
+              break;
+            }
+            if (disposed) break;
+            await new Promise((resolve) => setTimeout(resolve, SLICE_PAUSE_MS));
+          }
+          return total;
+        } finally {
+          draining = null;
+        }
+      })();
+      return draining;
     }
 
     function backfill(): Promise<BackfillCounts> {
-      return serial(async () => {
+      return (async () => {
         const projects = await listProjects();
-        const threads = await reconcileThreads(projects.names);
-        const transcripts = await importNow(projects.paths);
+        const threads = await serial(() => reconcileThreads(projects.names));
+        const transcripts = await drainImport(projects.paths);
         return { ...threads, transcripts };
-      });
+      })();
     }
 
     async function sampleWindows(): Promise<void> {
@@ -113,8 +166,8 @@ export function createUsageStats(options: UsageStatsOptions = {}) {
         });
       },
     });
-    bb.background.schedule("import", "*/5 * * * *", async () => {
-      await serial(() => importNow());
+    bb.background.schedule("import", "*/5 * * * *", () => {
+      drainImport().catch((error: unknown) => bb.log.warn(`import failed: ${String(error)}`));
     });
     bb.background.schedule("windows", "*/10 * * * *", sampleWindows);
 
@@ -183,7 +236,7 @@ export function createUsageStats(options: UsageStatsOptions = {}) {
                 exitCode: 0,
                 stdout: [
                   `bb threads recorded: ${counts.threadsRecorded} (${counts.ledgerRows} ledger rows)`,
-                  `transcript files: ${t.files} listed, ${t.filesRead} read`,
+                  `transcript files: ${t.files} listed, ${t.filesRead} read, ${t.filesFailed} unreadable`,
                   `messages: ${t.messages} new, ${t.repeatedLines} repeated content-block lines skipped`,
                   `prompts: ${t.prompts} new across ${t.sessions} sessions with new messages`,
                   "",
