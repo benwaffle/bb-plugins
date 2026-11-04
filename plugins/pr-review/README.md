@@ -197,8 +197,10 @@ PRs and threads on the thread's ticket:
 
 PRs come first, by number, then threads without a PR. A PR shows as `#600`, or
 as `widgets#600` when the tab lists PRs from more than one repository. Click an item to open
-its thread. The state of a PR that is no
-longer open is read with `gh pr view` and kept until the plugin restarts.
+its thread. The states of PRs that are not open in a configured repository are
+read together with one GraphQL call; a merged or closed state is kept until the
+plugin restarts, and a PR whose state cannot be read is tried again after five
+minutes.
 
 ## Settings
 
@@ -266,8 +268,15 @@ newest message checked for it.
 - Sibling PRs come from the open PRs in the same repository, so sibling PRs in
   other repositories are not found.
 - The queue caches GitHub results for 30 seconds. **Refresh** and `--refresh`
-  skip that cache.
-- Each `gh` call is killed after 10 seconds (30 for the open-PR query, two
+  skip that cache and read every open PR in full.
+- Each repository's open PRs are read in full every five minutes. In between,
+  a read fetches only each PR's head commit, update time, mergeability, and
+  check rollup state, and reads again in full only the PRs where one of those
+  changed. A change in the number of failing checks that leaves the rollup
+  state as it was shows at the next full read.
+- The review threads are read with one `threads.list` call, and a thread's
+  prompt history is read again only after the thread's `updatedAt` moves.
+- Each `gh` call is killed after 10 seconds (30 for GraphQL queries, two
   minutes for `gh pr checkout`). The GitHub login is read once per process.
 - The sidebar groups are kept in memory for a minute and refreshed in the
   background, one refresh at a time. While GitHub is unreachable the sidebar

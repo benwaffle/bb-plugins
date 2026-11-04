@@ -1,0 +1,287 @@
+{
+  "tickets": [
+    {
+      "key": "ACME-51",
+      "summary": "Cache the widget catalog",
+      "status": "In Progress",
+      "url": "https://example.atlassian.net/browse/ACME-51"
+    },
+    {
+      "key": "ACME-53",
+      "summary": "Pricing API",
+      "status": "Done",
+      "url": "https://example.atlassian.net/browse/ACME-53"
+    },
+    {
+      "key": "ACME-52",
+      "summary": "Price rounding",
+      "status": "To Do",
+      "url": "https://example.atlassian.net/browse/ACME-52"
+    },
+    {
+      "key": "ACME-99",
+      "summary": null,
+      "status": null,
+      "url": "https://example.atlassian.net/browse/ACME-99"
+    }
+  ],
+  "threadTickets": [
+    {
+      "threadId": "thr_unknown",
+      "ticketKey": "ACME-99"
+    },
+    {
+      "threadId": "thr_notes",
+      "ticketKey": "ACME-51"
+    },
+    {
+      "threadId": "thr_404",
+      "ticketKey": "ACME-52"
+    },
+    {
+      "threadId": "thr_78",
+      "ticketKey": "ACME-52"
+    },
+    {
+      "threadId": "thr_77",
+      "ticketKey": "ACME-52"
+    },
+    {
+      "threadId": "thr_541",
+      "ticketKey": "ACME-53"
+    },
+    {
+      "threadId": "thr_534",
+      "ticketKey": "ACME-51"
+    },
+    {
+      "threadId": "thr_640",
+      "ticketKey": "ACME-53"
+    },
+    {
+      "threadId": "thr_630",
+      "ticketKey": "ACME-53"
+    },
+    {
+      "threadId": "thr_596",
+      "ticketKey": "ACME-51"
+    }
+  ],
+  "pulls": [
+    {
+      "projectId": "proj_widgets",
+      "entry": {
+        "repo": "acme/widgets",
+        "number": 599,
+        "title": "Evict the old catalog entry",
+        "url": "https://github.com/acme/widgets/pull/599",
+        "isDraft": false,
+        "author": "bob",
+        "authorAvatarUrl": "https://avatars.githubusercontent.com/bob",
+        "headRefName": "branch-599",
+        "baseRefName": "branch-596",
+        "parentNumber": 596,
+        "depth": 1,
+        "childNumbers": [],
+        "ticketKey": "ACME-51",
+        "additions": 49,
+        "deletions": 4,
+        "changedFiles": 4,
+        "conflicting": false,
+        "failingChecks": 2,
+        "pendingReviewers": 1,
+        "me": "requested",
+        "bucket": "requested",
+        "otherReviews": [],
+        "agent": {
+          "state": "none",
+          "threadId": null
+        }
+      }
+    },
+    {
+      "projectId": "proj_widgets",
+      "entry": {
+        "repo": "acme/widgets",
+        "number": 640,
+        "title": "ACME-53: Rename the pricing table",
+        "url": "https://github.com/acme/widgets/pull/640",
+        "isDraft": false,
+        "author": "dave",
+        "authorAvatarUrl": "https://avatars.githubusercontent.com/dave",
+        "headRefName": "branch-640",
+        "baseRefName": "main",
+        "parentNumber": null,
+        "depth": 0,
+        "childNumbers": [],
+        "ticketKey": "ACME-53",
+        "additions": 40,
+        "deletions": 3,
+        "changedFiles": 0,
+        "conflicting": false,
+        "failingChecks": 0,
+        "pendingReviewers": 1,
+        "me": "requested",
+        "bucket": "requested",
+        "otherReviews": [
+          {
+            "login": "carol",
+            "avatarUrl": "https://avatars.githubusercontent.com/carol",
+            "state": "CHANGES_REQUESTED"
+          }
+        ],
+        "agent": {
+          "state": "none",
+          "threadId": null
+        }
+      }
+    }
+  ],
+  "threadPulls": [
+    {
+      "threadId": "thr_590",
+      "entry": {
+        "repo": "acme/widgets",
+        "number": 590,
+        "title": "Run the review workflow",
+        "url": "https://github.com/acme/widgets/pull/590",
+        "isDraft": false,
+        "author": "bob",
+        "authorAvatarUrl": "https://avatars.githubusercontent.com/bob",
+        "headRefName": "branch-590",
+        "baseRefName": "main",
+        "parentNumber": null,
+        "depth": 0,
+        "childNumbers": [],
+        "ticketKey": null,
+        "additions": 40,
+        "deletions": 2,
+        "changedFiles": 0,
+        "conflicting": false,
+        "failingChecks": 0,
+        "pendingReviewers": 1,
+        "me": "requested",
+        "bucket": "requested",
+        "otherReviews": [],
+        "agent": {
+          "state": "opened",
+          "threadId": "thr_590"
+        }
+      }
+    },
+    {
+      "threadId": "thr_596",
+      "entry": {
+        "repo": "acme/widgets",
+        "number": 596,
+        "title": "ACME-51: Cache the widget catalog per tenant",
+        "url": "https://github.com/acme/widgets/pull/596",
+        "isDraft": false,
+        "author": "bob",
+        "authorAvatarUrl": "https://avatars.githubusercontent.com/bob",
+        "headRefName": "branch-596",
+        "baseRefName": "main",
+        "parentNumber": null,
+        "depth": 0,
+        "childNumbers": [
+          599
+        ],
+        "ticketKey": "ACME-51",
+        "additions": 46,
+        "deletions": 1,
+        "changedFiles": 1,
+        "conflicting": false,
+        "failingChecks": 0,
+        "pendingReviewers": 1,
+        "me": "requested",
+        "bucket": "requested",
+        "otherReviews": [],
+        "agent": {
+          "state": "reviewed",
+          "threadId": "thr_596"
+        }
+      }
+    },
+    {
+      "threadId": "thr_630",
+      "entry": {
+        "repo": "acme/widgets",
+        "number": 630,
+        "title": "ACME-53: Draft the pricing API",
+        "url": "https://github.com/acme/widgets/pull/630",
+        "isDraft": true,
+        "author": "carol",
+        "authorAvatarUrl": "https://avatars.githubusercontent.com/carol",
+        "headRefName": "branch-630",
+        "baseRefName": "main",
+        "parentNumber": null,
+        "depth": 0,
+        "childNumbers": [],
+        "ticketKey": "ACME-53",
+        "additions": 30,
+        "deletions": 0,
+        "changedFiles": 0,
+        "conflicting": false,
+        "failingChecks": 0,
+        "pendingReviewers": 1,
+        "me": "requested",
+        "bucket": "requested",
+        "otherReviews": [],
+        "agent": {
+          "state": "follow-ups",
+          "threadId": "thr_630"
+        }
+      }
+    }
+  ],
+  "threadReviews": [
+    {
+      "threadId": "thr_404",
+      "number": 404,
+      "pullState": null,
+      "agent": "opened"
+    },
+    {
+      "threadId": "thr_78",
+      "number": 78,
+      "pullState": "open",
+      "agent": "opened"
+    },
+    {
+      "threadId": "thr_77",
+      "number": 77,
+      "pullState": "draft",
+      "agent": "opened"
+    },
+    {
+      "threadId": "thr_541",
+      "number": 541,
+      "pullState": "closed",
+      "agent": "none"
+    },
+    {
+      "threadId": "thr_534",
+      "number": 534,
+      "pullState": "merged",
+      "agent": "reviewed"
+    },
+    {
+      "threadId": "thr_640",
+      "number": 640,
+      "pullState": "open",
+      "agent": "reviewing"
+    },
+    {
+      "threadId": "thr_630",
+      "number": 630,
+      "pullState": "draft",
+      "agent": "follow-ups"
+    },
+    {
+      "threadId": "thr_596",
+      "number": 596,
+      "pullState": "open",
+      "agent": "reviewed"
+    }
+  ]
+}

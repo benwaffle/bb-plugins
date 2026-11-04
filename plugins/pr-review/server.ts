@@ -39,16 +39,25 @@ import { queuedPullState, relatedItems, withoutTickets, type RelatedItem, type R
 import { SIDEBAR_STYLES } from "./sidebar.js";
 import { createRefStore, createTicketStore, type TicketFields } from "./store.js";
 import {
+  CommandError,
   OPEN_PULLS_QUERY,
-  PULL_STATE_FIELDS,
+  OPEN_PULL_HEADS_QUERY,
   PULL_VIEW_FIELDS,
   createToolResolver,
+  hasLookupData,
   parseIssueTitle,
+  parseOpenPullHeads,
   parseOpenPulls,
-  parsePullState,
+  parsePullDetails,
+  parsePullStates,
   parsePullView,
   parseTwgWorkItems,
+  pullDetailsQuery,
+  pullStatesQuery,
   runCommand,
+  type FingerprintedPull,
+  type Page,
+  type PullRef,
   type PullView,
   type Runner,
 } from "./tools.js";
@@ -66,8 +75,21 @@ const TWG_TIMEOUT_MS = 20_000;
 const TEAMS_TTL_MS = 60 * 60_000;
 /** Hard limit on one gh call; the call's process group is killed when it passes. */
 const GH_TIMEOUT_MS = 10_000;
-/** The open-PR GraphQL query fetches up to 100 PRs with their reviews and checks. */
-const OPEN_PULLS_TIMEOUT_MS = 30_000;
+/** A GraphQL page reads up to 100 PRs with their reviews and checks. */
+const GRAPHQL_TIMEOUT_MS = 30_000;
+/** PRs read per aliased GraphQL lookup. */
+const LOOKUP_PAGE_SIZE = 50;
+/**
+ * How often a repository's open PRs are read in full. In between, a read
+ * fetches only what tells whether each PR changed, and the full fields of
+ * the PRs that did. Check counts that change within one rollup state show
+ * at the next full read.
+ */
+const FULL_READ_MS = 5 * 60_000;
+/** How long a PR whose state could not be read waits before it is read again. */
+const PULL_STATE_RETRY_MS = 5 * 60_000;
+/** Thread ids per `threads.list` call; the API's limit. */
+const THREAD_LIST_PAGE_SIZE = 200;
 const CHECKOUT_TIMEOUT_MS = 120_000;
 /** How long a `sidebarGroups` result is served before it is refreshed. */
 const SIDEBAR_TTL_MS = 60_000;
@@ -106,6 +128,20 @@ function distinct(values: Iterable<string | null>): string[] {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function chunks<T>(items: readonly T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
+  return result;
+}
+
+type ThreadRow = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["list"]>>[number];
+
+/** A thread's row, null for a deleted or unknown thread, and its agent state. */
+interface ThreadInfo {
+  thread: ThreadRow | null;
+  agent: QueueEntry["agent"];
 }
 
 /**
@@ -313,18 +349,84 @@ export function createPlugin(deps: PluginDeps) {
       return { login, teams };
     }
 
-    const pullsCache = new Map<string, Cached<PullSnapshot[]>>();
+    /** Every page of a repository's open PRs from `query`. */
+    async function openPullPages<T>(repo: string, query: string, parse: (raw: string) => Page<T>): Promise<T[]> {
+      const [owner, name] = repo.split("/");
+      const items: T[] = [];
+      let cursor: string | null = null;
+      do {
+        const args = ["api", "graphql", "-f", `owner=${owner}`, "-f", `name=${name}`, "-f", `query=${query}`];
+        const page = parse(await gh(cursor === null ? args : [...args, "-f", `cursor=${cursor}`], GRAPHQL_TIMEOUT_MS));
+        items.push(...page.items);
+        cursor = page.next;
+      } while (cursor !== null);
+      return items;
+    }
+
+    /**
+     * The output of an aliased GraphQL lookup. GitHub answers a lookup naming
+     * a PR or repository it cannot resolve with the rest of the data and an
+     * error, and gh then prints that answer and exits non-zero; that answer is
+     * returned as well. Any other failure, an answer without data included,
+     * rejects with gh's error.
+     */
+    async function graphqlLookup(query: string): Promise<string> {
+      try {
+        return await gh(["api", "graphql", "-f", `query=${query}`], GRAPHQL_TIMEOUT_MS);
+      } catch (error) {
+        if (error instanceof CommandError && hasLookupData(error.stdout)) return error.stdout;
+        throw error;
+      }
+    }
+
+    interface RepoPulls {
+      pulls: FingerprintedPull[];
+      at: number;
+      fullAt: number;
+    }
+
+    const pullsCache = new Map<string, RepoPulls>();
+
+    /**
+     * A repository's open PRs, most recently updated first, from memory for
+     * `QUEUE_TTL_MS`. `refresh`, a first read, and a read `FULL_READ_MS` after
+     * the last full one read every PR in full; any other read fetches each
+     * PR's fingerprint and re-reads only the PRs that are new or changed.
+     */
     async function openPulls(repo: string, refresh: boolean): Promise<PullSnapshot[]> {
       const cached = pullsCache.get(repo);
-      if (!refresh && fresh(cached, QUEUE_TTL_MS, deps.now())) return cached.value;
-      const [owner, name] = repo.split("/");
-      const raw = await gh(
-        ["api", "graphql", "-f", `owner=${owner}`, "-f", `name=${name}`, "-f", `query=${OPEN_PULLS_QUERY}`],
-        OPEN_PULLS_TIMEOUT_MS,
+      const now = deps.now();
+      if (!refresh && cached !== undefined && now - cached.at < QUEUE_TTL_MS) return cached.pulls.map(({ pull }) => pull);
+      let read: RepoPulls;
+      if (refresh || cached === undefined || now - cached.fullAt >= FULL_READ_MS) {
+        const pulls = await openPullPages(repo, OPEN_PULLS_QUERY, (raw) => parseOpenPulls(repo, raw));
+        read = { pulls, at: deps.now(), fullAt: deps.now() };
+      } else {
+        read = { pulls: await changedPulls(repo, cached.pulls), at: deps.now(), fullAt: cached.fullAt };
+      }
+      pullsCache.set(repo, read);
+      return read.pulls.map(({ pull }) => pull);
+    }
+
+    /**
+     * The repository's open PRs in `OPEN_PULL_HEADS_QUERY` order: each PR of
+     * `previous` whose fingerprint is unchanged as it was, and each new or
+     * changed PR read again in full.
+     */
+    async function changedPulls(repo: string, previous: readonly FingerprintedPull[]): Promise<FingerprintedPull[]> {
+      const heads = await openPullPages(repo, OPEN_PULL_HEADS_QUERY, parseOpenPullHeads);
+      const known = new Map(previous.map((entry) => [entry.pull.number, entry]));
+      const unchanged = (head: { number: number; fingerprint: string }) =>
+        known.get(head.number)?.fingerprint === head.fingerprint;
+      const changed: PullRef[] = heads.filter((head) => !unchanged(head)).map((head) => ({ repo, number: head.number }));
+      const pages = await Promise.all(
+        chunks(changed, LOOKUP_PAGE_SIZE).map(async (page) => parsePullDetails(await graphqlLookup(pullDetailsQuery(page)), page)),
       );
-      const pulls = parseOpenPulls(repo, raw);
-      pullsCache.set(repo, { value: pulls, at: deps.now() });
-      return pulls;
+      const details = new Map(pages.flatMap((page) => [...page]));
+      return heads.flatMap((head) => {
+        const entry = unchanged(head) ? known.get(head.number) : details.get(pullKey(repo, head.number));
+        return entry === undefined || entry === null ? [] : [entry];
+      });
     }
 
     let githubPanelCache: Cached<boolean> | undefined;
@@ -381,27 +483,63 @@ export function createPlugin(deps: PluginDeps) {
       return found === undefined ? reviewedAt : Math.max(found.createdAt, reviewedAt ?? 0);
     }
 
-    async function threadAgentState(threadId: string | undefined): Promise<QueueEntry["agent"]> {
-      if (threadId === undefined) return { state: "none", threadId: null };
-      const thread = await liveThread(threadId);
-      if (thread === null) return { state: "none", threadId: null };
-      let messages: UserMessage[] = [];
-      try {
-        messages = await userMessages(threadId);
-      } catch (error) {
-        bb.log.warn(`could not read prompt history for ${threadId}: ${errorMessage(error)}`);
-      }
-      const isRunning = thread.status === "active" || thread.status === "starting";
-      const reviewedAt = lastReviewAt(threadId, messages);
-      return { state: agentState({ userMessages: messages, reviewedAt, isRunning }), threadId };
+    /** The live (not deleted) threads among `threadIds`, by id, read with one `threads.list` call per 200 ids. */
+    async function liveThreads(threadIds: readonly string[]): Promise<Map<string, ThreadRow>> {
+      const pages = await Promise.all(
+        chunks([...new Set(threadIds)], THREAD_LIST_PAGE_SIZE).map((page) =>
+          bb.sdk.threads.list({ threadIds: page, includeHidden: true, limit: page.length }),
+        ),
+      );
+      return new Map(pages.flat().map((thread) => [thread.id, thread]));
     }
 
     /**
-     * The review queue. A repository whose open PRs cannot be read is listed
-     * in `errors`, and contributes its last PRs read when `staleOnError` is
-     * set, or none.
+     * Prompt history by thread, with the thread's `updatedAt` when it was
+     * read. bb moves `updatedAt` forward whenever a message is added, so the
+     * history is read again only after it moves.
      */
-    async function reviewQueue(refresh: boolean, staleOnError = false) {
+    const historyCache = new Map<string, { updatedAt: number; messages: UserMessage[] }>();
+
+    async function cachedUserMessages(thread: ThreadRow): Promise<UserMessage[]> {
+      const cached = historyCache.get(thread.id);
+      if (cached !== undefined && cached.updatedAt === thread.updatedAt) return cached.messages;
+      try {
+        const messages = await userMessages(thread.id);
+        historyCache.set(thread.id, { updatedAt: thread.updatedAt, messages });
+        return messages;
+      } catch (error) {
+        bb.log.warn(`could not read prompt history for ${thread.id}: ${errorMessage(error)}`);
+        return [];
+      }
+    }
+
+    /** Each of `threadIds` with its row and agent state, from one thread lookup. */
+    async function threadInfos(threadIds: readonly string[]): Promise<Map<string, ThreadInfo>> {
+      const threads = await liveThreads(threadIds);
+      const infos = await Promise.all(
+        [...new Set(threadIds)].map(async (threadId): Promise<[string, ThreadInfo]> => {
+          const thread = threads.get(threadId) ?? null;
+          if (thread === null) return [threadId, { thread, agent: { state: "none", threadId: null } }];
+          const messages = await cachedUserMessages(thread);
+          const isRunning = thread.status === "active" || thread.status === "starting";
+          const reviewedAt = lastReviewAt(threadId, messages);
+          return [threadId, { thread, agent: { state: agentState({ userMessages: messages, reviewedAt, isRunning }), threadId } }];
+        }),
+      );
+      return new Map(infos);
+    }
+
+    function reviewQueue(refresh: boolean) {
+      return queueWithThreads(refresh).then(({ queue }) => queue);
+    }
+
+    /**
+     * The review queue, and the row and agent state of each queued PR's
+     * review thread and each of `threadIds`, from one thread lookup. A
+     * repository whose open PRs cannot be read is listed in `errors`, and
+     * contributes its last PRs read when `staleOnError` is set, or none.
+     */
+    async function queueWithThreads(refresh: boolean, staleOnError = false, threadIds: readonly string[] = []) {
       const { repos, projectKeys, setup } = await config();
       const me = await viewer();
       const errors: Array<{ repo: string; message: string }> = [];
@@ -412,19 +550,24 @@ export function createPlugin(deps: PluginDeps) {
               return await openPulls(repo, refresh);
             } catch (error) {
               errors.push({ repo, message: errorMessage(error) });
-              return staleOnError ? (pullsCache.get(repo)?.value ?? []) : [];
+              return staleOnError ? (pullsCache.get(repo)?.pulls.map(({ pull }) => pull) ?? []) : [];
             }
           }),
         )
       ).flat();
-      const threads = store.threadsForPulls(pulls.map((pull) => pullKey(pull.repo, pull.number)));
+      const reviewThreads = store.threadsForPulls(pulls.map((pull) => pullKey(pull.repo, pull.number)));
+      const threads = await threadInfos([...reviewThreads.values(), ...threadIds]);
+      const agentFor = (pull: PullSnapshot): QueueEntry["agent"] => {
+        const threadId = reviewThreads.get(pullKey(pull.repo, pull.number));
+        return (threadId === undefined ? undefined : threads.get(threadId)?.agent) ?? { state: "none", threadId: null };
+      };
       const links = stackLinks(pulls);
       const sorted = sortQueue(
         pulls.map((pull) => ({ pull, classified: classifyPull(pull, me) })),
         links,
       );
-      const entries = await Promise.all(
-        sorted.map(async ({ pull, classified }): Promise<QueueEntry> => ({
+      const entries = sorted.map(
+        ({ pull, classified }): QueueEntry => ({
           repo: pull.repo,
           number: pull.number,
           title: pull.title,
@@ -445,10 +588,10 @@ export function createPlugin(deps: PluginDeps) {
           me: classified.me,
           bucket: classified.bucket,
           otherReviews: classified.otherReviews,
-          agent: await threadAgentState(threads.get(pullKey(pull.repo, pull.number))),
-        })),
+          agent: agentFor(pull),
+        }),
       );
-      return {
+      const queue = {
         viewer: me.login,
         fetchedAt: new Date().toISOString(),
         githubPanel: await githubPanel(),
@@ -457,6 +600,7 @@ export function createPlugin(deps: PluginDeps) {
         errors,
         setup,
       };
+      return { queue, threads };
     }
 
     const ticketLookups = new Map<string, Promise<void>>();
@@ -548,8 +692,8 @@ export function createPlugin(deps: PluginDeps) {
     }
 
     async function computeSidebarGroups(): Promise<{ value: SidebarGroupsResult; errors: string[] }> {
-      const queue = await reviewQueue(false, true);
       const threadTickets = store.ticketThreads();
+      const { queue, threads } = await queueWithThreads(false, true, [...threadTickets.keys()]);
       for (const entry of queue.entries) {
         if (entry.agent.threadId !== null && entry.ticketKey !== null) {
           threadTickets.set(entry.agent.threadId, entry.ticketKey);
@@ -578,15 +722,10 @@ export function createPlugin(deps: PluginDeps) {
         )
       ).filter((pull) => pull !== null);
       const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
-      const threadReviews = (
-        await Promise.all(
-          [...threadTickets.keys()].map(async (threadId) => {
-            const { pull, agent } = await threadReview(threadId, queued);
-            if (pull === null) return null;
-            return { threadId, number: pull.number, pullState: pull.state, agent: agent.state };
-          }),
-        )
-      ).filter((review) => review !== null);
+      const reviews = await threadReviews([...threadTickets.keys()], queued, threads);
+      const threadReviewRows = [...reviews].flatMap(([threadId, { pull, agent }]) =>
+        pull === null ? [] : [{ threadId, number: pull.number, pullState: pull.state, agent: agent.state }],
+      );
       const result: SidebarGroupsResult = {
         tickets: await tickets([...queue.tickets.map((ticket) => ticket.key), ...threadTickets.values()]),
         threadTickets: [...threadTickets].map(([threadId, ticketKey]) => ({ threadId, ticketKey })),
@@ -594,7 +733,7 @@ export function createPlugin(deps: PluginDeps) {
         threadPulls: queue.entries.flatMap((entry) =>
           entry.agent.threadId === null ? [] : [{ threadId: entry.agent.threadId, entry }],
         ),
-        threadReviews,
+        threadReviews: threadReviewRows,
       };
       return {
         value: result,
@@ -895,52 +1034,97 @@ export function createPlugin(deps: PluginDeps) {
     }
 
     const pullStates = new Map<string, Cached<NonNullable<RelatedPullState>>>();
+    const pullStateFailures = new Map<string, number>();
 
-    /** A PR's state from GitHub; merged and closed states are kept for good. */
-    async function pullState(repo: string, number: number): Promise<RelatedPullState> {
-      const key = pullKey(repo, number);
-      const cached = pullStates.get(key);
-      if (cached !== undefined && (cached.value === "merged" || cached.value === "closed" || fresh(cached, QUEUE_TTL_MS, deps.now()))) {
-        return cached.value;
+    /**
+     * Each of `pulls`' state from GitHub, by `pullKey`, read with one GraphQL
+     * call per `LOOKUP_PAGE_SIZE` PRs. Merged and closed states are kept for
+     * good, open and draft ones for `QUEUE_TTL_MS`. A PR whose state cannot
+     * be read is null. A PR GitHub cannot resolve is read again after
+     * `PULL_STATE_RETRY_MS`; after any other failure, on the next call.
+     */
+    async function pullStatesFor(pulls: readonly PullRef[]): Promise<Map<string, RelatedPullState>> {
+      const now = deps.now();
+      const states = new Map<string, RelatedPullState>();
+      const due: PullRef[] = [];
+      for (const pull of pulls) {
+        const key = pullKey(pull.repo, pull.number);
+        if (states.has(key)) continue;
+        const cached = pullStates.get(key);
+        const failedAt = pullStateFailures.get(key);
+        if (cached !== undefined && (cached.value === "merged" || cached.value === "closed" || fresh(cached, QUEUE_TTL_MS, now))) {
+          states.set(key, cached.value);
+          continue;
+        }
+        states.set(key, null);
+        if (failedAt === undefined || now - failedAt >= PULL_STATE_RETRY_MS) due.push(pull);
       }
-      try {
-        const state = parsePullState(await gh(["pr", "view", String(number), "-R", repo, "--json", PULL_STATE_FIELDS]));
-        pullStates.set(key, { value: state, at: deps.now() });
-        return state;
-      } catch (error) {
-        bb.log.warn(`could not read the state of ${key}: ${errorMessage(error)}`);
-        return null;
-      }
+      await Promise.all(
+        chunks(due, LOOKUP_PAGE_SIZE).map(async (page) => {
+          let read: Map<string, NonNullable<RelatedPullState> | null>;
+          try {
+            read = parsePullStates(await graphqlLookup(pullStatesQuery(page)), page);
+          } catch (error) {
+            bb.log.warn(`could not read the state of ${page.length} PRs: ${errorMessage(error)}`);
+            return;
+          }
+          const unread: string[] = [];
+          for (const pull of page) {
+            const key = pullKey(pull.repo, pull.number);
+            const state = read.get(key) ?? null;
+            if (state === null) {
+              pullStateFailures.set(key, deps.now());
+              unread.push(key);
+              continue;
+            }
+            pullStateFailures.delete(key);
+            pullStates.set(key, { value: state, at: deps.now() });
+            states.set(key, state);
+          }
+          if (unread.length > 0) bb.log.warn(`GitHub could not resolve ${unread.join(", ")}`);
+        }),
+      );
+      return states;
     }
 
     function isReviewPull(ref: ThreadRef): boolean {
       return ref.kind === "gh-pr" && (ref.source === "review-target" || ref.source === "environment");
     }
 
+    interface ThreadReview {
+      pull: RelatedItem["pull"];
+      title: string | null;
+      agent: QueueEntry["agent"];
+    }
+
     /**
-     * The PR `threadId` reviews, with its state, the PR's title as recorded,
-     * and the thread's agent state. `pull` is null for a thread that does
-     * not review a PR.
+     * For each of `threadIds`: the PR it reviews, with its state, the PR's
+     * title as recorded, and the thread's agent state from `threads`. `pull`
+     * is null for a thread that does not review a PR. The states of PRs that
+     * are not in `queued` are read from GitHub together.
      */
-    async function threadReview(
-      threadId: string,
+    async function threadReviews(
+      threadIds: readonly string[],
       queued: ReadonlyMap<string, QueueEntry>,
-    ): Promise<{ pull: RelatedItem["pull"]; title: string | null; agent: QueueEntry["agent"] }> {
-      const ref = store.forThread(threadId).find(isReviewPull);
-      const parsed = ref === undefined ? null : parseRepoKey(ref.key);
-      if (ref === undefined || parsed === null) {
-        return { pull: null, title: null, agent: await threadAgentState(threadId) };
-      }
-      const entry = queued.get(ref.key);
-      return {
-        pull: {
-          ...parsed,
-          url: ref.url,
-          state: entry === undefined ? await pullState(parsed.repo, parsed.number) : queuedPullState(entry),
-        },
-        title: entry?.title ?? ref.title,
-        agent: entry?.agent.threadId === threadId ? entry.agent : await threadAgentState(threadId),
-      };
+      threads: ReadonlyMap<string, ThreadInfo>,
+    ): Promise<Map<string, ThreadReview>> {
+      const targets = threadIds.map((threadId) => {
+        const ref = store.forThread(threadId).find(isReviewPull);
+        const parsed = ref === undefined ? null : parseRepoKey(ref.key);
+        return { threadId, ref, parsed };
+      });
+      const states = await pullStatesFor(
+        targets.flatMap(({ ref, parsed }) => (ref === undefined || parsed === null || queued.has(ref.key) ? [] : [parsed])),
+      );
+      return new Map(
+        targets.map(({ threadId, ref, parsed }): [string, ThreadReview] => {
+          const agent = threads.get(threadId)?.agent ?? { state: "none", threadId: null };
+          if (ref === undefined || parsed === null) return [threadId, { pull: null, title: null, agent }];
+          const entry = queued.get(ref.key);
+          const state = entry === undefined ? (states.get(ref.key) ?? null) : queuedPullState(entry);
+          return [threadId, { pull: { ...parsed, url: ref.url, state }, title: entry?.title ?? ref.title, agent }];
+        }),
+      );
     }
 
     /**
@@ -953,22 +1137,21 @@ export function createPlugin(deps: PluginDeps) {
       const tickets = ownRefs.filter((ref) => ref.kind === "jira").map((ref) => ref.key);
       if (tickets.length === 0) return { githubPanel: await githubPanel(), tickets, items: [] };
       const ownPulls = new Set(ownRefs.filter(isReviewPull).map((ref) => ref.key));
-      const queue = await reviewQueue(false);
-      const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
       const others = [...new Set(tickets.flatMap((key) => store.threadsWith("jira", key)))].filter(
         (other) => other !== threadId,
       );
-      const threadItems = (
-        await Promise.all(
-          others.map(async (otherId): Promise<RelatedItem | null> => {
-            const thread = await liveThread(otherId);
-            if (thread === null) return null;
-            const threadTitle = thread.title ?? thread.titleFallback ?? otherId;
-            const { pull, title, agent } = await threadReview(otherId, queued);
-            return { title: pull === null ? threadTitle : withoutTickets(title ?? threadTitle, tickets), pull, agent };
-          }),
-        )
-      ).filter((item) => item !== null);
+      const { queue, threads } = await queueWithThreads(false, false, others);
+      const queued = new Map(queue.entries.map((entry) => [pullKey(entry.repo, entry.number), entry]));
+      const live = others.flatMap((otherId) => {
+        const thread = threads.get(otherId)?.thread ?? null;
+        return thread === null ? [] : [{ otherId, thread }];
+      });
+      const reviews = await threadReviews(live.map(({ otherId }) => otherId), queued, threads);
+      const threadItems = live.map(({ otherId, thread }): RelatedItem => {
+        const threadTitle = thread.title ?? thread.titleFallback ?? otherId;
+        const { pull, title, agent } = reviews.get(otherId)!;
+        return { title: pull === null ? threadTitle : withoutTickets(title ?? threadTitle, tickets), pull, agent };
+      });
       return { githubPanel: queue.githubPanel, tickets, items: relatedItems(threadItems, queue.entries, tickets, ownPulls) };
     }
 

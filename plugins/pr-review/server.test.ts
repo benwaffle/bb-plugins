@@ -39,6 +39,7 @@ function graphqlNode(number: number, title: string, body: string, baseRefName = 
     mergeable: "MERGEABLE",
     author: { login: "bob", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=32" },
     commits: { nodes: [{ commit: { statusCheckRollup: rollup as CheckRollup | null } }] },
+    headRollup: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
     reviewRequests: {
       nodes: [{ requestedReviewer: { __typename: "Team", combinedSlug: "acme/platform" } }],
     },
@@ -57,7 +58,7 @@ const OPEN_PULL_NODES = [
 ];
 
 function openPulls(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>): string {
-  return JSON.stringify({ data: { repository: { pullRequests: { nodes } } } });
+  return JSON.stringify({ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
 }
 
 const JIRA = new Map([
@@ -122,11 +123,11 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
     }
     if (line.startsWith("gh api user --jq")) return "benwaffle\n";
     if (line.startsWith("gh api user/teams")) return "acme/platform\n";
-    if (line.startsWith("gh api graphql")) return openPulls(nodes);
-    if (line.startsWith("gh pr view 596")) return PULL_VIEW;
-    if (line.startsWith("gh pr view 534 -R acme/widgets --json state,isDraft")) {
-      return JSON.stringify({ state: "MERGED", isDraft: false });
+    if (line.startsWith("gh api graphql") && line.includes("pullRequests(states: OPEN")) return openPulls(nodes);
+    if (line.startsWith("gh api graphql") && line.includes("r0: repository(owner: \"acme\", name: \"widgets\") { p534: pullRequest(number: 534) { state isDraft }")) {
+      return JSON.stringify({ data: { r0: { p534: { state: "MERGED", isDraft: false } } } });
     }
+    if (line.startsWith("gh pr view 596")) return PULL_VIEW;
     if (line.startsWith("gh issue view 12")) return JSON.stringify({ title: "Stale prices after a currency change" });
     if (line.startsWith("twg jira workitem get ")) {
       await twg.gate;
@@ -141,6 +142,17 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
   return { calls, twg, github, run };
 }
 
+interface FakeThread {
+  id: string;
+  environmentId: string;
+  status: string;
+  title: string | null;
+  /** bb moves a thread's `updatedAt` forward whenever a message is added to it. */
+  updatedAt: number;
+}
+
+const threadRow = (thread: FakeThread) => ({ ...thread, deletedAt: null, titleFallback: null });
+
 const SETTINGS = { repos: REPO, jiraProjectKeys: "ACME", jiraSite: "https://example.atlassian.net/" };
 
 async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = SETTINGS) {
@@ -148,7 +160,7 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
   const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
   const plugin = createPlugin({ run: runner.run, pollMs: 1, now: () => clock.now });
   const host = createFakePluginHost({ pluginId: "pr-review", settings });
-  const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
+  const threads = new Map<string, FakeThread>();
   const sdk = host.harness.sdk;
   sdk.stub("projects.list", async () => [
     { id: "proj_widgets", name: "widgets", gitRemoteUrl: "git@github.com:acme/widgets.git", sources: [] },
@@ -156,15 +168,21 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
   sdk.stub("plugins.list", async () => ({ plugins: [{ id: "github", enabled: true, status: "running" }] }));
   sdk.stub("system.config", async () => ({ primaryHostId: "host_local" }));
   sdk.stub("threads.spawn", async (args: { title: string }) => {
-    const thread = { id: `thr_${threads.size + 1}`, environmentId: "env_review", status: "active", title: args.title };
+    const thread = { id: `thr_${threads.size + 1}`, environmentId: "env_review", status: "active", title: args.title, updatedAt: 1 };
     threads.set(thread.id, thread);
     return thread;
   });
   sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => {
     const thread = threads.get(threadId);
     if (thread === undefined) throw new Error("not found");
-    return { ...thread, deletedAt: null, titleFallback: null, updatedAt: 1 };
+    return threadRow(thread);
   });
+  sdk.stub("threads.list", async ({ threadIds }: { threadIds: readonly string[] }) =>
+    threadIds.flatMap((id) => {
+      const thread = threads.get(id);
+      return thread === undefined ? [] : [threadRow(thread)];
+    }),
+  );
   sdk.stub("threads.promptHistory", async () => [
     { id: "msg_1", createdAt: 1, input: [{ type: "text", text: "Review context", mentions: [] }] },
   ]);
@@ -309,7 +327,8 @@ describe("agent state", () => {
     };
     return queue.entries.find((entry) => entry.number === 596)?.agent.state;
   };
-  const history = (harness: Awaited<ReturnType<typeof load>>["harness"], messages: Message[]) =>
+  const history = ({ harness, threads }: Awaited<ReturnType<typeof load>>, messages: Message[]) => {
+    threads.get("thr_1")!.updatedAt = Math.max(...messages.map((message) => message.createdAt));
     harness.sdk.stub("threads.promptHistory", async () =>
       messages.map((message, index) => ({
         id: `msg_${index}`,
@@ -317,19 +336,21 @@ describe("agent state", () => {
         input: [{ type: "text", text: message.text, mentions: [] }],
       })),
     );
+  };
 
   it("is reviewing, then reviewed, after the review command, and follow-ups after a later message", async () => {
-    const { harness, threads, clock } = await load();
+    const loaded = await load();
+    const { harness, threads, clock } = loaded;
     await harness.runCli(["review", "596"]);
     expect(await agentStates(harness)).toBe("reviewing");
     threads.get("thr_1")!.status = "idle";
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
     ]);
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
       { createdAt: clock.now + 2_000, text: "Why?" },
@@ -338,21 +359,22 @@ describe("agent state", () => {
   });
 
   it("finds a review command typed into the thread, on any line, and keeps it once it leaves the history", async () => {
-    const { harness, threads } = await load();
+    const loaded = await load();
+    const { harness, threads } = loaded;
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     threads.get("thr_1")!.status = "idle";
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: 5, text: "What does this change?" },
     ]);
     expect(await agentStates(harness)).toBe("opened");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: 5, text: "What does this change?" },
       { createdAt: 9, text: `Look at the cache first.\n${REVIEW_COMMAND} 596` },
     ]);
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [{ createdAt: 12, text: "Fix the first finding" }]);
+    history(loaded, [{ createdAt: 12, text: "Fix the first finding" }]);
     expect(await agentStates(harness)).toBe("follow-ups");
   });
 });
@@ -486,7 +508,7 @@ describe("sidebarGroups", () => {
   });
 
   it("gives each review thread its PR state, read from GitHub for a PR that left the queue, and its agent state", async () => {
-    const { harness, bb } = await load();
+    const { harness, bb, threads } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
     const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
@@ -495,15 +517,9 @@ describe("sidebarGroups", () => {
       { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
     ]);
     store.record("thr_notes", [ticket]);
-    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
-      id: threadId,
-      environmentId: "env_review",
-      status: "idle",
-      title: null,
-      titleFallback: null,
-      deletedAt: null,
-      updatedAt: 1,
-    }));
+    for (const id of ["thr_1", "thr_merged", "thr_notes"]) {
+      threads.set(id, { id, environmentId: "env_review", status: "idle", title: null, updatedAt: 1 });
+    }
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
       threadReviews: Array<{ threadId: string; number: number; pullState: string | null; agent: string }>;
     };
@@ -516,7 +532,7 @@ describe("sidebarGroups", () => {
 
 describe("related threads", () => {
   it("lists the ticket's other threads with PR and agent state, then its open PRs without a thread", async () => {
-    const { harness, bb } = await load();
+    const { harness, bb, threads } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
     const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
@@ -525,15 +541,10 @@ describe("related threads", () => {
       { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
     ]);
     store.record("thr_notes", [ticket]);
-    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
-      id: threadId,
-      environmentId: "env_review",
-      status: "idle",
-      title: threadId === "thr_notes" ? "Plan ACME-51" : "#534 Drop the old cache",
-      titleFallback: null,
-      deletedAt: null,
-      updatedAt: 1,
-    }));
+    for (const id of ["thr_1", "thr_merged", "thr_notes"]) {
+      const title = id === "thr_notes" ? "Plan ACME-51" : "#534 Drop the old cache";
+      threads.set(id, { id, environmentId: "env_review", status: "idle", title, updatedAt: 1 });
+    }
     const related = await harness.callRpc("relatedThreads", { threadId: "thr_1" });
     expect(related).toEqual({
       githubPanel: true,
