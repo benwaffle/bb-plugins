@@ -8,6 +8,7 @@ import {
   type PluginNavPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { USAGE_CHANNEL } from "./channel";
+import { bindNavigate, registerOpenUsageCommand, USAGE_PANEL_PATH } from "./open-command";
 import { ThreadDrawer } from "./drawer";
 import { STYLES } from "./styles";
 import {
@@ -38,7 +39,7 @@ import {
   type StackBy,
 } from "./view";
 
-const PANEL_PATH = "usage";
+const PANEL_PATH = USAGE_PANEL_PATH;
 const RANGES: readonly { days: RangeDays; label: string }[] = [
   { days: 1, label: "Today" },
   { days: 7, label: "7 days" },
@@ -560,7 +561,16 @@ function UsageSidebar({ subPath }: PluginNavPanelProps) {
   );
 }
 
+/** Renders nothing; lends this plugin's navigator to the Open Usage command. */
+function NavigateBridge() {
+  const navigate = useBbNavigate();
+  useEffect(() => bindNavigate(navigate), [navigate]);
+  return null;
+}
+
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "navigate-bridge", component: NavigateBridge });
+  registerOpenUsageCommand(app);
   app.slots.navPanel({
     id: "usage",
     title: "Usage",

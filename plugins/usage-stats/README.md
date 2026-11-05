@@ -25,6 +25,11 @@ Open it from the **Usage** entry in the sidebar navigation, or at
 switch between all usage, bb threads, and Claude Code sessions outside bb
 (`/plugins/usage-stats/usage/bb` and `/plugins/usage-stats/usage/outside`).
 
+The **Open Usage** command (`plugin:usage-stats/open-usage` in bb's command
+palette) opens the page too. Other plugins can run it through bb's app command
+API, and today's totals are the `dashboard` RPC with
+`{ days: 1, source: "all", sort: "cost" }` (`current.costUsd`, `current.tokens`).
+
 ## Where the numbers come from
 
 | Source | What it records |
