@@ -1,8 +1,8 @@
 # Telecom reference
 
 A searchable 3GPP Release 18 reference inside bb: Diameter applications,
-commands, and AVPs, EPC and 5GC interfaces, and network functions, all
-cross-linked. An AVP page links to the commands that carry it, the grouped
+commands, and AVPs, EPC, CUPS, IMS, and 5GC reference points, network
+functions, 5GC SBI services, and protocols, all cross-linked. An AVP page links to the commands that carry it, the grouped
 AVPs that contain it, its applications, their interfaces, and the network
 functions at each end. Every entry cites the spec clause that defines it.
 
@@ -26,7 +26,9 @@ bb plugin install path:. --plugin telecom-ref
 
 - **Telecom reference** in the navigation opens the search page. Type an
   abbreviation (`ULR`), a name (`Subscription-Data`), a code (`316`,
-  `AVP 1400`), an interface (`S6a`), or a network function (`HSS`). Arrow keys
+  `AVP 1400`), an interface (`S6a`, `Sxb`), a network function (`HSS`), an SBI service
+  (`Nsmf_PDUSession`), or a protocol (`PFCP`, which also lists the interfaces
+  that carry it). Arrow keys
   move through the results and Enter opens one. Search runs in the page
   against a prebuilt index, so it needs no server round trip.
 - The sidebar filters results by type and by interface and lists recently

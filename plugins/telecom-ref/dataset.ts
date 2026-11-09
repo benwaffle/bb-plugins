@@ -4,7 +4,9 @@ import commands from "./data/commands.json";
 import interfaces from "./data/interfaces.json";
 import meta from "./data/meta.json";
 import nfs from "./data/nfs.json";
+import protocols from "./data/protocols.json";
 import search from "./data/search.json";
+import services from "./data/services.json";
 import type { Entity, EntityKind, Meta, RawDataset, SearchDoc } from "./types";
 
 export interface Dataset {
@@ -21,6 +23,8 @@ export const KIND_LABELS: Record<EntityKind, string> = {
   app: "Diameter applications",
   if: "Interfaces",
   nf: "Network functions",
+  svc: "SBI services",
+  proto: "Protocols",
 };
 
 export const KIND_BADGES: Record<EntityKind, string> = {
@@ -29,9 +33,11 @@ export const KIND_BADGES: Record<EntityKind, string> = {
   app: "APP",
   if: "IF",
   nf: "NF",
+  svc: "SVC",
+  proto: "PROTO",
 };
 
-export const KINDS: readonly EntityKind[] = ["cmd", "avp", "app", "if", "nf"];
+export const KINDS: readonly EntityKind[] = ["cmd", "avp", "app", "if", "nf", "svc", "proto"];
 
 export function entityKind(id: string): EntityKind | null {
   const prefix = id.split("/")[0];
@@ -46,14 +52,22 @@ export function entityKind(id: string): EntityKind | null {
       return "if";
     case "nf":
       return "nf";
+    case "svc":
+      return "svc";
+    case "proto":
+      return "proto";
     default:
       return null;
   }
 }
 
+export function allEntities(raw: RawDataset): Entity[] {
+  return [...raw.apps, ...raw.commands, ...raw.avps, ...raw.interfaces, ...raw.nfs, ...raw.services, ...raw.protocols];
+}
+
 export function createDataset(raw: RawDataset): Dataset {
   const byId = new Map<string, Entity>();
-  for (const entity of [...raw.apps, ...raw.commands, ...raw.avps, ...raw.interfaces, ...raw.nfs]) {
+  for (const entity of allEntities(raw)) {
     byId.set(entity.id, entity);
   }
   const text = new Map<string, string>();
@@ -72,6 +86,8 @@ export function bundledRaw(): RawDataset {
     avps: avps as RawDataset["avps"],
     interfaces: interfaces as RawDataset["interfaces"],
     nfs: nfs as RawDataset["nfs"],
+    services: services as RawDataset["services"],
+    protocols: protocols as RawDataset["protocols"],
     search: search as SearchDoc[],
   };
 }
@@ -93,6 +109,7 @@ export function entityTitle(entity: Entity): string {
     case "app":
       return entity.short && entity.short !== entity.name ? `${entity.short} · ${entity.name}` : entity.name;
     case "nf":
+    case "proto":
       return entity.fullName ? `${entity.name} · ${entity.fullName}` : entity.name;
     default:
       return entity.name;

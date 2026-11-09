@@ -2,7 +2,18 @@ import { useEffect, useState, type ReactNode } from "react";
 import { experimental_Icon as Icon, experimental_usePluginId, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { entityCode, entityShortName, entityTitle, KIND_BADGES, vendorLabel, type Dataset } from "./dataset";
 import { abnfLine, cardinality, codeLabel, specLabel } from "./format";
-import type { AppEntity, AvpEntity, AvpFlags, AvpRef, CommandEntity, Entity, InterfaceEntity, NfEntity } from "./types";
+import type {
+  AppEntity,
+  AvpEntity,
+  AvpFlags,
+  AvpRef,
+  CommandEntity,
+  Entity,
+  InterfaceEntity,
+  NfEntity,
+  ProtocolEntity,
+  ServiceEntity,
+} from "./types";
 import { CodeBadge, EntityLink, KindBadge, SECTION_HEADING, SpecPill } from "./ui";
 import { openSearch, rememberRecent } from "./view";
 
@@ -324,7 +335,70 @@ function interfaceBody(entity: InterfaceEntity): Body {
     ),
     links: [
       ["Terminated by", entity.endpoints],
+      ["Protocols", entity.protocols],
       ["Diameter applications", entity.apps],
+      ["SBI services", entity.services],
+    ],
+  };
+}
+
+function serviceBody(entity: ServiceEntity, dataset: Dataset): Body {
+  return {
+    main: (
+      <>
+        <Facts
+          rows={[
+            ["Producer", <EntityLink id={entity.producer} dataset={dataset} />],
+            ["Also called", entity.aliases.length > 0 ? entity.aliases.join(", ") : null],
+          ]}
+        />
+        {entity.operations.length > 0 ? (
+          <Section title={`Operations · ${entity.operations.length}`}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={TH}>Operation</th>
+                  <th className={TH}>Semantics</th>
+                  <th className={`${TH} pr-0`}>Example consumers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entity.operations.map((operation) => (
+                  <tr key={operation.name} className="border-b border-border/50 last:border-b-0">
+                    <td className={`${TD} font-mono text-[13px]`}>{operation.name}</td>
+                    <td className={`${TD} text-muted-foreground`}>{operation.semantics ?? "—"}</td>
+                    <td className={`${TD} pr-0`}>
+                      <InlineLinks ids={operation.consumers} dataset={dataset} separator=", " />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Section>
+        ) : null}
+      </>
+    ),
+    links: [
+      ["Consumers", entity.consumers],
+      ["Reference points", entity.interfaces],
+    ],
+  };
+}
+
+function protocolBody(entity: ProtocolEntity): Body {
+  return {
+    main: (
+      <Facts
+        rows={[
+          ["Transport", entity.transport ?? "—"],
+          ["Also called", entity.aliases.length > 0 ? entity.aliases.join(", ") : null],
+        ]}
+      />
+    ),
+    links: [
+      ["Interfaces", entity.interfaces],
+      ["Runs over", entity.over],
+      ["Carries", entity.carries],
     ],
   };
 }
@@ -370,6 +444,7 @@ function nfBody(entity: NfEntity, dataset: Dataset): Body {
       </>
     ),
     links: [
+      ["Produces", entity.services],
       ["Takes over from", entity.replaces],
       ["Taken over by", entity.replacedBy],
     ],
@@ -388,6 +463,10 @@ function entityBody(entity: Entity, dataset: Dataset): Body {
       return interfaceBody(entity);
     case "nf":
       return nfBody(entity, dataset);
+    case "svc":
+      return serviceBody(entity, dataset);
+    case "proto":
+      return protocolBody(entity);
   }
 }
 

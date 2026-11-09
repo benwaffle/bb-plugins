@@ -17,11 +17,13 @@ export const lookupParameters = z.object({
     .min(1)
     .max(200)
     .describe(
-      'An abbreviation, name, code, or entity id: "ULR", "Subscription-Data", "AVP 1400", "S6a", "HSS", "diam.avp/10415/1400".',
+      'An abbreviation, name, code, or entity id: "ULR", "Subscription-Data", "AVP 1400", "S6a", "HSS", "Nsmf_PDUSession", "PFCP", "diam.avp/10415/1400".',
     ),
   kind: kindSchema
     .optional()
-    .describe("Only this kind: cmd (Diameter command), avp, app (Diameter application), if (interface), nf (network function)."),
+    .describe(
+      "Only this kind: cmd (Diameter command), avp, app (Diameter application), if (interface), nf (network function), svc (5GC SBI service), proto (protocol).",
+    ),
   interface: z.string().max(40).optional().describe('Only entities on this interface, by name or id: "S6a", "if/Gx".'),
   limit: z.number().int().min(1).max(MAX_LIMIT).optional().describe(`Matches to return, ${DEFAULT_LIMIT} by default.`),
 });
@@ -71,8 +73,8 @@ export default function plugin(bb: BbPluginApi): void {
   bb.agents.registerTool({
     name: TOOL_NAME,
     description:
-      "Look up 3GPP Rel-18 Diameter applications, commands, and AVPs (codes, vendor, type, flag rules, ABNF), EPC and 5GC interfaces, and network functions. Returns the best matches with summaries, cross-links, and spec clause references.",
-    instructions: `Use ${TOOL_NAME} for Diameter AVP and command codes, flag rules, message formats, and which interface or network function uses them, instead of recalling them from memory. Cite the spec clause it returns.`,
+      "Look up 3GPP Rel-18 Diameter applications, commands, and AVPs (codes, vendor, type, flag rules, ABNF), EPC, CUPS, IMS, and 5GC interfaces, network functions, 5GC SBI services (producer, consumers, operations), and protocols (PFCP, GTP, NGAP, NAS, ...). Returns the best matches with summaries, cross-links, and spec clause references.",
+    instructions: `Use ${TOOL_NAME} for Diameter AVP and command codes, flag rules, message formats, reference points, SBI services and their operations, protocols, and which interface or network function uses them, instead of recalling them from memory. Cite the spec clause it returns.`,
     presentation: { label: { pending: "Looking up telecom reference", completed: "Looked up telecom reference" } },
     parameters: lookupParameters,
     execute(input) {
@@ -89,14 +91,14 @@ export default function plugin(bb: BbPluginApi): void {
   bb.cli.register(
     defineCli({
       name: "telecom-ref",
-      summary: "Search 3GPP Rel-18 Diameter commands, AVPs, and applications, interfaces, and network functions",
+      summary: "Search 3GPP Rel-18 Diameter commands, AVPs, and applications, interfaces, network functions, SBI services, and protocols",
       commands: {
         search: cliCommand({
           summary: "List the best matches for an abbreviation, name, or code",
-          positionals: [{ name: "query", description: 'For example "ULR", "Subscription-Data", "1400", "S6a"', required: true, variadic: true }],
+          positionals: [{ name: "query", description: 'For example "ULR", "Subscription-Data", "1400", "S6a", "PFCP", "Nnrf_NFDiscovery"', required: true, variadic: true }],
           options: {
             ...jsonOption,
-            kind: { type: "enum", values: [...KINDS], description: "Only this kind: cmd, avp, app, if, nf" },
+            kind: { type: "enum", values: [...KINDS], description: "Only this kind: cmd, avp, app, if, nf, svc, proto" },
             interface: { type: "string", description: 'Only entities on this interface, for example "S6a"' },
             limit: { type: "integer", min: 1, max: MAX_LIMIT, description: `Matches to print, 1-${MAX_LIMIT} (default 10)` },
           },

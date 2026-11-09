@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A searchable 3GPP Rel-18 telecom reference: Diameter applications, commands, and AVPs, EPC and 5GC interfaces, and network functions, with cross-links and spec references.",
+  "description": "A searchable 3GPP Rel-18 telecom reference: Diameter applications, commands, and AVPs, EPC, CUPS, IMS, and 5GC interfaces, network functions, SBI services, and protocols, with cross-links and spec references.",
   "license": "MIT",
   "author": "Ben Iofel",
   "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/telecom-ref#readme",
@@ -29,7 +29,7 @@
   },
   "bb": {
     "name": "Telecom reference",
-    "description": "Search 3GPP Rel-18 Diameter applications, commands, and AVPs, EPC and 5GC interfaces, and network functions, with cross-links and spec references.",
+    "description": "Search 3GPP Rel-18 Diameter applications, commands, and AVPs, EPC, CUPS, IMS, and 5GC interfaces, network functions, SBI services, and protocols, with cross-links and spec references.",
     "branding": {
       "icon": "FileText"
     },

@@ -52,6 +52,16 @@ describe(TOOL_NAME, () => {
     expect(text(result)).toContain('no interface named "Zz9"');
   });
 
+  it("returns an SBI service with its operations and specs", async () => {
+    const harness = await host();
+    const output = text(await harness.behavior.callAgentTool(TOOL_NAME, { query: "Nsmf_PDUSession" }));
+    expect(output).toMatch(/^## SVC Nsmf_PDUSession/);
+    expect(output).toContain("produced by SMF");
+    expect(output).toContain("Operations: ");
+    expect(output).toContain("CreateSMContext");
+    expect(output).toContain("TS 29.502");
+  });
+
   it("rejects an empty query", async () => {
     const harness = await host();
     await expect(harness.behavior.callAgentTool(TOOL_NAME, { query: "" })).rejects.toThrow();

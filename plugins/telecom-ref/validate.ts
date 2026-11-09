@@ -1,4 +1,4 @@
-import { entityKind } from "./dataset";
+import { allEntities, entityKind } from "./dataset";
 import { normalize } from "./search";
 import type { Entity, EntityKind, RawDataset, SpecRef } from "./types";
 
@@ -14,6 +14,8 @@ const ID_PATTERNS: Record<EntityKind, RegExp> = {
   avp: /^diam\.avp\/\d+\/\d+$/,
   if: /^if\/[A-Za-z0-9_-]+$/,
   nf: /^nf\/[A-Za-z0-9_-]+$/,
+  svc: /^svc\/N[a-z0-9]+(-[a-z]+)?_[A-Za-z0-9_-]+$/,
+  proto: /^proto\/[A-Za-z0-9'_-]+$/,
 };
 
 const SPEC_DOC = /^(TS \d{2}\.\d{3}|RFC \d{3,5})$/;
@@ -27,7 +29,7 @@ const SPEC_DOC = /^(TS \d{2}\.\d{3}|RFC \d{3,5})$/;
 export function validateDataset(raw: RawDataset): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const byId = new Map<string, Entity>();
-  const all: Entity[] = [...raw.apps, ...raw.commands, ...raw.avps, ...raw.interfaces, ...raw.nfs];
+  const all: Entity[] = allEntities(raw);
 
   for (const entity of all) {
     if (byId.has(entity.id)) issues.push({ id: entity.id, field: "id", message: "duplicate id" });
@@ -82,10 +84,24 @@ export function validateDataset(raw: RawDataset): ValidationIssue[] {
       case "if":
         links(entity, "endpoints", entity.endpoints, "nf");
         links(entity, "apps", entity.apps, "app");
+        links(entity, "protocols", entity.protocols, "proto");
+        links(entity, "services", entity.services, "svc");
         break;
       case "nf":
         links(entity, "replaces", entity.replaces, "nf");
         links(entity, "replacedBy", entity.replacedBy, "nf");
+        links(entity, "interfaces", entity.interfaces, "if");
+        links(entity, "services", entity.services, "svc");
+        break;
+      case "svc":
+        link(entity, "producer", entity.producer, "nf");
+        links(entity, "consumers", entity.consumers, "nf");
+        entity.operations.forEach((operation, index) => links(entity, `operations[${index}].consumers`, operation.consumers, "nf"));
+        links(entity, "interfaces", entity.interfaces, "if");
+        break;
+      case "proto":
+        links(entity, "over", entity.over, "proto");
+        links(entity, "carries", entity.carries, "proto");
         links(entity, "interfaces", entity.interfaces, "if");
         break;
     }
@@ -111,6 +127,55 @@ export function validateDataset(raw: RawDataset): ValidationIssue[] {
       const item = byId.get(interfaceId);
       if (item?.kind === "if" && !item.endpoints.includes(nf.id)) {
         issues.push({ id: nf.id, field: "interfaces", message: `${interfaceId} does not end at it` });
+      }
+    }
+  }
+
+  for (const item of raw.interfaces) {
+    for (const protocolId of item.protocols) {
+      const protocol = byId.get(protocolId);
+      if (protocol?.kind === "proto" && !protocol.interfaces.includes(item.id)) {
+        issues.push({ id: item.id, field: "protocols", message: `${protocolId} does not list it` });
+      }
+    }
+    for (const serviceId of item.services) {
+      const service = byId.get(serviceId);
+      if (service?.kind === "svc" && !service.interfaces.includes(item.id)) {
+        issues.push({ id: item.id, field: "services", message: `${serviceId} does not list it` });
+      }
+    }
+  }
+  for (const protocol of raw.protocols) {
+    for (const interfaceId of protocol.interfaces) {
+      const item = byId.get(interfaceId);
+      if (item?.kind === "if" && !item.protocols.includes(protocol.id)) {
+        issues.push({ id: protocol.id, field: "interfaces", message: `${interfaceId} does not list it` });
+      }
+    }
+    for (const lowerId of protocol.over) {
+      const lower = byId.get(lowerId);
+      if (lower?.kind === "proto" && !lower.carries.includes(protocol.id)) {
+        issues.push({ id: protocol.id, field: "over", message: `${lowerId} does not list it as carried` });
+      }
+    }
+  }
+  for (const nf of raw.nfs) {
+    for (const serviceId of nf.services) {
+      const service = byId.get(serviceId);
+      if (service?.kind === "svc" && service.producer !== nf.id) {
+        issues.push({ id: nf.id, field: "services", message: `${serviceId} has another producer` });
+      }
+    }
+  }
+  for (const service of raw.services) {
+    const producer = byId.get(service.producer);
+    if (producer?.kind === "nf" && !producer.services.includes(service.id)) {
+      issues.push({ id: service.id, field: "producer", message: `${service.producer} does not list it` });
+    }
+    for (const interfaceId of service.interfaces) {
+      const item = byId.get(interfaceId);
+      if (item?.kind === "if" && !item.services.includes(service.id)) {
+        issues.push({ id: service.id, field: "interfaces", message: `${interfaceId} does not list it` });
       }
     }
   }

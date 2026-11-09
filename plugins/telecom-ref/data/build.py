@@ -38,20 +38,25 @@ import docx
 import yaml
 
 from parse import (
+    SERVICE_NAME,
     CommandFormat,
     FlagRow,
     GroupedFormat,
+    SbiService,
+    ServiceTableRow,
     clean_name,
     dedupe_cells,
     docx_flag_rows,
     docx_headings,
     docx_lines,
+    docx_service_tables,
     norm_type,
     parse_abnf,
     rfc_command_abbrevs,
     rfc_flag_rows,
     rfc_lines,
     rfc_numbers,
+    sbi_services,
     spec_numbers,
 )
 
@@ -186,6 +191,8 @@ class Model:
     sources: list[dict] = field(default_factory=list)
     spec_versions: dict[str, str | None] = field(default_factory=dict)
     clause_titles: dict[str, dict[str, str]] = field(default_factory=dict)
+    # SBI services by name, as load_services merges them across specs.
+    services: dict[str, dict] = field(default_factory=dict)
 
 
 def ref(doc: str, model: Model, clause: str | None = None) -> dict:
@@ -416,6 +423,128 @@ def load_rfcs(model: Model, offline: bool) -> None:
         model.grouped += grouped
         write_text_dump(doc, None, lines)
         print(f"  {doc}: {merged} flag rows, {len(commands)} command formats, {len(grouped)} grouped", file=sys.stderr)
+
+
+# --------------------------------------------------------------------------
+# SBI services
+
+
+def service_config() -> dict:
+    return load_yaml(CURATED / "services.yaml") or {}
+
+
+def service_prefix(name: str) -> str:
+    return name.split("_", 1)[0]
+
+
+def merge_aliased(found: list[SbiService], canonical) -> list[SbiService]:
+    """One service per canonical name, in document order, with the operations of every name filed under it."""
+    merged: dict[str, SbiService] = {}
+    for service in found:
+        name = canonical(service.name)
+        target = merged.setdefault(name, SbiService(name, service.doc, service.clause))
+        # A name with two underscores is a heading that ran an operation into the service name.
+        target.aliases += [a for a in [service.name, *service.aliases]
+                           if a != name and a.count("_") == 1 and a not in target.aliases]
+        for operation in service.operations:
+            if all(o.name.lower() != operation.name.lower() for o in target.operations):
+                target.operations.append(operation)
+    return list(merged.values())
+
+
+def assign_table_rows(found: list[SbiService], rows: list[ServiceTableRow], canonical) -> None:
+    """Gives each operation the semantics and consumers its service table row lists.
+
+    Table rows name the operation but often split the service name over
+    several rows, so a row goes to the service that has the operation: the
+    current service when it has it, else the only one, else the first in
+    document order after the current one.
+    """
+    by_name = {s.name: s for s in found}
+    order = [s.name for s in found]
+    current: str | None = None
+    for row in rows:
+        label = canonical(row.label) if row.label else ""
+        if label in by_name:
+            current = label
+        op = row.operation.lower()
+        has = [n for n in order if any(o.name.lower() == op for o in by_name[n].operations)]
+        if not has:
+            continue
+        if current not in has:
+            after = [n for n in has if current is None or order.index(n) > order.index(current)]
+            current = (after or has)[0]
+        for operation in by_name[current].operations:
+            if operation.name.lower() == op:
+                operation.semantics = operation.semantics or (row.semantics or "").replace(" / ", "/") or None
+                operation.consumers = sorted(set(operation.consumers) | set(row.consumers))
+
+
+def load_services(model: Model, offline: bool) -> None:
+    config = service_config()
+    aliases: dict[str, str] = config.get("aliases") or {}
+    producers: dict[str, str] = config.get("producers") or {}
+
+    def canonical(name: str) -> str:
+        return aliases.get(name, name)
+
+    def record(name: str) -> dict:
+        return model.services.setdefault(name, {"name": name, "aliases": [], "operations": {}, "stage2": [], "stage3": None})
+
+    for entry in config.get("stage2", []):
+        doc = entry["doc"]
+        source = latest_spec(doc.removeprefix("TS "), offline)
+        assert source.path, f"{doc} must be available"
+        model.spec_versions[doc] = source.version
+        model.sources.append({"name": f"3GPP {doc} V{source.version}", "url": source.url})
+        found = merge_aliased([s for s in sbi_services(docx_headings(docx_lines(source.path)), doc, tuple(entry["clauses"]))
+                               if service_prefix(s.name) in producers], canonical)
+        assign_table_rows(found, docx_service_tables(source.path), canonical)
+        for service in found:
+            out = record(service.name)
+            out["aliases"] += [a for a in service.aliases if a not in out["aliases"]]
+            if (doc, service.clause) not in out["stage2"]:
+                out["stage2"].append((doc, service.clause))
+            for operation in service.operations:
+                existing = out["operations"].setdefault(operation.name.lower(), {
+                    "name": operation.name, "semantics": None, "consumers": []})
+                existing["semantics"] = existing["semantics"] or operation.semantics
+                existing["consumers"] = sorted(set(existing["consumers"]) | set(operation.consumers))
+        print(f"  {doc} V{source.version}: {len(found)} services", file=sys.stderr)
+
+    token = re.compile(rf"\b({SERVICE_NAME})(?=[\s(]|$)")
+    for doc in config.get("stage3", []):
+        source = latest_spec(doc.removeprefix("TS "), offline)
+        assert source.path, f"{doc} must be available"
+        model.spec_versions[doc] = source.version
+        model.sources.append({"name": f"3GPP {doc} V{source.version}", "url": source.url})
+        for clause, title in docx_headings(docx_lines(source.path)).items():
+            if clause.split(".")[0] not in {"4", "5", "6"}:
+                continue
+            for raw in token.findall(title.replace("\xa0", " ")):
+                name = canonical(raw)
+                if raw.count("_") != 1 or service_prefix(name) not in producers:
+                    continue
+                out = record(name)
+                if raw != name and raw not in out["aliases"]:
+                    out["aliases"].append(raw)
+                out["stage3"] = out["stage3"] or (doc, clause)
+    for name, doc in (config.get("stage3Services") or {}).items():
+        if name not in model.services:
+            raise SystemExit(f"services.yaml stage3Services names {name}, which no stage-2 spec lists")
+        model.services[name]["stage3"] = model.services[name]["stage3"] or (doc, None)
+        model.spec_versions.setdefault(doc, latest_spec(doc.removeprefix("TS "), offline).version)
+
+
+def sbi_catalogue(offline: bool) -> list[tuple[str, str]]:
+    """Every service the configured specs name, with the clause that names it, for the coverage audit."""
+    model = Model()
+    load_services(model, offline)
+    out = []
+    for name, service in sorted(model.services.items()):
+        doc, clause = (service["stage2"] or [service["stage3"]])[0]
+        out.append((name, f"{doc} §{clause}" if clause else doc))
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -691,6 +820,7 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             "aliases": nf.get("aliases", []),
             "spec": ref_list(nf.get("spec", [])),
             "interfaces": [],
+            "services": [],
         }
     for nid, nf in nfs_out.items():
         for old in nf["replaces"]:
@@ -708,6 +838,8 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             "endpoints": [f"nf/{e}" for e in item.get("endpoints", [])],
             "protocol": item.get("protocol"),
             "apps": [app_id(a) for a in item.get("apps", [])],
+            "protocols": [],
+            "services": [],
             "description": item.get("description"),
             "aliases": item.get("aliases", []),
             "spec": ref_list(item.get("spec", [])),
@@ -718,6 +850,9 @@ def assemble(model: Model) -> dict[str, list[dict]]:
         for a in interfaces_out[iid]["apps"]:
             if a in apps_out:
                 apps_out[a]["interfaces"].append(iid)
+
+    protocols_out = assemble_protocols(load_yaml(CURATED / "protocols.yaml") or [], interfaces_out, ref_list)
+    services_out = assemble_services(model, nfs_out, interfaces_out, ref)
 
     for cmd in commands_out.values():
         cmd["interfaces"] = sorted({i for a in cmd["apps"] if a in apps_out for i in apps_out[a]["interfaces"]})
@@ -741,7 +876,111 @@ def assemble(model: Model) -> dict[str, list[dict]]:
         "avps": list(avps_out.values()),
         "interfaces": list(interfaces_out.values()),
         "nfs": list(nfs_out.values()),
+        "services": list(services_out.values()),
+        "protocols": list(protocols_out.values()),
     }
+
+
+def assemble_protocols(protocols: list[dict], interfaces_out: dict[str, dict], ref_list) -> dict[str, dict]:
+    """Protocol entities, linked to the interfaces whose protocol text matches them or that they list."""
+    out: dict[str, dict] = {}
+    for item in protocols:
+        pid = f"proto/{item['id']}"
+        match = re.compile(item["match"]) if item.get("match") else None
+        found = [iid for iid, i in interfaces_out.items() if match and i["protocol"] and match.search(i["protocol"])]
+        for extra in item.get("interfaces", []):
+            iid = f"if/{extra}"
+            if iid not in interfaces_out:
+                raise SystemExit(f"protocols.yaml: {pid} lists unknown interface {extra}")
+            if iid not in found:
+                found.append(iid)
+        out[pid] = {
+            "id": pid,
+            "kind": "proto",
+            "name": item["name"],
+            "fullName": item.get("fullName"),
+            "aliases": item.get("aliases", []),
+            "transport": item.get("transport"),
+            "over": [f"proto/{x}" for x in item.get("over", [])],
+            "carries": [],
+            "description": item.get("description"),
+            "spec": ref_list(item.get("spec", [])),
+            "interfaces": sorted(found, key=lambda i: interfaces_out[i]["name"].lower()),
+        }
+        for iid in found:
+            interfaces_out[iid]["protocols"].append(pid)
+    for pid, proto in out.items():
+        for lower in proto["over"]:
+            if lower not in out:
+                raise SystemExit(f"protocols.yaml: {pid} runs over unknown protocol {lower}")
+            out[lower]["carries"].append(pid)
+    unmatched = sorted(i["name"] for i in interfaces_out.values() if i["protocol"] and not i["protocols"])
+    if unmatched:
+        print(f"  interfaces whose protocol no protocol entry matches ({len(unmatched)}): {unmatched}", file=sys.stderr)
+    return out
+
+
+def assemble_services(model: Model, nfs_out: dict[str, dict], interfaces_out: dict[str, dict], ref) -> dict[str, dict]:
+    """SBI service entities: producer, consumers, operations, and the SBI reference points they realize."""
+    config = service_config()
+    producers: dict[str, str] = config.get("producers") or {}
+    consumer_names: dict[str, str] = config.get("consumerNames") or {}
+    ignored = {norm_key(n) for n in config.get("ignoredConsumers") or []}
+    descriptions: dict[str, dict] = config.get("services") or {}
+    nf_index: dict[str, str] = {}
+    for nid, nf in nfs_out.items():
+        for key in [nf["name"], *nf["aliases"]]:
+            nf_index.setdefault(norm_key(key), nid)
+    unknown: dict[str, int] = {}
+
+    def nf_ref(name: str) -> str | None:
+        key = norm_key(consumer_names.get(name, name))
+        if key in ignored or not key:
+            return None
+        if key not in nf_index:
+            unknown[name] = unknown.get(name, 0) + 1
+        return nf_index.get(key)
+
+    sbi = [iid for iid, i in interfaces_out.items() if "proto/SBI" in i["protocols"]]
+    out: dict[str, dict] = {}
+    for name, service in sorted(model.services.items(), key=lambda kv: kv[0].lower()):
+        sid = f"svc/{name}"
+        producer = f"nf/{producers[service_prefix(name)]}"
+        if producer not in nfs_out:
+            raise SystemExit(f"services.yaml producers: {producer} is not a network function")
+        operations = []
+        for operation in service["operations"].values():
+            consumers = sorted({c for c in (nf_ref(n) for n in operation["consumers"]) if c})
+            operations.append({"name": operation["name"], "semantics": operation["semantics"], "consumers": consumers})
+        consumers = sorted({c for o in operations for c in o["consumers"]})
+        curated = descriptions.get(name, {})
+        spec = [ref(doc, model, clause) for doc, clause in service["stage2"]]
+        if service["stage3"]:
+            spec.append(ref(service["stage3"][0], model, service["stage3"][1]))
+        realized = sorted(
+            (iid for iid in sbi
+             if producer in interfaces_out[iid]["endpoints"]
+             and any(c in interfaces_out[iid]["endpoints"] and (c != producer or interfaces_out[iid]["endpoints"].count(c) > 1)
+                     for c in consumers)),
+            key=lambda i: interfaces_out[i]["name"].lower())
+        out[sid] = {
+            "id": sid,
+            "kind": "svc",
+            "name": name,
+            "aliases": service["aliases"],
+            "producer": producer,
+            "consumers": consumers,
+            "operations": operations,
+            "description": curated.get("description"),
+            "spec": dedupe_refs(spec),
+            "interfaces": realized,
+        }
+        nfs_out[producer]["services"].append(sid)
+        for iid in realized:
+            interfaces_out[iid]["services"].append(sid)
+    if unknown:
+        print(f"  service consumers that name no network function: {sorted(unknown.items())}", file=sys.stderr)
+    return out
 
 
 ABBREV = re.compile(r"[A-Z]{3}")
@@ -816,7 +1055,7 @@ def dedupe_refs(refs: list[dict]) -> list[dict]:
 # Search index
 
 
-def search_keys(entity: dict) -> list[str]:
+def search_keys(entity: dict, protocol_names: dict[str, list[str]]) -> list[str]:
     """Normalized keys, best first. The plugin normalizes queries the same way (search.ts normalize)."""
     keys: list[str] = []
     kind = entity["kind"]
@@ -830,8 +1069,11 @@ def search_keys(entity: dict) -> list[str]:
     elif kind == "app":
         keys += [entity.get("short") or "", entity["name"], str(entity["appId"])]
     elif kind == "if":
-        keys += [entity["name"], *entity.get("aliases", [])]
+        # The protocols an interface carries come after its own names, so "PFCP" lists N4 and Sxa after PFCP itself.
+        keys += [entity["name"], *entity.get("aliases", []), *protocol_names.get(entity["id"], [])]
     elif kind == "nf":
+        keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
+    elif kind in ("svc", "proto"):
         keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
     out: list[str] = []
     for key in keys:
@@ -842,10 +1084,14 @@ def search_keys(entity: dict) -> list[str]:
 
 
 def build_search(dataset: dict[str, list[dict]]) -> list[list]:
+    protocol_names: dict[str, list[str]] = {}
+    for proto in dataset["protocols"]:
+        for iid in proto["interfaces"]:
+            protocol_names.setdefault(iid, []).append(proto["name"])
     docs = []
-    for group in ("commands", "apps", "interfaces", "nfs", "avps"):
+    for group in ("commands", "apps", "interfaces", "nfs", "services", "protocols", "avps"):
         for entity in dataset[group]:
-            docs.append([entity["id"], search_keys(entity)])
+            docs.append([entity["id"], search_keys(entity, protocol_names)])
     return docs
 
 
@@ -872,6 +1118,8 @@ def main() -> None:
     load_rfcs(model, args.offline)
     print("3GPP specs cited by TS 29.230", file=sys.stderr)
     load_specs(model, args.offline)
+    print("3GPP SBI service specs", file=sys.stderr)
+    load_services(model, args.offline)
 
     dataset = assemble(model)
     counts = {k: len(v) for k, v in dataset.items()}

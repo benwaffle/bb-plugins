@@ -80,3 +80,57 @@ describe("resolve", () => {
     expect(resolve(dataset, "diam.avp/10415/999999")).toBeNull();
   });
 });
+
+describe("CUPS reference points", () => {
+  it.each([
+    ["Sxa", "nf/SGW-C", "nf/SGW-U"],
+    ["Sxb", "nf/PGW-C", "nf/PGW-U"],
+    ["Sxc", "nf/TDF-C", "nf/TDF-U"],
+  ])("resolves %s to a PFCP interface between its control and user plane", (name, control, user) => {
+    const entity = resolve(dataset, name);
+    expect(entity?.kind).toBe("if");
+    if (entity?.kind !== "if") return;
+    expect(entity.endpoints).toEqual([control, user]);
+    expect(entity.protocols).toContain("proto/PFCP");
+    expect(entity.spec.map((ref) => ref.doc)).toContain("TS 29.244");
+  });
+});
+
+describe("protocol search", () => {
+  it("puts the protocol first, then the interfaces that carry it", () => {
+    const ids = topIds("PFCP", 10);
+    expect(ids[0]).toBe("proto/PFCP");
+    expect(ids).toEqual(expect.arrayContaining(["if/N4", "if/Sxa", "if/Sxb", "if/Sxc"]));
+  });
+
+  it("links a protocol to the interfaces whose protocol text names it", () => {
+    const pfcp = resolve(dataset, "PFCP");
+    expect(pfcp?.kind === "proto" && pfcp.interfaces).toEqual(expect.arrayContaining(["if/N4", "if/Sxa", "if/Sxb", "if/Sxc"]));
+    const ngap = resolve(dataset, "NGAP");
+    expect(ngap?.kind === "proto" && ngap.over).toEqual(["proto/SCTP"]);
+  });
+});
+
+describe("SBI services", () => {
+  it("resolves a service to its producer, operations, and stage-2 and stage-3 specs", () => {
+    const service = resolve(dataset, "Nnrf_NFDiscovery");
+    expect(service?.kind).toBe("svc");
+    if (service?.kind !== "svc") return;
+    expect(service.producer).toBe("nf/NRF");
+    expect(service.operations.map((operation) => operation.name)).toContain("Request");
+    expect(service.consumers).toContain("nf/AMF");
+    expect(service.spec.map((ref) => ref.doc)).toEqual(expect.arrayContaining(["TS 23.502", "TS 29.510"]));
+    expect(service.description).toBeTruthy();
+  });
+
+  it("finds a service by the abbreviated name the spec also uses", () => {
+    expect(resolve(dataset, "Nudm_SDM")?.id).toBe("svc/Nudm_SubscriberDataManagement");
+  });
+
+  it("links a service to the reference points between its producer and consumers", () => {
+    const service = resolve(dataset, "Nsmf_PDUSession");
+    expect(service?.kind === "svc" && service.interfaces).toContain("if/N11");
+    const smf = resolve(dataset, "SMF");
+    expect(smf?.kind === "nf" && smf.services).toContain("svc/Nsmf_PDUSession");
+  });
+});

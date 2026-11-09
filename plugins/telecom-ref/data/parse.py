@@ -5,7 +5,7 @@ grouped AVP definitions, and RFC text tables. Pure functions of their input.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import docx
@@ -387,3 +387,149 @@ def rfc_command_abbrevs(lines: list[tuple[str, str | None]]) -> dict[int, list[t
     return out
 
 
+
+
+# --------------------------------------------------------------------------
+# Stage-2 architecture specs: reference point lists and SBI services
+
+
+@dataclass
+class ReferencePoint:
+    name: str
+    text: str
+    doc: str
+    clause: str | None
+
+
+# "N16a:<TAB>Reference point between SMF and I-SMF." (TS 23.501, 23.401, 23.214)
+REFERENCE_POINT_LINE = re.compile(r"^([A-Z][A-Za-z0-9'\-]{0,10}):\t(.+)$")
+REFERENCE_POINT_TEXT = re.compile(r"[Rr]eference point|^It (enables|provides|is)|^Inter-PLMN|resides between|interface between")
+
+
+def reference_point_lines(lines: list[tuple[str, str | None]], doc: str,
+                          clause_prefixes: tuple[str, ...]) -> list[ReferencePoint]:
+    """Definition-list entries ("S11:<TAB>Reference point ...") in clauses starting with any prefix."""
+    out: list[ReferencePoint] = []
+    for text, clause in lines:
+        if clause is None or not any(clause == p or clause.startswith(p + ".") for p in clause_prefixes):
+            continue
+        match = REFERENCE_POINT_LINE.match(text.replace("\xa0", " ").strip())
+        if match and REFERENCE_POINT_TEXT.search(match.group(2)) and not match.group(1).startswith("NOTE"):
+            out.append(ReferencePoint(match.group(1), match.group(2).strip(), doc, clause))
+    return out
+
+
+# "Interface between SGSN and HLR (Gr-interface)", "Reference Point HSS - CSCF (Cx Reference Point)"
+HEADING_REFERENCE_POINT = re.compile(r"\(([A-Za-z0-9_'/\- ]+?)[\s-]*(?:[Rr]eference [Pp]oints?|[Ii]nterfaces?)\)")
+
+
+def heading_reference_points(headings: dict[str, str], doc: str,
+                             clause_prefixes: tuple[str, ...]) -> list[ReferencePoint]:
+    """Reference points that TS 23.002 names in clause headings, split where a heading names two ("S5 and S8")."""
+    out: list[ReferencePoint] = []
+    for clause, title in headings.items():
+        if not any(clause == p or clause.startswith(p + ".") for p in clause_prefixes):
+            continue
+        match = HEADING_REFERENCE_POINT.search(title)
+        if not match:
+            continue
+        for name in re.split(r"\s+and\s+|/", match.group(1)):
+            name = name.strip(" -")
+            if name:
+                out.append(ReferencePoint(name.replace("_", "-"), title, doc, clause))
+    return out
+
+
+@dataclass
+class SbiOperation:
+    name: str
+    clause: str
+    semantics: str | None = None
+    consumers: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SbiService:
+    name: str
+    doc: str
+    clause: str
+    operations: list[SbiOperation] = field(default_factory=list)
+    # Other names the spec uses: "Nudm_SDM" for "Nudm_SubscriberDataManagement (SDM)".
+    aliases: list[str] = field(default_factory=list)
+
+
+SERVICE_NAME = r"N[a-z0-9]+(?:-[a-z]+)?_[A-Za-z][A-Za-z0-9\-]*(?:_[A-Za-z][A-Za-z0-9]*)*?"
+# "Nudm_UECM (UECM) service", "Nnrf_AccessToken_service", "Ntsctsf_QoSandTSCAssistance"
+SERVICE_HEADING = re.compile(rf"^({SERVICE_NAME})(?:\s*\(([A-Za-z]+)\))?(?:[ _][Ss]ervices?)?$")
+# "Namf_Communication_UEContextTransfer service operation", "Nchf_SpendingLimitControl Subscribe service operation"
+OPERATION_HEADING = re.compile(rf"^({SERVICE_NAME})[ _]([A-Za-z][A-Za-z0-9]*)(?: [Ss]ervice)? [Oo]peration$")
+
+
+def sbi_services(headings: dict[str, str], doc: str, clause_prefixes: tuple[str, ...]) -> list[SbiService]:
+    """The NF services and their operations named by clause headings under the given prefixes, in document order."""
+    def within(clause: str) -> bool:
+        return any(clause == p or clause.startswith(p + ".") for p in clause_prefixes)
+
+    services: dict[str, SbiService] = {}
+    short: dict[str, str] = {}  # "Nudm_SDM" -> "Nudm_SubscriberDataManagement"
+    for clause, title in headings.items():
+        if not within(clause):
+            continue
+        title = title.replace("\xa0", " ").strip()
+        operation = OPERATION_HEADING.match(title)
+        if operation:
+            name, op = short.get(operation.group(1), operation.group(1)), operation.group(2)
+            if op.lower() == "service":
+                continue
+            service = services.setdefault(name, SbiService(name, doc, clause.rsplit(".", 1)[0]))
+            if all(o.name.lower() != op.lower() for o in service.operations):
+                service.operations.append(SbiOperation(op, clause))
+            continue
+        heading = SERVICE_HEADING.match(title)
+        if heading and heading.group(1).count("_") == 1:
+            name, abbrev = heading.group(1), heading.group(2)
+            service = services.setdefault(name, SbiService(name, doc, clause))
+            if abbrev:
+                alias = f"{name.split('_')[0]}_{abbrev}"
+                if alias != name:
+                    short[alias] = name
+                    service.aliases.append(alias)
+    return list(services.values())
+
+
+@dataclass
+class ServiceTableRow:
+    label: str
+    operation: str
+    semantics: str | None
+    consumers: list[str]
+
+
+def _cell(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+
+
+def docx_service_tables(path: Path) -> list[ServiceTableRow]:
+    """Rows of the "NF services provided by ..." tables: service label, operation, semantics, consumers.
+
+    A table's service column often splits one name over several rows
+    ("Subscriber Data" / "Management" / "(SDM)"), so the label is the raw
+    cell text and the caller assigns rows to services by operation name.
+    """
+    document = docx.Document(str(path))
+    rows: list[ServiceTableRow] = []
+    for table in document.tables:
+        if not table.rows:
+            continue
+        header = [_cell(c.text).lower() for c in table.rows[0].cells]
+        if len(header) < 4 or "operation" not in header[1] or "consumer" not in header[-1]:
+            continue
+        if not ("service" in header[0] and "semantic" in header[2]):
+            continue
+        for row in table.rows[1:]:
+            cells = [_cell(c.text) for c in row.cells]
+            if len(cells) < 4 or cells[0].startswith("NOTE") or not cells[1] or cells[1] == cells[0] == cells[3]:
+                continue
+            consumers = [c.strip() for c in re.split(r",|/|\band\b", re.sub(r"\(NOTE[^)]*\)|NOTE \d+", "", cells[3]))]
+            rows.append(ServiceTableRow(cells[0], cells[1], cells[2] or None, [c for c in consumers if c]))
+    return rows

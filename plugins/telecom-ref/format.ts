@@ -98,6 +98,18 @@ export function factLine(entity: Entity, dataset: Dataset): string {
     case "nf":
       if (entity.generations.length > 0) parts.push(entity.generations.join("/"));
       break;
+    case "svc": {
+      const names = (ids: readonly string[]) => ids.map((id) => id.replace(/^nf\//, "")).join(", ");
+      parts.push(`produced by ${names([entity.producer])}`);
+      if (entity.consumers.length > 0) parts.push(`consumers: ${names(entity.consumers)}`);
+      parts.push(`${entity.operations.length} operation${entity.operations.length === 1 ? "" : "s"}`);
+      break;
+    }
+    case "proto":
+      if (entity.transport) parts.push(entity.transport);
+      if (entity.over.length > 0) parts.push(`over ${entity.over.map((id) => id.replace(/^proto\//, "")).join(", ")}`);
+      parts.push(`${entity.interfaces.length} interface${entity.interfaces.length === 1 ? "" : "s"}`);
+      break;
   }
   return parts.join(" · ");
 }
@@ -167,12 +179,35 @@ export function formatEntity(entity: Entity, dataset: Dataset, pluginId: string)
       break;
     case "if":
       section("Endpoints", entity.endpoints);
+      section("Protocols", entity.protocols);
       section("Applications", entity.apps);
+      section("SBI services", entity.services);
       break;
     case "nf":
       section("Interfaces", entity.interfaces);
+      section("Produces", entity.services);
       section("Replaces", entity.replaces);
       section("Replaced by", entity.replacedBy);
+      break;
+    case "svc": {
+      const shown = entity.operations.slice(0, LIST_LIMIT).map((operation) => {
+        const consumers = operation.consumers.map((id) => id.replace(/^nf\//, "")).join("/");
+        const facts = [operation.semantics, consumers ? `from ${consumers}` : null].filter(Boolean).join(", ");
+        return facts ? `${operation.name} (${facts})` : operation.name;
+      });
+      const more = entity.operations.length - shown.length;
+      if (shown.length > 0) lines.push(`Operations: ${shown.join("; ")}${more > 0 ? `; … ${more} more` : ""}`);
+      section("Producer", [entity.producer]);
+      section("Consumers", entity.consumers);
+      section("Reference points", entity.interfaces);
+      if (entity.aliases.length > 0) lines.push(`Also called: ${entity.aliases.join(", ")}`);
+      break;
+    }
+    case "proto":
+      section("Runs over", entity.over);
+      section("Carries", entity.carries);
+      section("Interfaces", entity.interfaces);
+      if (entity.aliases.length > 0) lines.push(`Also called: ${entity.aliases.join(", ")}`);
       break;
   }
   if (entity.spec.length > 0) lines.push(`Spec: ${entity.spec.map(specLabel).join("; ")}`);

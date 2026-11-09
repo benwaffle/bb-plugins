@@ -42,6 +42,8 @@ describe("kind badges", () => {
       app: "Application",
       if: "Interface",
       nf: "NF",
+      svc: "Service",
+      proto: "Protocol",
     });
     expect(new Set(KINDS.map((kind) => KIND_STYLES[kind].hue)).size).toBe(KINDS.length);
   });

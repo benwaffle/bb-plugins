@@ -1,4 +1,4 @@
-import { entityInterfaces, entityKind, entityTitle, type Dataset } from "./dataset";
+import { entityInterfaces, entityKind, entityTitle, KINDS, type Dataset } from "./dataset";
 import type { Entity, EntityKind } from "./types";
 
 /**
@@ -38,10 +38,15 @@ const KIND_WORDS: Record<string, EntityKind> = {
   interface: "if",
   nf: "nf",
   node: "nf",
+  svc: "svc",
+  service: "svc",
+  services: "svc",
+  proto: "proto",
+  protocol: "proto",
 };
 
 /** Ties between equal matches go to the kind people look up most. */
-const KIND_ORDER: Record<EntityKind, number> = { cmd: 5, app: 4, if: 3, nf: 2, avp: 1 };
+const KIND_ORDER: Record<EntityKind, number> = { cmd: 7, proto: 6, app: 5, if: 4, svc: 3, nf: 2, avp: 1 };
 
 interface ParsedQuery {
   normalized: string;
@@ -135,7 +140,7 @@ export function search(dataset: Dataset, query: string, filters: SearchFilters =
 
 /** Counts of each kind among all matches of `query`, ignoring the kind filter. */
 export function kindCounts(dataset: Dataset, query: string, filters: SearchFilters = {}): Record<EntityKind, number> {
-  const counts: Record<EntityKind, number> = { cmd: 0, avp: 0, app: 0, if: 0, nf: 0 };
+  const counts = Object.fromEntries(KINDS.map((kind) => [kind, 0])) as Record<EntityKind, number>;
   for (const hit of search(dataset, query, { ...filters, kinds: [] }, Number.POSITIVE_INFINITY)) {
     counts[hit.entity.kind] += 1;
   }

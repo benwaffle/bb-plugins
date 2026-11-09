@@ -107,7 +107,7 @@
   generations: [4G]
   endpoints: [UE, eNodeB]
   protocol: LTE-Uu RRC/NAS
-  aliases: []
+  aliases: [E-UTRAN Uu]
   description: >-
     The LTE air interface. It carries RRC signalling with the eNodeB, NAS signalling relayed to the MME,
     and user data on data radio bearers.
@@ -1815,3 +1815,1229 @@
     The reference point between the GMLC and the UDM. It returns the serving AMF and location privacy
     settings for a UE.
   spec: ["TS 23.273", "TS 29.503"]
+
+# --- Further reference points from TS 23.002 and TS 23.401 ---
+
+- id: S17
+  name: S17
+  generations: [4G]
+  endpoints: [MME, UCMF]
+  protocol: URCMP or HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the MME and the UCMF for radio capability signalling optimisation
+    (RACS). The MME uses it to resolve UE Radio Capability IDs to full capability sets and to have the
+    UCMF assign PLMN IDs for new capability sets.
+  spec: ["TS 23.401 §4.2.3", "TS 29.674"]
+
+- id: Iuh
+  name: Iuh
+  generations: [3G]
+  endpoints: [HNB, HNB-GW]
+  protocol: HNBAP / RUA
+  aliases: []
+  description: >-
+    The interface between a Home NodeB and its HNB gateway, usually carried over the public internet. It
+    handles HNB and UE registration and relays RANAP signalling and user data toward the core.
+  spec: ["TS 23.002 §6.3.5", "TS 25.469", "TS 25.468"]
+
+- id: Mc
+  name: Mc
+  generations: [3G]
+  endpoints: [MSC, CS-MGW]
+  protocol: H.248
+  aliases: []
+  description: >-
+    The gateway control interface between an MSC Server or GMSC Server and a CS-MGW. The server uses it
+    to set up terminations, bearers, and media processing in the gateway, including anchoring during
+    handover and relocation.
+  spec: ["TS 23.002 §6.4.1.7"]
+
+- id: Nc
+  name: Nc
+  generations: [3G]
+  endpoints: [MSC, GMSC]
+  protocol: BICC / ISUP
+  aliases: []
+  description: >-
+    The call control interface between MSC Servers and GMSC Servers in a split CS core. It carries
+    network-to-network call signalling such as ISUP or bearer independent call control, over IP or SS7
+    transport.
+  spec: ["TS 23.002 §6.4.1.8"]
+
+- id: Nb
+  name: Nb
+  generations: [3G]
+  endpoints: [CS-MGW, CS-MGW]
+  protocol: RTP / AAL2
+  aliases: []
+  description: >-
+    The user plane between two CS-MGWs in a split CS core. It carries the voice and data bearers and
+    their bearer control, using RTP over IP or AAL2 over ATM.
+  spec: ["TS 23.002 §6.4.1.9"]
+
+- id: Hv
+  name: Hv
+  generations: [3G]
+  endpoints: [VLR, CSS]
+  protocol: MAP
+  aliases: []
+  description: >-
+    The reference point between the VLR and the CSS in the visited network. The CSS uses it to give the
+    VLR the CSG subscription data it holds for roaming users so they can use CS services in CSG cells.
+  spec: ["TS 23.002 §6.4.1.10", "TS 29.002"]
+
+- id: Ghv
+  name: Ghv
+  generations: [3G]
+  endpoints: [SGSN, CSS]
+  protocol: MAP
+  aliases: []
+  description: >-
+    The reference point between a Gn/Gp SGSN and the CSS in the visited network. It transfers the CSG
+    subscription data held in the VPLMN for roaming users to the SGSN.
+  spec: ["TS 23.002 §6.4.2.5", "TS 29.002"]
+
+- id: H
+  name: H
+  generations: [2G, 3G]
+  endpoints: [HLR, AuC]
+  protocol: Not standardised
+  aliases: []
+  description: >-
+    The internal link between the HLR or HSS and the Authentication Centre. The HLR requests
+    authentication and ciphering vectors from the AuC when it holds none for a subscriber.
+  spec: ["TS 23.002 §6.4.3.2"]
+
+- id: S14
+  name: S14
+  generations: [4G]
+  endpoints: [UE, ANDSF]
+  protocol: OMA DM
+  aliases: []
+  description: >-
+    The reference point between the UE and the ANDSF, carried over IP. The UE pulls, or the ANDSF
+    pushes, access network discovery information and inter-system mobility and routing policies for
+    non-3GPP accesses such as WLAN.
+  spec: ["TS 23.002 §6.4.4.21", "TS 24.302"]
+
+- id: S101
+  name: S101
+  generations: [4G]
+  endpoints: [MME, HRPD-AN]
+  protocol: S101-AP
+  aliases: []
+  description: >-
+    The reference point between the MME and a 3GPP2 HRPD access network. It tunnels HRPD signalling for
+    a UE on E-UTRAN, supporting pre-registration, session maintenance, and active handover to HRPD.
+  spec: ["TS 23.002 §6.4.4.22"]
+
+- id: S102
+  name: S102
+  generations: [4G]
+  endpoints: [MME, 1xCS-IWS]
+  protocol: S102 (A21 messages)
+  aliases: []
+  description: >-
+    The tunnel between the MME and a 3GPP2 1xCS interworking solution. It relays 1xRTT CS signalling for
+    SRVCC and CS fallback to CDMA2000 1x circuit-switched networks.
+  spec: ["TS 23.002 §6.4.4.23"]
+
+- id: S103
+  name: S103
+  generations: [4G]
+  endpoints: [SGW, HSGW]
+  protocol: GTP-U
+  aliases: []
+  description: >-
+    The user plane interface between the Serving GW and the HRPD Serving Gateway. It forwards downlink
+    data during handover from E-UTRAN to HRPD, using tunnels set up through S101 signalling.
+  spec: ["TS 23.002 §6.4.4.24"]
+
+- id: Uh
+  name: Uh
+  generations: [3G, 4G]
+  endpoints: [UE, CSG-List-Server]
+  protocol: OMA DM / OTA
+  aliases: []
+  description: >-
+    The reference point between the UE and the CSG List Server. It provisions the Allowed CSG list and
+    the Operator CSG list on the UE, either by OMA DM or by OTA updates to the USIM.
+  spec: ["TS 23.002 §6.4.4.25", "TS 24.285", "TS 31.102"]
+
+- id: S7d
+  name: S7d
+  generations: [3G]
+  endpoints: [SGSN, CSS]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The interface between an S4-SGSN and the CSS in the visited network. The CSS provides, and updates,
+    the CSG subscription data it holds for roaming users.
+  spec: ["TS 23.002 §6.4.4.26", "TS 29.272"]
+
+- id: S7a
+  name: S7a
+  generations: [4G]
+  endpoints: [MME, CSS]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The interface between the MME and the CSS in the visited network. The CSS provides, and updates, the
+    CSG subscription data it holds for roaming users so the MME can control access to CSG cells.
+  spec: ["TS 23.002 §6.4.4.27", "TS 29.272"]
+
+- id: S121
+  name: S121
+  generations: [4G]
+  endpoints: [MME, HRPD-AN]
+  protocol: RIM transfer
+  aliases: []
+  description: >-
+    The reference point between the MME and a 3GPP2 HRPD access network for RAN information management.
+    It relays RIM messages between eNodeBs and the HRPD access network, for example to exchange cell
+    load information.
+  spec: ["TS 23.002 §6.4.4.30"]
+
+- id: I
+  name: I
+  generations: [2G, 3G]
+  endpoints: [MSC, GCR]
+  protocol: Not standardised
+  aliases: []
+  description: >-
+    The interface between an MSC and its Group Call Register. The MSC queries the GCR for the attributes
+    of a voice group or voice broadcast call, such as the cells and MSCs the call covers.
+  spec: ["TS 23.002 §6a.1.1"]
+
+- id: Lb
+  name: Lb
+  generations: [2G]
+  endpoints: [BSC, SMLC]
+  protocol: BSSAP-LE
+  aliases: []
+  description: >-
+    The GERAN interface between the BSC and a standalone SMLC. It carries positioning requests,
+    measurements, and location results for the target MS served by the BSC; in UTRAN the SMLC role sits
+    in the SRNC.
+  spec: ["TS 23.002 §6a.3.5", "TS 49.031"]
+
+- id: Lp
+  name: Lp
+  generations: [2G]
+  endpoints: [SMLC, SMLC]
+  protocol: BSSAP-LE / SMLCPP
+  aliases: []
+  description: >-
+    The GERAN interface between peer SMLCs. An SMLC uses it to reach positioning information and
+    resources, such as LMUs, owned by another SMLC; in UTRAN the equivalent function runs over Iur.
+  spec: ["TS 23.002 §6a.3.6", "TS 48.031"]
+
+- id: Le
+  name: Le
+  generations: [2G, 3G, 4G]
+  endpoints: [LCS-Client, GMLC]
+  protocol: OMA MLP
+  aliases: []
+  description: >-
+    The interface between an external LCS client and the GMLC. The client requests a target UE's
+    location and receives the estimate, typically using the OMA Mobile Location Protocol or the OSA API.
+  spec: ["TS 23.002 §6a.3.8"]
+
+- id: Iupc
+  name: Iupc
+  generations: [3G]
+  endpoints: [RNC, SAS]
+  protocol: PCAP
+  aliases: []
+  description: >-
+    The UTRAN interface between the SRNC and a Stand-Alone SMLC. The SAS supplies positioning assistance
+    data to the RNC and can calculate the UE's position from measurements the RNC passes on.
+  spec: ["TS 23.002 §6a.3.10", "TS 25.453"]
+
+- id: Lr
+  name: Lr
+  generations: [2G, 3G, 4G]
+  endpoints: [GMLC, GMLC]
+  protocol: OMA RLP
+  aliases: []
+  description: >-
+    The interface between GMLCs, often across networks when the target UE is roaming. It forwards
+    location requests and results between the requesting, home, and visited GMLCs.
+  spec: ["TS 23.002 §6a.3.11"]
+
+- id: Lgd
+  name: Lgd
+  generations: [3G]
+  endpoints: [SGSN, GMLC]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The interface between the GMLC and an SGSN that supports EPS-based protocols. The GMLC sends
+    location requests for a UE the SGSN serves, and the SGSN returns the location results.
+  spec: ["TS 23.002 §6a.3.15", "TS 29.172"]
+
+- id: Ge
+  name: Ge
+  generations: [2G, 3G]
+  endpoints: [gprsSSF, gsmSCF]
+  protocol: CAP
+  aliases: []
+  description: >-
+    The CAMEL interface between the gprsSSF in the SGSN and the gsmSCF. The gprsSSF asks for
+    instructions, and the gsmSCF then controls the GPRS session or PDP context, for example for prepaid
+    charging.
+  spec: ["TS 23.002 §6a.4.8"]
+
+- id: Iu-BC
+  name: Iu-BC
+  generations: [3G]
+  endpoints: [CBC, RNC]
+  protocol: SABP
+  aliases: [Iu_BC]
+  description: >-
+    The interface between the Cell Broadcast Centre and the UTRAN RNC. It carries cell broadcast
+    messages and their delivery parameters, such as the cells and repetition schedule.
+  spec: ["TS 23.002 §6a.5.1"]
+
+- id: Mb
+  name: Mb
+  generations: [IMS]
+  endpoints: [IMS-MGW, DN]
+  protocol: RTP
+  aliases: []
+  description: >-
+    The IMS media plane, carried over IP between media-handling functions such as the UE, MRFP, IMS-MGW,
+    and TrGW and toward IP networks. It transports the RTP voice, video, and other media streams of IMS
+    sessions.
+  spec: ["TS 23.002 §6a.7.14", "TS 26.114"]
+
+- id: Si
+  name: Si
+  generations: [IMS]
+  endpoints: [IM-SSF, HSS]
+  protocol: MAP
+  aliases: []
+  description: >-
+    The interface between the IM-SSF and the HSS. It transfers CAMEL subscription information, including
+    trigger data, so CAMEL-based services can run for IMS sessions; the same data can also travel over
+    Sh.
+  spec: ["TS 23.002 §6a.7.17"]
+
+- id: Ix
+  name: Ix
+  generations: [IMS]
+  endpoints: [IBCF, TrGW]
+  protocol: H.248
+  aliases: []
+  description: >-
+    The gateway control interface between the IBCF and the TrGW at an IMS network border. The IBCF uses
+    it to request address and port translation bindings and IPv4/IPv6 conversion for session media.
+  spec: ["TS 23.002 §6a.7.21"]
+
+- id: Iq
+  name: Iq
+  generations: [IMS]
+  endpoints: [P-CSCF, IMS-AGW]
+  protocol: H.248
+  aliases: []
+  description: >-
+    The gateway control interface between the P-CSCF and the IMS Access Gateway. The P-CSCF uses it to
+    allocate and release media transport addresses and to set policing and NAT traversal for each flow.
+  spec: ["TS 23.002 §6a.7.23"]
+
+- id: Izi
+  name: Izi
+  generations: [IMS]
+  endpoints: [TrGW, TrGW]
+  protocol: RTP
+  aliases: []
+  description: >-
+    The media path between TrGWs that belong to different IMS networks. It forwards the RTP media
+    streams of sessions that cross an IMS-to-IMS interconnect, after address and protocol translation.
+  spec: ["TS 23.002 §6a.7.25"]
+
+- id: I2
+  name: I2
+  generations: [IMS]
+  endpoints: [MSC, S-CSCF]
+  protocol: SIP
+  aliases: []
+  description: >-
+    The reference point between an MSC Server and the IMS CSCFs, usable across operators. It routes SIP
+    session control for an MSC Server enhanced for ICS or SRVCC, including mid-call and alerting-phase
+    transfer.
+  spec: ["TS 23.002 §6a.7.27"]
+
+- id: I3
+  name: I3
+  generations: [IMS]
+  endpoints: [MSC, AS]
+  protocol: SIP / XCAP
+  aliases: []
+  description: >-
+    The reference point between an MSC Server enhanced for ICS and the telephony application server. It
+    interworks CS supplementary service signalling and service setting procedures with the TAS.
+  spec: ["TS 23.002 §6a.7.28"]
+
+- id: I1
+  name: I1
+  generations: [IMS]
+  endpoints: [UE, AS]
+  protocol: I1 over CS (USSD)
+  aliases: []
+  description: >-
+    The reference point between an ICS UE and the SCC AS. It carries IMS service control signalling
+    while the UE uses CS access for the call bearer.
+  spec: ["TS 23.002 §6a.7.29"]
+
+- id: Ms
+  name: Ms
+  generations: [IMS]
+  endpoints: [IBCF, AS]
+  protocol: SIP
+  aliases: []
+  description: >-
+    The reference point between an IBCF and an application server. The IBCF uses it for caller identity
+    attestation, identity signing, and signature verification on calls crossing the network border.
+  spec: ["TS 23.002 §6a.7.30"]
+
+- id: Wa
+  name: Wa
+  generations: [3G]
+  endpoints: [WLAN-AN, AAA-Server]
+  protocol: RADIUS / Diameter
+  aliases: []
+  description: >-
+    The I-WLAN reference point between a WLAN access network and the 3GPP AAA Proxy or Server. It
+    carries authentication, authorization, and charging data for WLAN access.
+  spec: ["TS 23.002 §6a.9.2"]
+
+- id: Wd
+  name: Wd
+  generations: [3G]
+  endpoints: [AAA-Proxy, AAA-Server]
+  protocol: RADIUS / Diameter
+  aliases: []
+  description: >-
+    The I-WLAN roaming reference point between the visited 3GPP AAA Proxy and the home 3GPP AAA Server.
+    It relays authentication, authorization, and related information for roaming WLAN users.
+  spec: ["TS 23.002 §6a.9.3"]
+
+- id: Wg
+  name: Wg
+  generations: [3G]
+  endpoints: [WAG, AAA-Server]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the 3GPP AAA Server or Proxy and the WAG. It gives the WAG the
+    policy enforcement information for authorised users and returns per-tunnel charging data when
+    roaming.
+  spec: ["TS 23.002 §6a.9.4"]
+
+- id: Wi
+  name: Wi
+  generations: [3G]
+  endpoints: [PDG, DN]
+  protocol: IP
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the PDG and a packet data network. The network can be an external
+    public or private network or an operator network, for example for IMS services.
+  spec: ["TS 23.002 §6a.9.5"]
+
+- id: Wm
+  name: Wm
+  generations: [3G]
+  endpoints: [PDG, AAA-Server]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the 3GPP AAA Server or Proxy and the PDG. It carries service
+    authentication and authorization, tunnel authentication data, and tunnelling attributes and IP
+    configuration for the WLAN UE.
+  spec: ["TS 23.002 §6a.9.6"]
+
+- id: Wn
+  name: Wn
+  generations: [3G]
+  endpoints: [WLAN-AN, WAG]
+  protocol: IP
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the WLAN access network and the WAG. It forces traffic between a
+    WLAN UE and the PDG to pass through the WAG.
+  spec: ["TS 23.002 §6a.9.7"]
+
+- id: Wp
+  name: Wp
+  generations: [3G]
+  endpoints: [WAG, PDG]
+  protocol: IP
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the WAG and the PDG. It transports the tunnelled Wu packets
+    between the WLAN UE and the PDG, so the WAG can enforce policy on them.
+  spec: ["TS 23.002 §6a.9.8"]
+
+- id: Wu
+  name: Wu
+  generations: [3G]
+  endpoints: [UE, PDG]
+  protocol: IKEv2/IPsec
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the WLAN UE and the PDG. The UE uses it to set up a tunnel to the
+    PDG and exchange packet data with 3GPP PS services through it.
+  spec: ["TS 23.002 §6a.9.9"]
+
+- id: Ww
+  name: Ww
+  generations: [3G]
+  endpoints: [UE, WLAN-AN]
+  protocol: IEEE 802.11
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the WLAN UE and the WLAN access network. Its radio and access
+    protocols, such as 802.11 and 802.1X, are defined by IEEE outside 3GPP.
+  spec: ["TS 23.002 §6a.9.10"]
+
+- id: Wx
+  name: Wx
+  generations: [3G]
+  endpoints: [AAA-Server, HSS]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The I-WLAN reference point between the 3GPP AAA Server and the HSS. The AAA Server fetches
+    authentication vectors, WLAN subscriber profiles, and charging addresses, and registers itself for
+    authorised WLAN users.
+  spec: ["TS 23.002 §6a.9.11"]
+
+- id: Dw
+  name: Dw
+  generations: [3G]
+  endpoints: [AAA-Server, SLF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the 3GPP AAA Server and the SLF. The AAA Server uses it to find which
+    HSS holds a user's data when the network has several HSSs.
+  spec: ["TS 23.002 §6a.9.12"]
+
+- id: Mz
+  name: Mz
+  generations: [3G, 4G]
+  endpoints: [BM-SC, BM-SC]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The roaming variant of Gmb, between a BM-SC in the visited network and one in the home network. It
+    carries MBMS service authorization and bearer signalling for roaming users.
+  spec: ["TS 23.002 §6a.10.2", "TS 29.061"]
+
+- id: Gmc
+  name: Gmc
+  generations: [3G]
+  endpoints: [GGSN, RNC]
+  protocol: GTP-U
+  aliases: []
+  description: >-
+    The reference point between the GGSN and the RNS or Iu-mode BSS for MBMS. It delivers MBMS user data
+    to the radio network using IP multicast.
+  spec: ["TS 23.002 §6a.10.3", "TS 29.281"]
+
+- id: Sn
+  name: Sn
+  generations: [3G]
+  endpoints: [MBMS-GW, SGSN]
+  protocol: GTPv2-C / GTP-U
+  aliases: []
+  description: >-
+    The reference point between the MBMS-GW and an S4-SGSN. It carries MBMS session start, update, and
+    stop signalling and delivers MBMS data to the SGSN in point-to-point mode.
+  spec: ["TS 23.002 §6a.11.4", "TS 29.274"]
+
+- id: M1
+  name: M1
+  generations: [3G, 4G]
+  endpoints: [MBMS-GW, eNodeB]
+  protocol: GTP-U
+  aliases: []
+  description: >-
+    The MBMS user plane between the MBMS-GW and the E-UTRAN or UTRAN. It delivers broadcast content to
+    the eNodeBs or RNCs over IP multicast with GTP-U encapsulation.
+  spec: ["TS 23.002 §6a.11.5", "TS 29.281", "TS 36.445"]
+
+- id: M3
+  name: M3
+  generations: [4G]
+  endpoints: [MME, MCE]
+  protocol: M3AP
+  aliases: []
+  description: >-
+    The control interface between the MME and the MCE for E-UTRAN MBMS. It carries MBMS session start,
+    update, and stop signalling, with the session's QoS and service area.
+  spec: ["TS 23.002 §6a.11.6", "TS 36.444"]
+
+- id: M2
+  name: M2
+  generations: [4G]
+  endpoints: [MCE, eNodeB]
+  protocol: M2AP
+  aliases: []
+  description: >-
+    The control interface between the MCE and the eNodeBs in an MBSFN area. It carries MBMS session
+    control and the radio configuration the MCE allocates for the broadcast.
+  spec: ["TS 23.002 §6a.11.7", "TS 36.443"]
+
+- id: xMB
+  name: xMB
+  generations: [4G]
+  endpoints: [Content-Provider, BM-SC]
+  protocol: HTTP (REST)
+  aliases: []
+  description: >-
+    The reference point between a content provider and the BM-SC, either directly or through the SCEF.
+    The provider uses it to create and control MBMS user services and to hand over the content to
+    broadcast.
+  spec: ["TS 23.002 §6a.11.8", "TS 26.346"]
+
+- id: Rg
+  name: Rg
+  generations: [3G, IMS]
+  endpoints: [AS, GUP-Server]
+  protocol: SOAP over HTTP
+  aliases: []
+  description: >-
+    The reference point between applications and the GUP Server. Applications use it to create, read,
+    modify, and delete Generic User Profile data, and the GUP Server locates the repositories that hold
+    it.
+  spec: ["TS 23.002 §6a.12.1"]
+
+- id: Rp
+  name: Rp
+  generations: [3G, IMS]
+  endpoints: [GUP-Server, HSS]
+  protocol: Not specified
+  aliases: []
+  description: >-
+    The reference point from the GUP Server, or from applications, to GUP data repositories such as the
+    HSS. It gives access to the stored user profile components, including IMS user data.
+  spec: ["TS 23.002 §6a.12.2"]
+
+- id: Sp
+  name: Sp
+  generations: [4G]
+  endpoints: [PCRF, SPR]
+  protocol: Not specified
+  aliases: []
+  description: >-
+    The reference point between the PCRF and the Subscription Profile Repository. The PCRF fetches
+    subscription data for policy decisions, and the SPR can notify it when that data changes.
+  spec: ["TS 23.002 §6a.13.3"]
+
+- id: Gxb
+  name: Gxb
+  generations: [4G]
+  endpoints: [ePDG, PCRF]
+  protocol: Diameter
+  aliases: [Gxb*]
+  description: >-
+    The reference point between the ePDG and the PCRF or visited PCRF; only the Gxb* variant for fixed
+    broadband interworking is specified. It reports WLAN access information such as the UE's local IP
+    address and UDP port.
+  spec: ["TS 23.002 §6a.13.7", "TS 29.212"]
+
+- id: Gxx
+  name: Gxx
+  generations: [4G]
+  endpoints: [BBERF, PCRF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The generic name for the policy interface between the PCRF and a BBERF, covering Gxa and Gxc. The
+    PCRF uses it to install QoS rules and control bearer binding and event reporting in the access
+    gateway.
+  spec: ["TS 23.002 §6a.13.9", "TS 29.213"]
+
+- id: Ud
+  name: Ud
+  generations: [3G, 4G, IMS]
+  endpoints: [AFE, UDR]
+  protocol: LDAP / SOAP
+  aliases: []
+  description: >-
+    The reference point between application front ends, such as HLR, HSS, or AS front ends, and the UDR
+    in a User Data Convergence architecture. Front ends, including a PCRF acting as one, read and update
+    user data and subscribe to change notifications.
+  spec: ["TS 23.002 §6a.13.11", "TS 23.002 §6a.15.1", "TS 29.335"]
+
+- id: S15
+  name: S15
+  generations: [3G]
+  endpoints: [HNB-GW, PCRF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the HNB-GW and the PCRF for fixed broadband interworking. It sets up,
+    modifies, and ends sessions so the PCRF can request fixed network resources for HNB CS calls.
+  spec: ["TS 23.002 §6a.13.14", "TS 29.212"]
+
+- id: S9a
+  name: S9a
+  generations: [4G]
+  endpoints: [BPCF, PCRF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the PCRF and the Broadband Policy Control Function of a fixed broadband
+    access network. It transfers QoS policy information from the PCRF to the BPCF.
+  spec: ["TS 23.002 §6a.13.15", "TS 29.215"]
+
+- id: Gyn
+  name: Gyn
+  generations: [4G]
+  endpoints: [TDF, OCS]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The online charging interface between the TDF and the OCS. It uses Diameter credit control to
+    request quota and report usage for the application traffic the TDF detects.
+  spec: ["TS 23.002 §6a.13.16", "TS 32.251", "RFC 4006"]
+
+- id: Gzn
+  name: Gzn
+  generations: [4G]
+  endpoints: [TDF, OFCS]
+  protocol: Diameter (Rf) / GTP'
+  aliases: []
+  description: >-
+    The offline charging interface between the TDF and the OFCS. It transfers charging data and records
+    for the application traffic the TDF detects, for later billing.
+  spec: ["TS 23.002 §6a.13.17", "TS 32.295"]
+
+- id: Gw
+  name: Gw
+  generations: [4G]
+  endpoints: [PCEF, PFDF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the PFDF and the PCEF. The PFDF provides the Packet Flow Descriptions
+    that third parties manage, so the PCEF can detect their application traffic.
+  spec: ["TS 23.002 §6a.13.20"]
+
+- id: Gwn
+  name: Gwn
+  generations: [4G]
+  endpoints: [TDF, PFDF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the PFDF and the TDF. The PFDF provides the Packet Flow Descriptions
+    that third parties manage, so the TDF can detect their application traffic.
+  spec: ["TS 23.002 §6a.13.21"]
+
+- id: J
+  name: J
+  generations: [IMS]
+  endpoints: [IP-SM-GW, HSS]
+  protocol: MAP
+  aliases: []
+  description: >-
+    The reference point between the IP-SM-GW and the HSS for SMS over IP. The IP-SM-GW uses it to
+    register as the user's serving node for SMS and to fetch routing data.
+  spec: ["TS 23.002 §6a.14.1"]
+
+- id: Nu
+  name: Nu
+  generations: [4G]
+  endpoints: [SCEF, PFDF]
+  protocol: HTTP
+  aliases: []
+  description: >-
+    The reference point between the SCEF and the PFDF. The SCEF adds, updates, and removes Packet Flow
+    Descriptions in the PFDF on behalf of third-party SCS/AS providers.
+  spec: ["TS 23.002 §6a.16.10"]
+
+- id: MB2
+  name: MB2
+  generations: [4G]
+  endpoints: [GCS-AS, BM-SC]
+  protocol: Diameter / IP
+  aliases: []
+  description: >-
+    The reference point between a GCS AS and the BM-SC for group communication over LTE. It starts,
+    stops, and modifies MBMS broadcast bearers and carries the group application data to broadcast.
+  spec: ["TS 23.002 §6a.17.1"]
+
+- id: GC1
+  name: GC1
+  generations: [4G]
+  endpoints: [UE, GCS-AS]
+  protocol: Application-defined
+  aliases: []
+  description: >-
+    The application-level reference point between the UE and the GCS AS. It carries group communication
+    signalling and application data, over unicast bearers or alongside MBMS delivery.
+  spec: ["TS 23.002 §6a.17.2"]
+
+- id: PC1
+  name: PC1
+  generations: [4G]
+  endpoints: [UE, ProSe-AS]
+  protocol: Application-defined
+  aliases: []
+  description: >-
+    The application-level reference point between the ProSe application in the UE and the ProSe
+    Application Server. Its signalling is left to the application and not specified by 3GPP.
+  spec: ["TS 23.002 §6a.18.1"]
+
+- id: PC2
+  name: PC2
+  generations: [4G]
+  endpoints: [ProSe-AS, ProSe-Function]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the ProSe Application Server and the ProSe Function. It supports EPC-
+    level ProSe discovery, for example by translating application user identities into network
+    identities.
+  spec: ["TS 23.002 §6a.18.2", "TS 29.343"]
+
+- id: PC3
+  name: PC3
+  generations: [4G]
+  endpoints: [UE, ProSe-Function]
+  protocol: HTTP
+  aliases: []
+  description: >-
+    The over-IP reference point between the UE and the ProSe Function. It authorises discovery requests,
+    allocates ProSe Application Codes, and provisions per-PLMN policy for direct discovery and
+    communication.
+  spec: ["TS 23.002 §6a.18.3"]
+
+- id: PC4a
+  name: PC4a
+  generations: [4G]
+  endpoints: [ProSe-Function, HSS]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the ProSe Function and the HSS. It provides per-PLMN ProSe subscription
+    data for authorising direct discovery and communication, and EPC-level discovery subscriber data.
+  spec: ["TS 23.002 §6a.18.4"]
+
+- id: PC4b
+  name: PC4b
+  generations: [4G]
+  endpoints: [ProSe-Function, SLP]
+  protocol: OMA MLP
+  aliases: []
+  description: >-
+    The reference point between the ProSe Function and the SUPL Location Platform. The ProSe Function
+    acts as an LCS client and queries the SLP for UE locations during EPC-level discovery.
+  spec: ["TS 23.002 §6a.18.5"]
+
+- id: PC5
+  name: PC5
+  generations: [4G]
+  endpoints: [UE, UE]
+  protocol: PC5 (sidelink)
+  aliases: []
+  description: >-
+    The direct radio link between ProSe-enabled UEs, without passing through the network. It carries
+    control and user plane traffic for direct discovery, direct communication, and UE-to-network relay.
+  spec: ["TS 23.002 §6a.18.6"]
+
+- id: PC6
+  name: PC6
+  generations: [4G]
+  endpoints: [ProSe-Function, ProSe-Function]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between ProSe Functions in different PLMNs, such as home and local. It
+    authorises discovery requests, retrieves discovery filters, and translates ProSe Application Codes
+    to application IDs.
+  spec: ["TS 23.002 §6a.18.7", "TS 29.345"]
+
+- id: PC7
+  name: PC7
+  generations: [4G]
+  endpoints: [ProSe-Function, ProSe-Function]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the home and visited ProSe Functions. It lets the home network control
+    ProSe service authorization and handles discovery authorization, filters, and code translation.
+  spec: ["TS 23.002 §6a.18.8", "TS 29.345"]
+
+- id: Nq
+  name: Nq
+  generations: [4G]
+  endpoints: [MME, RCAF]
+  protocol: Diameter
+  aliases: []
+  description: >-
+    The reference point between the MME and the RCAF. The RCAF retrieves the UEs served by a congested
+    eNodeB or cell and the APNs of their active PDN connections.
+  spec: ["TS 23.002 §6a.19.2", "TS 23.401"]
+
+- id: Mm
+  name: Mm
+  generations: [IMS]
+  endpoints: [IBCF, DN]
+  protocol: SIP
+  aliases: []
+  description: >-
+    The IP signalling interface between a CSCF or IBCF and external multimedia IP networks. It exchanges
+    SIP session requests with other SIP servers or terminals outside the IMS.
+  spec: ["TS 23.002 §7.4"]
+
+# --- 5GS reference points, CUPS (TS 23.214), NG-RAN split, and charging ---
+
+- id: N16a
+  name: N16a
+  generations: [5G]
+  endpoints: [SMF, I-SMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the anchor SMF and an I-SMF inserted for a PDU session. It uses
+    Nsmf_PDUSession to pass N4 rules and QoS information that the I-SMF applies to the UPFs it controls.
+  spec: ["TS 23.501 §4.2.7", "TS 29.502"]
+
+- id: N38
+  name: N38
+  generations: [5G]
+  endpoints: [I-SMF, I-SMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between I-SMFs and between V-SMFs, in the same or different PLMNs. It transfers
+    the SM context and forwarding tunnel information when the I-SMF or V-SMF of a PDU session changes.
+  spec: ["TS 23.501 §4.2.7", "TS 29.502"]
+
+- id: N41
+  name: N41
+  generations: [5G]
+  endpoints: [AMF, CHF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AMF and the CHF in the home PLMN. It uses Nchf_ConvergedCharging to
+    report registration, mobility, and connection events for charging.
+  spec: ["TS 23.501 §4.2.7", "TS 32.256", "TS 32.291"]
+
+- id: N42
+  name: N42
+  generations: [5G]
+  endpoints: [AMF, CHF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AMF and the CHF in the visited PLMN. It uses Nchf_ConvergedCharging
+    so the VPLMN can charge for the registration, mobility, and connection events of roaming UEs.
+  spec: ["TS 23.501 §4.2.7", "TS 32.256", "TS 32.291"]
+
+- id: N43
+  name: N43
+  generations: [5G]
+  endpoints: [PCF, PCF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the PCF for the UE and the PCF for the PDU session. It is used, for
+    example, with Npcf_UEPolicyControl to deliver URSP rules to a UE served over EPS.
+  spec: ["TS 23.501 §4.2.7", "TS 23.503", "TS 29.525"]
+
+- id: N55
+  name: N55
+  generations: [5G]
+  endpoints: [AMF, UCMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AMF and the UCMF. It uses Nucmf_UECapabilityManagement to assign UE
+    radio capability IDs and resolve them into full radio capabilities.
+  spec: ["TS 23.501 §4.2.7", "TS 29.673"]
+
+- id: N56
+  name: N56
+  generations: [5G]
+  endpoints: [NEF, UCMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the NEF and the UCMF. It lets an external AF provision manufacturer-
+    assigned UE radio capability IDs in the UCMF through the NEF.
+  spec: ["TS 23.501 §4.2.7", "TS 23.502"]
+
+- id: N57
+  name: N57
+  generations: [5G]
+  endpoints: [AF, UCMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between a trusted AF and the UCMF. The AF uses Nucmf_Provisioning to provision
+    manufacturer-assigned UE radio capability IDs directly, without the NEF.
+  spec: ["TS 23.501 §4.2.7", "TS 23.502"]
+
+- id: N60
+  name: N60
+  generations: [5G]
+  endpoints: [AUSF, NSWOF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AUSF and the NSWOF. It uses Nausf_UEauthentication to authenticate a
+    UE with its 5GS credentials when it connects to a WLAN for non-seamless offload.
+  spec: ["TS 23.501 §4.2.7", "TS 33.501", "TS 29.509"]
+
+- id: N80
+  name: N80
+  generations: [5G]
+  endpoints: [AMF, NSACF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AMF and the NSACF. It uses Nnsacf_NSAC to check and update the
+    number of UEs registered on a network slice before admitting a UE.
+  spec: ["TS 23.501 §4.2.7", "TS 29.536"]
+
+- id: N81
+  name: N81
+  generations: [5G]
+  endpoints: [SMF, NSACF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the SMF and the NSACF. It uses Nnsacf_NSAC to check and update the
+    number of PDU sessions on a network slice before admitting a session.
+  spec: ["TS 23.501 §4.2.7", "TS 29.536"]
+
+- id: N82
+  name: N82
+  generations: [5G]
+  endpoints: [NSACF, NEF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the NSACF and the NEF. It uses Nnsacf_SliceEventExposure to report slice
+    status, such as current UE and PDU session counts, toward an AF.
+  spec: ["TS 23.501 §4.2.7", "TS 29.536"]
+
+- id: N83
+  name: N83
+  generations: [5G]
+  endpoints: [AUSF, NSSAAF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the AUSF and the NSSAAF. It uses Nnssaaf_AIW to relay EAP authentication
+    toward an external AAA server, for example for SNPN access with credentials from a credentials
+    holder.
+  spec: ["TS 23.501 §4.2.7", "TS 29.526"]
+
+- id: N84
+  name: N84
+  generations: [5G]
+  endpoints: [TSCTSF, PCF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and the PCF. The TSCTSF uses Npcf_PolicyAuthorization to pass
+    QoS requirements, TSC assistance containers, and time synchronization settings for a PDU session.
+  spec: ["TS 23.501 §4.2.7", "TS 29.514"]
+
+- id: N85
+  name: N85
+  generations: [5G]
+  endpoints: [TSCTSF, NEF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and the NEF. The NEF relays external AF requests for time
+    synchronization and time sensitive QoS to the TSCTSF services.
+  spec: ["TS 23.501 §4.2.7", "TS 29.565"]
+
+- id: N86
+  name: N86
+  generations: [5G]
+  endpoints: [TSCTSF, AF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and a trusted AF. The AF uses the TSCTSF services directly to
+    request time synchronization and QoS for time sensitive traffic.
+  spec: ["TS 23.501 §4.2.7", "TS 29.565"]
+
+- id: N87
+  name: N87
+  generations: [5G]
+  endpoints: [TSCTSF, UDM]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and the UDM. The TSCTSF uses Nudm_SDM to fetch time
+    synchronization subscription data and to resolve GPSIs and group IDs into SUPIs.
+  spec: ["TS 23.501 §4.2.7", "TS 29.503"]
+
+- id: N88
+  name: N88
+  generations: [5G]
+  endpoints: [SMF, EASDF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the SMF and the EASDF. The SMF uses Neasdf_DNSContext to install rules
+    for handling a PDU session's DNS messages and to receive DNS message reports.
+  spec: ["TS 23.501 §4.2.7", "TS 23.548", "TS 29.556"]
+
+- id: N89
+  name: N89
+  generations: [5G]
+  endpoints: [TSCTSF, AMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and the AMF. The TSCTSF subscribes to UE presence in an area
+    of interest and sends non-UE N2 messages to configure and monitor NG-RAN time synchronization.
+  spec: ["TS 23.501 §4.2.7", "TS 29.518"]
+
+- id: N96
+  name: N96
+  generations: [5G]
+  endpoints: [TSCTSF, NRF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between the TSCTSF and the NRF. The TSCTSF uses Nnrf_NFDiscovery, for example to
+    find the AMFs serving the tracking areas of a time synchronization coverage area.
+  spec: ["TS 23.501 §4.2.7", "TS 29.510"]
+
+- id: N97
+  name: N97
+  generations: [5G]
+  endpoints: [NSACF, NSACF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between NSACFs in different PLMNs. A VPLMN NSACF uses it to reach the HPLMN
+    primary or central NSACF for slice admission control of inbound roamers.
+  spec: ["TS 23.501 §4.2.7", "TS 29.536"]
+
+- id: N99
+  name: N99
+  generations: [5G]
+  endpoints: [NSACF, NSACF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The reference point between NSACFs in the same PLMN. In a hierarchical deployment, NSACFs use it to
+    obtain and return slice quota from the primary NSACF.
+  spec: ["TS 23.501 §4.2.7", "TS 29.536"]
+
+- id: Sxa
+  name: Sxa
+  generations: [4G]
+  endpoints: [SGW-C, SGW-U]
+  protocol: PFCP
+  aliases: []
+  description: >-
+    The reference point between the SGW-C and the SGW-U. The SGW-C installs packet detection,
+    forwarding, and buffering rules, and the SGW-U reports usage and downlink data arrival for idle UEs.
+  spec: ["TS 23.214 §4.2.3", "TS 29.244"]
+
+- id: Sxb
+  name: Sxb
+  generations: [4G]
+  endpoints: [PGW-C, PGW-U]
+  protocol: PFCP
+  aliases: []
+  description: >-
+    The reference point between the PGW-C and the PGW-U. The PGW-C installs detection, forwarding, QoS,
+    and usage reporting rules for bearers. In 5GS interworking, a PGW-C+SMF uses N4 toward a UPF+PGW-U
+    instead.
+  spec: ["TS 23.214 §4.2.3", "TS 23.501 §4.3.1", "TS 29.244"]
+
+- id: Sxc
+  name: Sxc
+  generations: [4G]
+  endpoints: [TDF-C, TDF-U]
+  protocol: PFCP
+  aliases: []
+  description: >-
+    The reference point between the TDF-C and the TDF-U. The TDF-C installs application detection and
+    enforcement rules, and the TDF-U reports detected applications and usage.
+  spec: ["TS 23.214 §4.2.3", "TS 29.244"]
+
+- id: Sxa-Sxb
+  name: Sxa/Sxb
+  generations: [4G]
+  endpoints: [SGW-PGW-C, SGW-PGW-U]
+  protocol: PFCP
+  aliases: []
+  description: >-
+    The reference point between the control and user plane functions of a combined SGW/PGW. It uses the
+    same Sx parameter structure and covers only the functionality of Sxa and Sxb.
+  spec: ["TS 23.214 §4.2.2", "TS 29.244"]
+
+- id: S11-U
+  name: S11-U
+  generations: [4G]
+  endpoints: [MME, SGW]
+  protocol: GTP-U
+  aliases: []
+  description: >-
+    The user-plane reference point between the MME and the SGW, used for Control Plane CIoT EPS
+    Optimisation. It carries user data sent in NAS messages; with CUPS it terminates on the SGW-U.
+  spec: ["TS 23.401 §4.2.3", "TS 23.214 §4.2.1", "TS 29.281"]
+
+- id: F1-C
+  name: F1-C
+  generations: [5G]
+  endpoints: [gNB-CU-CP, gNB-DU]
+  protocol: F1AP
+  aliases: []
+  description: >-
+    The control-plane interface between the gNB-CU-CP and a gNB-DU. It carries F1AP over SCTP for UE
+    context management, RRC message transfer, system information, and cell management.
+  spec: ["TS 38.401", "TS 38.473"]
+
+- id: F1-U
+  name: F1-U
+  generations: [5G]
+  endpoints: [gNB-CU-UP, gNB-DU]
+  protocol: GTP-U
+  aliases: []
+  description: >-
+    The user-plane interface between the gNB-CU-UP and a gNB-DU. It carries user data for each data
+    radio bearer in GTP-U tunnels, with flow control feedback from the DU.
+  spec: ["TS 38.401", "TS 38.470", "TS 38.474"]
+
+- id: E1
+  name: E1
+  generations: [5G]
+  endpoints: [gNB-CU-CP, gNB-CU-UP]
+  protocol: E1AP
+  aliases: []
+  description: >-
+    The interface between the gNB-CU-CP and the gNB-CU-UP. The CU-CP uses E1AP to set up, modify, and
+    release bearer contexts in the CU-UP for each UE.
+  spec: ["TS 38.401", "TS 38.463"]
+
+- id: Ga
+  name: Ga
+  generations: [2G, 3G, 4G, IMS]
+  endpoints: [CDF, CGF]
+  protocol: GTP'
+  aliases: []
+  description: >-
+    The offline charging interface between the CDF and the CGF. It carries CDRs over GTP' (GTP prime),
+    which the CGF then validates, consolidates, and passes to the billing domain.
+  spec: ["TS 32.240", "TS 32.295"]

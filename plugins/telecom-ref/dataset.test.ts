@@ -3,7 +3,10 @@ import { bundledRaw } from "./dataset";
 import type { RawDataset } from "./types";
 import { validateDataset } from "./validate";
 
-/** A small consistent dataset: S6a carries ULR, which carries Subscription-Data, which groups MSISDN. */
+/**
+ * A small consistent dataset: S6a carries ULR, which carries Subscription-Data, which groups MSISDN;
+ * S6a runs Diameter, and the HSS produces Nhss_UECM.
+ */
 function fixture(): RawDataset {
   return {
     meta: { release: 18, built: "2026-10-22", counts: {}, specVersions: {}, sources: [], inScopeApps: [], notice: "" },
@@ -92,7 +95,9 @@ function fixture(): RawDataset {
         generations: ["4G"],
         endpoints: ["nf/MME", "nf/HSS"],
         protocol: "Diameter",
+        protocols: ["proto/Diameter"],
         apps: ["diam.app/16777251"],
+        services: [],
         description: null,
         aliases: [],
         spec: [{ doc: "TS 23.401", clause: "4.2" }],
@@ -111,6 +116,7 @@ function fixture(): RawDataset {
         aliases: [],
         spec: [],
         interfaces: ["if/S6a"],
+        services: [],
       },
       {
         id: "nf/HSS",
@@ -124,6 +130,36 @@ function fixture(): RawDataset {
         aliases: [],
         spec: [],
         interfaces: ["if/S6a"],
+        services: ["svc/Nhss_UECM"],
+      },
+    ],
+    services: [
+      {
+        id: "svc/Nhss_UECM",
+        kind: "svc",
+        name: "Nhss_UECM",
+        aliases: [],
+        producer: "nf/HSS",
+        consumers: ["nf/MME"],
+        operations: [{ name: "Update", semantics: "Request/Response", consumers: ["nf/MME"] }],
+        description: null,
+        spec: [{ doc: "TS 23.632", clause: "6.1.3" }],
+        interfaces: [],
+      },
+    ],
+    protocols: [
+      {
+        id: "proto/Diameter",
+        kind: "proto",
+        name: "Diameter",
+        fullName: null,
+        aliases: [],
+        transport: "TCP or SCTP port 3868",
+        over: [],
+        carries: [],
+        description: null,
+        spec: [{ doc: "RFC 6733" }],
+        interfaces: ["if/S6a"],
       },
     ],
     search: [
@@ -134,6 +170,8 @@ function fixture(): RawDataset {
       ["if/S6a", ["s6a"]],
       ["nf/MME", ["mme"]],
       ["nf/HSS", ["hss"]],
+      ["svc/Nhss_UECM", ["nhssuecm"]],
+      ["proto/Diameter", ["diameter"]],
     ],
   };
 }
@@ -165,6 +203,17 @@ describe("validateDataset", () => {
       field: "parents",
       message: "diam.avp/10415/1400 does not list it as a child",
     });
+  });
+
+  it("reports protocol and service links that their targets do not mirror", () => {
+    const raw = fixture();
+    raw.interfaces[0]!.protocols = [];
+    raw.nfs[1]!.services = [];
+    raw.services[0]!.consumers = ["if/S6a"];
+    const issues = validateDataset(raw);
+    expect(issues).toContainEqual({ id: "proto/Diameter", field: "interfaces", message: "if/S6a does not list it" });
+    expect(issues).toContainEqual({ id: "svc/Nhss_UECM", field: "producer", message: "nf/HSS does not list it" });
+    expect(issues).toContainEqual(expect.objectContaining({ id: "svc/Nhss_UECM", field: "consumers", message: "if/S6a is a if, expected nf" }));
   });
 
   it("reports duplicate ids, malformed spec docs, and gaps in the search index", () => {
@@ -211,6 +260,8 @@ describe("the committed dataset", () => {
       avps: raw.avps.length,
       interfaces: raw.interfaces.length,
       nfs: raw.nfs.length,
+      services: raw.services.length,
+      protocols: raw.protocols.length,
     });
   });
 });
