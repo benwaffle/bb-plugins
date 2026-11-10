@@ -45,9 +45,9 @@ async function seeded() {
   return ledger;
 }
 
-// msg_A1 0.0138 + msg_A2 0.005525 + msg_A3 0.00035 + msg_S1 0.00135
-const ACME_COST = 0.021025;
-const GADGET_COST = 0.00338;
+// msg_A1 0.01004 + msg_A2 0.00322 + msg_A3 0.00035 + msg_S1 0.00088
+const ACME_COST = 0.01449;
+const GADGET_COST = 0.002704;
 
 describe("totals", () => {
   it("sums cost, tokens, turns, and threads across sources without counting a session twice", async () => {
@@ -66,8 +66,8 @@ describe("totals", () => {
       unpricedTokens: 0,
     });
     expect(cacheHitRatio(totals)).toBeCloseTo(12_000 / 13_736, 10);
-    // opus cache reads: 12,000 × ($5 − $0.50) per million
-    expect(totals.savedUsd).toBeCloseTo(0.054, 10);
+    // opus 5.5 cache reads: 12,000 × ($4 − $0.20) per million
+    expect(totals.savedUsd).toBeCloseTo(0.0456, 10);
   });
 
   it("splits bb threads from sessions outside bb", async () => {
@@ -81,8 +81,8 @@ describe("totals", () => {
 
   it("counts only today for a one-day range and compares with yesterday", async () => {
     const data = dashboard((await seeded()).db, { days: 1, source: "all", sort: "cost" }, NOW);
-    expect(data.current.costUsd).toBeCloseTo(0.00035 + 0.00135 + GADGET_COST + 0.5, 10);
-    expect(data.previous.costUsd).toBeCloseTo(0.0138 + 0.005525, 10);
+    expect(data.current.costUsd).toBeCloseTo(0.00035 + 0.00088 + GADGET_COST + 0.5, 10);
+    expect(data.previous.costUsd).toBeCloseTo(0.01004 + 0.00322, 10);
     expect(data.days).toHaveLength(7);
   });
 });
@@ -172,7 +172,7 @@ describe("threadDetail", () => {
       [1, 6_210 + 6_105],
       [2, 150 + 1_050],
     ]);
-    expect(detail?.turns[0]?.costUsd).toBeCloseTo(0.0138 + 0.005525, 10);
+    expect(detail?.turns[0]?.costUsd).toBeCloseTo(0.01004 + 0.00322, 10);
     expect(detail?.models.map((model) => model.model)).toEqual(["claude-opus-5-5", "claude-haiku-4-5-20251001"]);
     expect(detail?.totals.costUsd).toBeCloseTo(ACME_COST, 10);
   });

@@ -40,9 +40,12 @@ API, and today's totals are the `dashboard` RPC with
 A bb thread's Claude Code session id is its provider thread id, so a session
 found in both is counted once, from its transcript. Claude Code writes one
 transcript line per content block, all with the same message id and usage;
-the importer records each message id once. Transcript messages are priced with
-the same Anthropic list prices bb uses. Other providers use the cost bb
-reports, which is empty for models bb has no price for.
+the importer records each message id once. Transcript messages are priced at
+import with the Anthropic list prices in `pricing.ts` (cache writes at the
+5-minute rate; Haiku 5.5 prompts over 100K tokens at its long-prompt rates).
+When that table's `PRICING_VERSION` changes, the next plugin start re-prices
+every stored transcript row once. Other providers use the cost bb reports,
+which is empty for models bb has no price for.
 
 The transcript import runs at startup and every 5 minutes, and reads only the
 bytes appended since the last run. Each file keeps a cursor: its size, mtime,

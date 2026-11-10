@@ -20,6 +20,7 @@ import {
   type ProjectPath,
 } from "./importer.js";
 import { MIGRATIONS, openLedger } from "./ledger.js";
+import { PRICING_VERSION } from "./pricing.js";
 import { formatSummary } from "./summary.js";
 import { createThreadRecorder } from "./threads.js";
 import { localTranscriptReader, type TranscriptReader } from "./transcripts.js";
@@ -62,6 +63,7 @@ export function createUsageStats(options: UsageStatsOptions = {}) {
     const db = bb.storage.database();
     bb.storage.migrate(db, MIGRATIONS);
     const ledger = openLedger(db);
+    ledger.repriceTranscripts(String(PRICING_VERSION));
     const { recordThread, reconcileThreads } = createThreadRecorder(bb, ledger);
 
     let queue: Promise<unknown> = Promise.resolve();

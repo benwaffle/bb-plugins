@@ -51,8 +51,8 @@ describe("importTranscripts", () => {
       cache_read: 5000,
       cache_write: 1000,
     });
-    // 10×$5 + 200×$25 + 5000×$0.50 + 1000×$6.25 per million
-    expect(rows.find((row) => row.id === "transcript:msg_A1")?.cost_usd).toBeCloseTo(0.0138, 10);
+    // 10×$4 + 200×$20 + 5000×$0.20 + 1000×$5 per million
+    expect(rows.find((row) => row.id === "transcript:msg_A1")?.cost_usd).toBeCloseTo(0.01004, 10);
     expect(rows.find((row) => row.id === "transcript:msg_A2")?.session_id).toBe(SESSION_A);
     expect(rows.find((row) => row.id === "transcript:msg_S1")?.session_id).toBe(SESSION_A);
     expect(rows.find((row) => row.id === "transcript:msg_B1")?.project).toBe("gadget");
@@ -98,7 +98,7 @@ describe("importTranscripts", () => {
     expect(ledger.addTranscriptMessage(message, "local", null)).toBe(false);
     const row = ledger.db.prepare(`SELECT output, cost_usd FROM usage`).get() as { output: number; cost_usd: number };
     expect(row.output).toBe(30);
-    expect(row.cost_usd).toBeCloseTo((1 * 5 + 30 * 25) / 1e6, 12);
+    expect(row.cost_usd).toBeCloseTo((1 * 4 + 30 * 20) / 1e6, 12);
   });
 });
 

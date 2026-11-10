@@ -271,6 +271,10 @@ export function openLedger(db: Database.Database) {
   const upsertMeta = db.prepare(
     `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
   );
+  const selectTranscriptRows = db.prepare<[], UsageRow & { id: string; model: string }>(
+    `SELECT id, model, input, output, cache_read, cache_write, cost_usd FROM usage WHERE source = 'transcript'`,
+  );
+  const updateCost = db.prepare(`UPDATE usage SET cost_usd = ? WHERE id = ?`);
 
   return {
     db,
@@ -396,6 +400,27 @@ export function openLedger(db: Database.Database) {
 
     setMeta(key: string, value: string): void {
       upsertMeta.run(key, value);
+    },
+
+    /**
+     * Re-prices every transcript row with the current table, once per
+     * `version`, and returns the rows whose cost changed. Ledger rows keep
+     * the cost bb reported for the turn, and their running totals are
+     * subtracted from bb's next report, so they are left as recorded.
+     */
+    repriceTranscripts(version: string): number {
+      if (selectMeta.get("pricingVersion")?.value === version) return 0;
+      let changed = 0;
+      db.transaction(() => {
+        for (const row of selectTranscriptRows.all()) {
+          const cost = priceTokens(row.model, rowTokens(row));
+          if (cost === row.cost_usd) continue;
+          updateCost.run(cost, row.id);
+          changed += 1;
+        }
+        upsertMeta.run("pricingVersion", version);
+      })();
+      return changed;
     },
   };
 }
