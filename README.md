@@ -15,6 +15,7 @@ not add commits that have to be carried through every upstream sync.
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
 | `telecom-ref` | [plugins/telecom-ref](plugins/telecom-ref) | Searchable 3GPP Rel-18 reference: Diameter apps, commands, and AVPs, EPC/5GC interfaces, and network functions. |
 | `usage-stats` | [plugins/usage-stats](plugins/usage-stats) | A Usage page with token and API-equivalent cost history per day, model, project, and thread. |
+| `wallpaper` | [plugins/wallpaper](plugins/wallpaper) | A local image behind the thread and New thread panes, with optional dim and blur. |
 | `voice-whisper-local` | [plugins/voice-whisper-local](plugins/voice-whisper-local) | Transcribe voice input locally with whisper.cpp. |
 
 Install one at a time, naming the entry from `.bb/plugins.json`:
