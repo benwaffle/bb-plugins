@@ -25,6 +25,7 @@ import { githubPanelPath, QUEUE_PANEL_ACTION_ID } from "./links";
 import { titleWithoutTicket } from "./parse";
 import { needsViewer, pullLabeler, queueSections, type QueueSection, type QueueSectionKey } from "./queue";
 import {
+  decorationThreadId,
   groupHeaderLook,
   pullActionLabel,
   pullRowLook,
@@ -39,6 +40,7 @@ import {
   type PullRowLook,
   type SidebarStyle,
   type StackedThreadRow,
+  type ThreadDecorationTarget,
   type ThreadRowDecoration,
 } from "./sidebar";
 import { ticketTooltip } from "./tickets";
@@ -413,7 +415,7 @@ type SidebarThreadGroupsSlot = (registration: {
 type SidebarThreadDecorationSlot = (registration: {
   id: string;
   title: string;
-  useThreadDecoration(threadId: string, projectId: string): ThreadRowDecoration | null;
+  useThreadDecoration(target: ThreadDecorationTarget, projectId?: string): ThreadRowDecoration | null;
 }) => void;
 
 /** A group as bb reports it back; builds that draw styled groups always set `style`. */
@@ -885,7 +887,7 @@ export default definePluginApp((app) => {
   slots.experimental_sidebarThreadDecoration?.({
     id: "tickets",
     title: "Review threads by ticket",
-    useThreadDecoration: (threadId) => useThreadRowDecoration(store, threadId),
+    useThreadDecoration: (target) => useThreadRowDecoration(store, decorationThreadId(target)),
   });
   app.slots.experimental_appOverlay({
     id: "sidebar-groups",

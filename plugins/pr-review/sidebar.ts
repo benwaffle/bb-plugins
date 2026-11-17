@@ -123,6 +123,17 @@ export interface ThreadRowDecoration {
   pullRequest?: SidebarRowPullRequest;
 }
 
+/**
+ * What bb passes to a thread row decoration hook: the thread id on its own
+ * (with the project id as a second argument), or an object that carries
+ * both, depending on the build.
+ */
+export type ThreadDecorationTarget = string | { readonly threadId: string; readonly projectId: string };
+
+export function decorationThreadId(target: ThreadDecorationTarget): string {
+  return typeof target === "string" ? target : target.threadId;
+}
+
 function reviewWords(entry: QueueEntry): string | null {
   const states = new Set(entry.otherReviews.map((review) => review.state));
   if (entry.me === "changes-requested" || states.has("CHANGES_REQUESTED")) return "changes requested";
