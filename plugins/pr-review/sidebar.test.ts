@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
 import {
+  decorationThreadId,
   groupHeaderLook,
   pullActionLabel,
   pullRowLook,
@@ -393,6 +394,16 @@ describe("styled looks", () => {
     expect(pullActionLabel("minimal", true)).toBe("…");
     expect(pullActionLabel("card", false)).toBe("Start");
     expect(pullActionLabel("legacy", true)).toBe("Starting…");
+  });
+});
+
+describe("decorationThreadId", () => {
+  it("reads a bare thread id", () => {
+    expect(decorationThreadId("thr_followups")).toBe("thr_followups");
+  });
+
+  it("reads the thread id from an object", () => {
+    expect(decorationThreadId({ threadId: "thr_followups", projectId: "proj_atlas" })).toBe("thr_followups");
   });
 });
 
