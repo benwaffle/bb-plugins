@@ -963,6 +963,10 @@ def assemble_services(model: Model, nfs_out: dict[str, dict], interfaces_out: di
              and any(c in interfaces_out[iid]["endpoints"] and (c != producer or interfaces_out[iid]["endpoints"].count(c) > 1)
                      for c in consumers)),
             key=lambda i: interfaces_out[i]["name"].lower())
+        # The service-based interface the producer exhibits (TS 23.501 §4.2.6) carries every service it produces.
+        exhibited = f"if/{service_prefix(name)}"
+        if interfaces_out.get(exhibited, {}).get("endpoints") == [producer]:
+            realized.insert(0, exhibited)
         out[sid] = {
             "id": sid,
             "kind": "svc",
