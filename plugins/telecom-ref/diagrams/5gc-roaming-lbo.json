@@ -1,0 +1,74 @@
+{
+  "id": "5gc-roaming-lbo",
+  "title": "5GC roaming",
+  "group": "5gc-roaming",
+  "variant": "Local breakout",
+  "summary": "Local breakout roaming in service-based form: the SMF, UPF, and data network are in the visited network, while subscription data and authentication (UDM, AUSF, NSSAAF) stay home. The PLMNs meet only through the vSEPP and hSEPP over N32.",
+  "figures": [
+    {
+      "doc": "TS 23.501",
+      "clause": "4.2.4",
+      "figure": "4.2.4-1",
+      "title": "Roaming 5G System architecture - local breakout scenario in service-based interface representation",
+      "shows": ["if/Nnssf", "if/Nnef", "if/Nnrf", "if/Npcf", "if/Naf", "if/Namf", "if/Nsmf", "if/Nnsacf", "if/N32", "if/Nudm", "if/Nnssaaf", "if/Nausf", "if/N1", "if/N2", "if/N3", "if/N4", "if/N6", "if/N9"]
+    }
+  ],
+  "width": 1380,
+  "height": 560,
+  "regions": [
+    { "label": "VPLMN", "x": 10, "y": 10, "w": 770, "h": 540, "labelAt": "bottom-left" },
+    { "label": "HPLMN", "x": 800, "y": 10, "w": 570, "h": 540, "labelAt": "bottom-right" }
+  ],
+  "nodes": [
+    { "id": "vnssf", "nfs": ["nf/NSSF"], "x": 90, "y": 60 },
+    { "id": "vnef", "nfs": ["nf/NEF"], "x": 220, "y": 60 },
+    { "id": "vnrf", "nfs": ["nf/NRF"], "x": 350, "y": 60 },
+    { "id": "vpcf", "nfs": ["nf/PCF"], "x": 480, "y": 60 },
+    { "id": "af", "nfs": ["nf/AF"], "x": 610, "y": 60 },
+    { "id": "amf", "nfs": ["nf/AMF"], "x": 240, "y": 260 },
+    { "id": "smf", "nfs": ["nf/SMF"], "x": 420, "y": 260 },
+    { "id": "vnsacf", "nfs": ["nf/NSACF"], "x": 570, "y": 260 },
+    { "id": "vsepp", "nfs": ["nf/SEPP"], "labels": ["vSEPP"], "x": 700, "y": 260, "w": 80, "tap": "vbus" },
+    { "id": "ue", "nfs": ["nf/UE"], "x": 60, "y": 460, "w": 64 },
+    { "id": "ran", "nfs": ["nf/gNB"], "labels": ["(R)AN"], "x": 230, "y": 460 },
+    { "id": "upf", "nfs": ["nf/UPF"], "x": 420, "y": 460 },
+    { "id": "dn", "nfs": ["nf/DN"], "x": 620, "y": 460, "w": 110, "shape": "network" },
+    { "id": "udm", "nfs": ["nf/UDM"], "x": 960, "y": 60 },
+    { "id": "hnrf", "nfs": ["nf/NRF"], "x": 1090, "y": 60 },
+    { "id": "nssaaf", "nfs": ["nf/NSSAAF"], "x": 1225, "y": 60, "w": 104 },
+    { "id": "hsepp", "nfs": ["nf/SEPP"], "labels": ["hSEPP"], "x": 880, "y": 260, "w": 80, "tap": "hbus" },
+    { "id": "ausf", "nfs": ["nf/AUSF"], "x": 1000, "y": 260 },
+    { "id": "hpcf", "nfs": ["nf/PCF"], "x": 1110, "y": 260 },
+    { "id": "hnef", "nfs": ["nf/NEF"], "x": 1220, "y": 260 },
+    { "id": "hnsacf", "nfs": ["nf/NSACF"], "x": 1320, "y": 360 }
+  ],
+  "buses": [
+    { "id": "vbus", "x1": 40, "x2": 740, "y": 160 },
+    { "id": "hbus", "x1": 840, "x2": 1350, "y": 160 }
+  ],
+  "edges": [
+    { "if": "if/Nnssf", "from": "vnssf", "to": "vbus" },
+    { "if": "if/Nnef", "from": "vnef", "to": "vbus" },
+    { "if": "if/Nnrf", "from": "vnrf", "to": "vbus" },
+    { "if": "if/Npcf", "from": "vpcf", "to": "vbus" },
+    { "if": "if/Naf", "from": "af", "to": "vbus" },
+    { "if": "if/Namf", "from": "amf", "to": "vbus" },
+    { "if": "if/Nsmf", "from": "smf", "to": "vbus" },
+    { "if": "if/Nnsacf", "from": "vnsacf", "to": "vbus" },
+    { "if": "if/N32", "from": "vsepp", "to": "hsepp" },
+    { "if": "if/Nudm", "from": "udm", "to": "hbus" },
+    { "if": "if/Nnrf", "from": "hnrf", "to": "hbus" },
+    { "if": "if/Nnssaaf", "from": "nssaaf", "to": "hbus" },
+    { "if": "if/Nausf", "from": "ausf", "to": "hbus" },
+    { "if": "if/Npcf", "from": "hpcf", "to": "hbus" },
+    { "if": "if/Nnef", "from": "hnef", "to": "hbus" },
+    { "if": "if/Nnsacf", "from": "hnsacf", "to": "hbus", "x": 1320 },
+    { "if": "if/N1", "from": "ue", "to": "amf", "at": 0.45 },
+    { "if": "if/N2", "from": "ran", "to": "amf" },
+    { "if": "if/NR-Uu", "from": "ue", "to": "ran", "plane": "user" },
+    { "if": "if/N3", "from": "ran", "to": "upf", "plane": "user" },
+    { "if": "if/N4", "from": "smf", "to": "upf" },
+    { "if": "if/N6", "from": "upf", "to": "dn", "plane": "user" },
+    { "if": "if/N9", "from": "upf", "to": "upf", "loop": "bottom", "plane": "user" }
+  ]
+}

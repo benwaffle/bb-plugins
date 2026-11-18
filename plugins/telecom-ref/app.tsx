@@ -9,6 +9,8 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { bundledDataset, entityInterfaces, entityShortName, entityTitle, KIND_LABELS, KINDS, type Dataset } from "./dataset";
 import { DetailPage } from "./detail";
+import { DiagramPage } from "./diagram-page";
+import { diagramById, diagramSubPath, groupLeaders } from "./diagrams";
 import { factLine, firstSentence, PANEL_PATH } from "./format";
 import { parseSubPath, querySubPath } from "./links";
 import { kindCounts, search, type SearchHit } from "./search";
@@ -234,7 +236,17 @@ function SearchPage({ dataset, routeQuery }: { dataset: Dataset; routeQuery: str
     <div className="flex h-full min-h-0 flex-col">
       <div className="px-4 pt-6 pb-3 md:px-6">
         <div className="mx-auto w-full max-w-4xl">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Telecom reference</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Telecom reference</h1>
+            <button
+              type="button"
+              onClick={() => navigate.toPluginPanel(PANEL_PATH, { subPath: diagramSubPath(groupLeaders()[0]!.id) })}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-[background-color,color] duration-150 hover:bg-foreground/[0.05] hover:text-foreground"
+            >
+              <Icon name="Map" className="size-3.5" aria-hidden />
+              Architecture diagrams
+            </button>
+          </div>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             3GPP Release {dataset.meta.release} Diameter, EPC, and 5GC, built {dataset.meta.built}
           </p>
@@ -317,11 +329,14 @@ function SearchPage({ dataset, routeQuery }: { dataset: Dataset; routeQuery: str
 function ReferencePanel({ subPath }: PluginNavPanelProps) {
   const dataset = bundledDataset();
   const route = parseSubPath(subPath);
-  return route.kind === "entity" ? (
-    <DetailPage dataset={dataset} id={route.id} />
-  ) : (
-    <SearchPage dataset={dataset} routeQuery={route.query} />
-  );
+  switch (route.kind) {
+    case "entity":
+      return <DetailPage dataset={dataset} id={route.id} />;
+    case "diagram":
+      return <DiagramPage dataset={dataset} id={route.id} focus={route.focus} />;
+    case "search":
+      return <SearchPage dataset={dataset} routeQuery={route.query} />;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +372,7 @@ function ReferenceSidebar({ subPath }: PluginNavPanelProps) {
   const open = useOpenEntity();
   const route = parseSubPath(subPath);
   const viewingId = route.kind === "entity" ? route.id : null;
+  const viewingGroup = route.kind === "diagram" ? (diagramById(route.id ?? "") ?? groupLeaders()[0])?.group : null;
 
   const counts = useMemo(() => kindCounts(dataset, view.query, { interface: view.interfaceId }), [dataset, view.query, view.interfaceId]);
   const interfaces = useMemo(() => interfaceFacets(dataset, view), [dataset, view]);
@@ -365,7 +381,7 @@ function ReferenceSidebar({ subPath }: PluginNavPanelProps) {
 
   const apply = (patch: Partial<ViewState>) => {
     setView(patch);
-    if (viewingId !== null) openSearch(navigate);
+    if (route.kind !== "search") openSearch(navigate);
   };
 
   return (
@@ -392,6 +408,17 @@ function ReferenceSidebar({ subPath }: PluginNavPanelProps) {
           />
         ))}
         {interfaces.length === 0 ? <p className="px-2 text-xs text-muted-foreground">No interface among the matches.</p> : null}
+      </div>
+      <div className="space-y-0.5">
+        <h2 className={`px-2 pb-1 ${SECTION_HEADING}`}>Diagrams</h2>
+        {groupLeaders().map((diagram) => (
+          <FacetButton
+            key={diagram.group}
+            active={viewingGroup === diagram.group}
+            label={diagram.title}
+            onClick={() => navigate.toPluginPanel(PANEL_PATH, { subPath: diagramSubPath(diagram.id) })}
+          />
+        ))}
       </div>
       {view.recent.length > 0 ? (
         <div className="space-y-0.5">
@@ -422,6 +449,11 @@ function ReferenceSidebar({ subPath }: PluginNavPanelProps) {
 /** The entry's short name after the panel title on detail pages. */
 function usePageTitle({ subPath }: PluginNavPanelProps): ExperimentalPageTitle | null {
   const route = parseSubPath(subPath);
+  if (route.kind === "diagram") {
+    const diagram = diagramById(route.id ?? "") ?? groupLeaders()[0];
+    if (!diagram) return null;
+    return { title: `${diagram.title} · ${diagram.variant}`, windowTitle: `${diagram.title} · Telecom reference` };
+  }
   const entity = route.kind === "entity" ? bundledDataset().byId.get(route.id) : undefined;
   if (!entity) return null;
   return { title: entityShortName(entity), windowTitle: `${entityShortName(entity)} · Telecom reference` };
@@ -447,6 +479,11 @@ export default definePluginApp((app) => {
     title: "Telecom reference: search Diameter AVPs, commands, interfaces, network functions",
     defaultShortcut: { key: "k", mod: true, alt: true },
     run: () => openSearch(getWindowNavigate(), ""),
+  });
+  app.commands.register({
+    id: "diagrams",
+    title: "Telecom reference: architecture diagrams (EPC, 5GC, IMS, roaming)",
+    run: () => getWindowNavigate()?.toPluginPanel(PANEL_PATH, { subPath: diagramSubPath(groupLeaders()[0]!.id) }),
   });
   app.commands.register({
     id: "lookup-selection",

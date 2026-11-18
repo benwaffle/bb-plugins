@@ -1,13 +1,24 @@
 import type { SpecRef } from "./types";
 
-/** What a panel subPath shows: the search page with its query ("" at the panel root) or one entity. */
-export type PanelRoute = { kind: "search"; query: string } | { kind: "entity"; id: string };
+/**
+ * What a panel subPath shows: the search page with its query ("" at the panel
+ * root), one entity, or an architecture diagram with the entity picked in it.
+ */
+export type PanelRoute =
+  | { kind: "search"; query: string }
+  | { kind: "entity"; id: string }
+  | { kind: "diagram"; id: string | null; focus: string | null };
 
 const QUERY_PREFIX = "q/";
+const DIAGRAM_PREFIX = "diagram";
 
 export function parseSubPath(subPath: string): PanelRoute {
   const path = subPath.replace(/^\/+|\/+$/g, "");
   if (path === "") return { kind: "search", query: "" };
+  if (path === DIAGRAM_PREFIX || path.startsWith(`${DIAGRAM_PREFIX}/`)) {
+    const [, id, ...focus] = path.split("/");
+    return { kind: "diagram", id: id || null, focus: focus.length > 0 ? focus.join("/") : null };
+  }
   if (path.startsWith(QUERY_PREFIX)) {
     try {
       return { kind: "search", query: decodeURIComponent(path.slice(QUERY_PREFIX.length)) };

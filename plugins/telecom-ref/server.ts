@@ -1,6 +1,7 @@
 import { PluginCliError, cliCommand, defineCli, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { bundledDataset, entityKind, KINDS, type Dataset } from "./dataset";
+import { DIAGRAMS, diagramById, diagramPath, diagramsShowing, diagramText } from "./diagrams";
 import { formatEntity, formatHit } from "./format";
 import { resolve, search } from "./search";
 import type { EntityKind } from "./types";
@@ -54,7 +55,11 @@ export function lookup(dataset: Dataset, input: LookupInput, pluginId: string): 
   const exact = filters.kinds.length === 0 && filters.interface === null ? resolve(dataset, input.query) : null;
   const hits = search(dataset, input.query, filters, limit + 1).filter((hit) => hit.id !== exact?.id);
   const parts: string[] = [];
-  if (exact) parts.push(formatEntity(exact, dataset, pluginId));
+  if (exact) {
+    const drawn = diagramsShowing(exact.id);
+    const diagrams = drawn.map((diagram) => `${diagram.id} (${diagramPath(pluginId, diagram.id, exact.id)})`).join(", ");
+    parts.push(drawn.length > 0 ? `${formatEntity(exact, dataset, pluginId)}\nDiagrams: ${diagrams}` : formatEntity(exact, dataset, pluginId));
+  }
   const others = hits.slice(0, exact ? limit - 1 : limit);
   if (others.length > 0) {
     if (exact) parts.push("Other matches:");
@@ -120,6 +125,36 @@ export default function plugin(bb: BbPluginApi): void {
             }
             if (hits.length === 0) return { exitCode: 1, stderr: `no match for "${query}"\n` };
             return { exitCode: 0, stdout: `${hits.map((hit) => formatHit(hit, dataset)).join("\n\n")}\n` };
+          },
+        }),
+        "diagram list": cliCommand({
+          summary: "List the architecture diagrams (EPC, 5GC, interworking, IMS, roaming) with their spec figures",
+          options: jsonOption,
+          async run(input) {
+            if (input.options.json) {
+              const rows = DIAGRAMS.map(({ id, title, variant, group, figures }) => ({ id, title, variant, group, figures: figures.map(({ doc, clause, figure, title: name }) => ({ doc, clause, figure, title: name })) }));
+              return { exitCode: 0, stdout: `${JSON.stringify(rows)}\n` };
+            }
+            const lines = DIAGRAMS.map((diagram) => {
+              const figures = diagram.figures.map((figure) => `${figure.doc} Fig ${figure.figure}`).join("; ");
+              return `${diagram.id}\t${diagram.title} · ${diagram.variant}\t${figures}`;
+            });
+            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+          },
+        }),
+        "diagram show": cliCommand({
+          summary: "Print one diagram as text: its spec figures, nodes, and each interface with its two ends",
+          positionals: [{ name: "id", description: 'A diagram id from `diagram list`, for example "5gc-sba" or "interworking"', required: true }],
+          options: jsonOption,
+          async run(input) {
+            const diagram = diagramById(input.positionals.id);
+            if (!diagram) {
+              throw new PluginCliError(`no diagram "${input.positionals.id}"`, {
+                code: "not_found",
+                hint: "Run `bb telecom-ref diagram list` for the diagram ids.",
+              });
+            }
+            return { exitCode: 0, stdout: input.options.json ? `${JSON.stringify(diagram)}\n` : `${diagramText(diagram, dataset, bb.pluginId)}\n` };
           },
         }),
         show: cliCommand({

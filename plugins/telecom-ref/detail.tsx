@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { experimental_Icon as Icon, experimental_usePluginId, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { entityCode, entityShortName, entityTitle, KIND_BADGES, vendorLabel, type Dataset } from "./dataset";
-import { abnfLine, cardinality, codeLabel, specLabel } from "./format";
+import { diagramPath, diagramsShowing, diagramSubPath } from "./diagrams";
+import { abnfLine, cardinality, codeLabel, PANEL_PATH, specLabel } from "./format";
 import type {
   AppEntity,
   AvpEntity,
@@ -107,6 +108,41 @@ function LinkGroup({ title, ids, dataset }: { title: string; ids: readonly strin
           {expanded ? "Show fewer" : `Show all ${ids.length}`}
         </button>
       ) : null}
+    </section>
+  );
+}
+
+/** The architecture diagrams that draw this entry, each opening with it picked. */
+function DiagramLinks({ id }: { id: string }) {
+  const pluginId = experimental_usePluginId();
+  const navigate = useBbNavigate();
+  const diagrams = diagramsShowing(id);
+  if (diagrams.length === 0) return null;
+  return (
+    <section className="space-y-1.5">
+      <h2 className={`${SECTION_HEADING} flex items-baseline gap-1.5`}>
+        In diagrams
+        <span className="tabular-nums text-muted-foreground/70">{diagrams.length}</span>
+      </h2>
+      <ul className="-mx-2">
+        {diagrams.map((diagram) => (
+          <li key={diagram.id}>
+            <a
+              href={diagramPath(pluginId, diagram.id, id)}
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                event.preventDefault();
+                navigate.toPluginPanel(PANEL_PATH, { subPath: diagramSubPath(diagram.id, id) });
+              }}
+              className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground transition-colors duration-150 hover:bg-foreground/[0.05]"
+            >
+              <Icon name="Map" className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{diagram.title}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{diagram.variant}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -512,6 +548,7 @@ export function DetailPage({ dataset, id }: { dataset: Dataset; id: string }) {
   };
   const body = entityBody(entity, dataset);
   const links = body.links.filter(([, ids]) => ids.length > 0);
+  const inDiagrams = diagramsShowing(entity.id).length > 0;
   return (
     <div className="h-full overflow-y-auto px-4 py-6 md:px-6">
       <article className="mx-auto w-full max-w-5xl">
@@ -541,10 +578,11 @@ export function DetailPage({ dataset, id }: { dataset: Dataset; id: string }) {
             <p className="mt-4 text-sm text-muted-foreground">No summary yet. The spec references above define this entry.</p>
           )}
         </header>
-        <div key={entity.id} className={`mt-8 grid gap-x-12 gap-y-8 ${links.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}>
+        <div key={entity.id} className={`mt-8 grid gap-x-12 gap-y-8 ${links.length > 0 || inDiagrams ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}>
           <div className="min-w-0 space-y-8">{body.main}</div>
-          {links.length > 0 ? (
+          {links.length > 0 || inDiagrams ? (
             <aside aria-label="Related entries" className="space-y-6 lg:border-l lg:border-border lg:pl-8">
+              <DiagramLinks id={entity.id} />
               {links.map(([title, ids]) => (
                 <LinkGroup key={title} title={title} ids={ids} dataset={dataset} />
               ))}

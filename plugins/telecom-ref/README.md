@@ -36,6 +36,15 @@ bb plugin install path:. --plugin telecom-ref
 - Each entry has its own page at `/plugins/telecom-ref/ref/<id>`, for example
   `/plugins/telecom-ref/ref/diam.avp/10415/1400`, so back and forward walk the
   cross-links. **Copy ref** copies a one-line citation.
+- **Architecture diagrams** (the button on the search page, the sidebar, or
+  the palette) draws the EPC (CUPS split or combined gateways, with PCC and
+  untrusted non-3GPP access), the 5GC in service-based and reference point
+  form, EPC/5GC interworking, the IMS, and EPC and 5GC roaming, each laid
+  out after the 3GPP figure it cites. Every box and interface line is a
+  button: hovering or focusing one lights it and what it connects to, and
+  picking one shows its entry beside the diagram. Ctrl or Cmd with the wheel
+  zooms, a drag pans, and + - 0 work from the keyboard. Each entry's page
+  lists the diagrams that draw it.
 - The command palette (Mod+Shift+P) has **Telecom reference: search…**
   (default shortcut Mod+Alt+K) and **Telecom reference: look up selected
   text**.
@@ -83,6 +92,24 @@ ABNF, merges the curated YAML in `data/curated/`, computes the reverse
 cross-links and the search index, writes `data/*.json`, and runs the dataset
 validator in `dataset.test.ts`, which fails on any dangling cross-link.
 `--offline` rebuilds from the cache.
+
+## Diagrams
+
+Each diagram is a JSON file in `diagrams/` (format in `diagram-types.ts`):
+boxes name dataset network functions (several for a combined node such as
+SMF + PGW-C) at fixed positions, and lines name dataset interfaces. One
+component, `diagram-canvas.tsx`, renders them all as SVG in the active bb
+theme's colours. `diagrams.test.ts` fails when a diagram names an id the
+dataset lacks, draws a line whose ends are not endpoints the dataset
+records for that interface, or leaves out an interface a cited figure shows
+without a reason; it also fails on overlapping boxes, labels that cover a
+box, a label, or a line, and lines through boxes. `data/coverage.py` lists
+what the diagrams draw in `data/COVERAGE.md`.
+
+To look at them, `DIAGRAM_OUT=<dir> npm run diagrams:render` writes a light
+and a dark PNG of every diagram with headless Chrome (`CHROME` overrides the
+path) and the layout check's findings to `<dir>/layout.txt`;
+`DIAGRAM_ONLY=epc,ims` limits it to some diagrams.
 
 The curated files:
 

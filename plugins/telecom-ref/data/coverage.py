@@ -10,6 +10,10 @@ TS 23.002 clauses 6, 6a, and 7, TS 23.214 §4.2, TS 23.501 clause 4, and the
 service clauses build.py reads) and from fixed lists for the IMS reference
 points and protocols this reference sets out to cover.
 
+It also lists which interfaces and network functions the architecture
+diagrams in diagrams/*.json draw, and how each diagram covers the spec
+figures it cites.
+
 Run from the plugin directory after data/build.py: uv run data/coverage.py [--offline]
 """
 
@@ -17,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +44,36 @@ PHASE_2 = """## Not covered (candidate phase 2)
 - Reference points in TS 23.002 Annex A (the optional GLR) and in the feature specs TS 23.501 only points to
   (LCS TS 23.273, ProSe TS 23.304, MBS TS 23.247, UAS TS 23.256, AKMA TS 33.535).
 """
+
+
+DIAGRAMS = DATA.parent / "diagrams"
+SBI_LINE = re.compile(r"^(N[a-z0-9-]+):\s*Service[- ]based interface exhibited by")
+
+
+def diagram_lines(interfaces: list[dict], nfs: list[dict]) -> list[str]:
+    """The diagrams section: per-diagram figure coverage, then what at least one diagram draws."""
+    diagrams = [json.loads(path.read_text("utf-8")) for path in sorted(DIAGRAMS.glob("*.json"))]
+    names = {e["id"]: e["name"] for e in interfaces + nfs}
+    drawn_ifs = {edge["if"] for d in diagrams for edge in d["edges"]}
+    drawn_nfs = {nf for d in diagrams for node in d["nodes"] for nf in node["nfs"]}
+    lines = ["## Architecture diagrams", "",
+             "Each diagram in `diagrams/` cites the spec figures it draws. `Shown` counts the interfaces a figure",
+             "labels; each is drawn or listed as omitted with a reason (checked by `diagrams.test.ts`).", "",
+             "| Diagram | Figure | Shown | Drawn | Omitted |", "| --- | --- | ---: | ---: | ---: |"]
+    for d in diagrams:
+        drawn = {edge["if"] for edge in d["edges"]}
+        for figure in d["figures"]:
+            shows = figure["shows"]
+            lines.append(f"| {d['id']} ({d['title']} · {d['variant']}) | {figure['doc']} Figure {figure['figure']} | {len(shows)} "
+                         f"| {sum(1 for i in shows if i in drawn)} | {sum(1 for i in shows if i in d.get('omitted', {}))} |")
+    def listing(ids: set[str]) -> str:
+        return ", ".join(sorted((names.get(i, i) for i in ids), key=str.lower))
+    lines += ["", f"Interfaces drawn in at least one diagram ({len(drawn_ifs)} of {len(interfaces)}): {listing(drawn_ifs)}.", "",
+              f"Network functions drawn in at least one diagram ({len(drawn_nfs)} of {len(nfs)}): {listing(drawn_nfs)}.", ""]
+    omitted = sorted({i for d in diagrams for i in d.get("omitted", {})} - drawn_ifs)
+    if omitted:
+        lines += [f"Shown in a cited figure but drawn in no diagram: {listing(set(omitted))}.", ""]
+    return lines
 
 
 @dataclass
@@ -114,6 +149,11 @@ def main() -> None:
     five_g_items.append(Item("N26", "TS 23.501 §4.3.1", if_index.get("n26")))
     categories["5GS reference points (TS 23.501 clause 4)"] = unique(five_g_items)
 
+    sbi_names = [m.group(1) for text, clause in spec_lines("23.501") if clause in ("4.2.6", "4.4.2.3")
+                 and (m := SBI_LINE.match(text.replace("\t", " ")))]
+    categories["5GC service-based interfaces (TS 23.501 §4.2.6, §4.4.2.3)"] = unique(
+        [Item(n, "TS 23.501 §4.2.6", if_index.get(norm_key(n))) for n in sbi_names])
+
     categories["IMS reference points"] = [Item(n, "TS 23.228 / TS 23.002 §6a.7", if_index.get(norm_key(n)))
                                           for n in IMS_REFERENCE_POINTS]
 
@@ -146,6 +186,7 @@ def main() -> None:
         lines += [f"Missing ({len(missing)}):", ""]
         lines += [f"- {i.name}" + (f" ({i.source})" if i.source else "") for i in missing]
         lines.append("")
+    lines += diagram_lines(interfaces, nfs)
     lines += PHASE_2.splitlines()
     (DATA / "COVERAGE.md").write_text("\n".join(lines).rstrip() + "\n", "utf-8")
     for title, items in categories.items():

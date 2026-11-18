@@ -67,3 +67,46 @@ describe("search keyboard navigation", () => {
     view.unmount();
   });
 });
+
+describe("architecture diagrams", () => {
+  it("draws every box and interface as a focusable button", () => {
+    const view = renderSlot(panel, { subPath: "diagram/interworking" });
+    const n26 = view.getByRole("button", { name: "N26 interface, MME to AMF" });
+    expect(n26.getAttribute("tabindex")).toBe("0");
+    expect(view.getByRole("button", { name: "PGW-C, PDN Gateway Control plane function" })).toBeTruthy();
+    view.unmount();
+  });
+
+  it("picks an interface by click or Enter and keeps the pick in the route", () => {
+    const view = renderSlot(panel, { subPath: "diagram/interworking" });
+    fireEvent.click(view.getByRole("button", { name: "N26 interface, MME to AMF" }));
+    expect(view.navigateCalls.at(-1)).toEqual({ method: "toPluginPanel", path: "ref", options: { subPath: "diagram/interworking/if/N26", replace: true } });
+    fireEvent.keyDown(view.getByRole("button", { name: "N11 interface, SMF + PGW-C to AMF" }), { key: "Enter" });
+    expect(view.navigateCalls.at(-1)).toMatchObject({ options: { subPath: "diagram/interworking/if/N11" } });
+    view.unmount();
+  });
+
+  it("shows the picked entry's detail beside the diagram and opens the full entry", () => {
+    const view = renderSlot(panel, { subPath: "diagram/interworking/if/N26" });
+    const inspector = view.getByRole("complementary", { name: "Selection" });
+    expect(inspector.textContent).toContain("GTPv2-C");
+    expect(inspector.textContent).toContain("MME — AMF");
+    fireEvent.click(view.getByRole("button", { name: /Open full entry/ }));
+    expect(view.navigateCalls.at(-1)).toEqual({ method: "toPluginPanel", path: "ref", options: { subPath: "if/N26" } });
+    view.unmount();
+  });
+
+  it("switches between the views of one architecture, keeping the pick when the other view draws it", () => {
+    const view = renderSlot(panel, { subPath: "diagram/5gc-sba/nf/AMF" });
+    fireEvent.click(view.getByRole("button", { name: "Reference points" }));
+    expect(view.navigateCalls.at(-1)).toMatchObject({ options: { subPath: "diagram/5gc-rp/nf/AMF" } });
+    view.unmount();
+  });
+
+  it("links an entry's page to the diagrams that draw it", () => {
+    const view = renderSlot(panel, { subPath: "nf/PGW-C" });
+    fireEvent.click(view.getByRole("link", { name: /EPC and 5GC interworking/ }));
+    expect(view.navigateCalls.at(-1)).toEqual({ method: "toPluginPanel", path: "ref", options: { subPath: "diagram/interworking/nf/PGW-C" } });
+    view.unmount();
+  });
+});
