@@ -56,7 +56,13 @@
     "types.ts",
     "ui.tsx",
     "validate.ts",
-    "view.ts"
+    "view.ts",
+    "diagrams/*.json",
+    "diagram-canvas.tsx",
+    "diagram-layout.ts",
+    "diagram-page.tsx",
+    "diagram-types.ts",
+    "diagrams.ts"
   ],
   "scripts": {
     "build": "env -u BB_CLI bb plugin build .",
@@ -65,7 +71,8 @@
     "types:refresh": "env -u BB_CLI bb plugin types .",
     "test": "vitest run --config vitest.config.ts",
     "check": "npm run types:check && npm run typecheck && npm test && npm run build",
-    "data": "uv run data/build.py"
+    "data": "uv run data/build.py",
+    "diagrams:render": "vitest run --config scripts/vitest.render.config.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"

@@ -8,11 +8,12 @@ summary counts the items the cited specs list and how many have an entry here.
 | EPC and legacy reference points (TS 23.401 §4.2, TS 23.002 clauses 6, 6a, 7) | 177 | 177 | 0 |
 | CUPS reference points and functions (TS 23.214, TS 29.244) | 11 | 11 | 0 |
 | 5GS reference points (TS 23.501 clause 4) | 64 | 64 | 0 |
+| 5GC service-based interfaces (TS 23.501 §4.2.6, §4.4.2.3) | 29 | 28 | 1 |
 | IMS reference points | 16 | 16 | 0 |
 | 5GC SBI services (TS 23.502 §5.2, TS 23.288, TS 23.273, TS 23.632, TS 32.290, stage 3) | 119 | 119 | 0 |
 | Protocols | 16 | 16 | 0 |
 
-Dataset: 268 interfaces, 147 network functions, 119 SBI services, 36 protocols.
+Dataset: 298 interfaces, 148 network functions, 119 SBI services, 36 protocols.
 
 ## EPC and legacy reference points (TS 23.401 §4.2, TS 23.002 clauses 6, 6a, 7)
 
@@ -26,6 +27,12 @@ All covered.
 
 All covered.
 
+## 5GC service-based interfaces (TS 23.501 §4.2.6, §4.4.2.3)
+
+Missing (1):
+
+- Naanf (TS 23.501 §4.2.6)
+
 ## IMS reference points
 
 All covered.
@@ -37,6 +44,33 @@ All covered.
 ## Protocols
 
 All covered.
+
+## Architecture diagrams
+
+Each diagram in `diagrams/` cites the spec figures it draws. `Shown` counts the interfaces a figure
+labels; each is drawn or listed as omitted with a reason (checked by `diagrams.test.ts`).
+
+| Diagram | Figure | Shown | Drawn | Omitted |
+| --- | --- | ---: | ---: | ---: |
+| 5gc-roaming-hr (5GC roaming · Home routed) | TS 23.501 Figure 4.2.4-3 | 18 | 18 | 0 |
+| 5gc-roaming-lbo (5GC roaming · Local breakout) | TS 23.501 Figure 4.2.4-1 | 18 | 18 | 0 |
+| 5gc-rp (5GC non-roaming · Reference points) | TS 23.501 Figure 4.2.3-2 | 20 | 20 | 0 |
+| 5gc-sba (5GC non-roaming · Service-based) | TS 23.501 Figure 4.2.3-1 | 18 | 18 | 0 |
+| epc-cups (EPC non-roaming · CUPS split) | TS 23.401 Figure 4.2.1-1 | 13 | 13 | 0 |
+| epc-cups (EPC non-roaming · CUPS split) | TS 23.214 Figure 4.2.1-1 | 24 | 16 | 8 |
+| epc-cups (EPC non-roaming · CUPS split) | TS 23.402 Figure 4.2.2-1 | 17 | 12 | 5 |
+| epc-roaming-hr (EPC roaming · Home routed) | TS 23.401 Figure 4.2.2-1 | 13 | 13 | 0 |
+| epc-roaming-lbo (EPC roaming · Local breakout) | TS 23.401 Figure 4.2.2-2 | 14 | 14 | 0 |
+| epc (EPC non-roaming · Combined gateways) | TS 23.401 Figure 4.2.1-1 | 13 | 13 | 0 |
+| epc (EPC non-roaming · Combined gateways) | TS 23.402 Figure 4.2.2-1 | 17 | 12 | 5 |
+| ims (IMS · Reference architecture) | TS 23.228 Figure 4.0 | 27 | 27 | 0 |
+| interworking (EPC and 5GC interworking · Non-roaming) | TS 23.501 Figure 4.3.1-1 | 15 | 15 | 0 |
+
+Interfaces drawn in at least one diagram (94 of 298): Cr, Cx, Dh, Dx, Gm, Gx, Gy, Gz, Ici, Iq, ISC, Iu-PS, Ix, Izi, LTE-Uu, Ma, Mb, Mg, Mi, Mj, Mk, Mm, Mn, Mp, Mr, Mr', Ms, Mw, Mx, N1, N10, N11, N12, N13, N14, N15, N2, N22, N26, N3, N32, N4, N5, N58, N59, N6, N7, N8, N80, N81, N9, Naf, Namf, Nausf, Neasdf, Nnef, Nnrf, Nnsacf, Nnssaaf, Nnssf, Npcf, NR-Uu, Nsmf, Nudm, Rc, Rx, S1-MME, S1-U, S10, S11, S11-U, S12, S2b, S3, S4, S5, S6a, S6b, S6d, S8, S9, Sd, SGi, Sh, SWa, SWm, SWn, SWu, SWx, Sxa, Sxb, Sxc, Ut, Uu.
+
+Network functions drawn in at least one diagram (52 of 148): 3GPP AAA Server, AF, AMF, AS, AUSF, BGCF, DN, EASDF, eNodeB, ePDG, gNB, HSS, I-CSCF, IBCF, IMS-AGW, IMS-MGW, MGCF, MME, MRB, MRFC, MRFP, NEF, NodeB, NRF, NSACF, NSSAAF, NSSF, OCS, OFCS, P-CSCF, PCF, PCRF, PGW, PGW-C, PGW-U, RNC, S-CSCF, SCP, SEPP, SGSN, SGW, SGW-C, SGW-U, SLF, SMF, TDF-C, TDF-U, TrGW, UDM, UE, Untrusted non-3GPP AN, UPF.
+
+Shown in a cited figure but drawn in no diagram: Gn, Gp, Gw, Gwn, Gxa, Gxb, Gxc, Gyn, Gzn, S2a, STa.
 
 ## Not covered (candidate phase 2)
 

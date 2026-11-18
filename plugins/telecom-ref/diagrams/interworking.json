@@ -1,0 +1,55 @@
+{
+  "id": "interworking",
+  "title": "EPC and 5GC interworking",
+  "group": "interworking",
+  "variant": "Non-roaming",
+  "summary": "EPC/E-UTRAN on the left and 5GS on the right share combined nodes: HSS + UDM, SMF + PGW-C, and UPF + PGW-U. N26 between MME and AMF carries the MM and EPS bearer contexts for handover; it is optional.",
+  "figures": [
+    {
+      "doc": "TS 23.501",
+      "clause": "4.3.1",
+      "figure": "4.3.1-1",
+      "title": "Non-roaming architecture for interworking between 5GS and EPC/E-UTRAN",
+      "shows": ["if/S6a", "if/N10", "if/N8", "if/N7", "if/N15", "if/N11", "if/N4", "if/S5", "if/S11", "if/S1-MME", "if/S1-U", "if/N26", "if/N3", "if/N2", "if/N1"]
+    }
+  ],
+  "notes": [
+    "The Rel-18 figure draws the policy function as PCF alone; earlier releases drew PCF + PCRF.",
+    "UE to E-UTRAN and UE to NG-RAN are unlabelled in the figure; they are drawn here as LTE-Uu and NR-Uu."
+  ],
+  "width": 1180,
+  "height": 620,
+  "nodes": [
+    { "id": "hssudm", "nfs": ["nf/HSS", "nf/UDM"], "x": 590, "y": 62, "w": 124 },
+    { "id": "pcf", "nfs": ["nf/PCF"], "x": 590, "y": 190 },
+    { "id": "smfpgwc", "nfs": ["nf/SMF", "nf/PGW-C"], "x": 590, "y": 330, "w": 124 },
+    { "id": "upfpgwu", "nfs": ["nf/UPF", "nf/PGW-U"], "x": 590, "y": 480, "w": 124 },
+    { "id": "mme", "nfs": ["nf/MME"], "x": 150, "y": 330 },
+    { "id": "sgw", "nfs": ["nf/SGW"], "x": 340, "y": 480 },
+    { "id": "eutran", "nfs": ["nf/eNodeB"], "labels": ["E-UTRAN"], "x": 150, "y": 480 },
+    { "id": "ue4g", "nfs": ["nf/UE"], "x": 150, "y": 585, "w": 80 },
+    { "id": "amf", "nfs": ["nf/AMF"], "x": 1030, "y": 330 },
+    { "id": "ngran", "nfs": ["nf/gNB"], "labels": ["NG-RAN"], "x": 1030, "y": 480 },
+    { "id": "ue5g", "nfs": ["nf/UE"], "x": 1030, "y": 585, "w": 80 }
+  ],
+  "edges": [
+    { "if": "if/S6a", "from": "mme", "to": "hssudm", "via": [[130, 46]], "at": 0.25 },
+    { "if": "if/N8", "from": "amf", "to": "hssudm", "via": [[1060, 78]], "at": 0.3 },
+    { "if": "if/N10", "from": "smfpgwc", "to": "hssudm", "via": [[470, 314], [470, 78]], "at": 0.45 },
+    { "if": "if/N7", "from": "pcf", "to": "smfpgwc", "at": 0.35 },
+    { "if": "if/N15", "from": "pcf", "to": "amf", "via": [[1000, 190]], "at": 0.4 },
+    { "if": "if/N11", "from": "smfpgwc", "to": "amf", "via": [[800, 314]], "at": 0.5 },
+    { "if": "if/N4", "from": "smfpgwc", "to": "upfpgwu", "at": 0.5 },
+    { "if": "if/S5", "label": "S5-C", "from": "sgw", "to": "smfpgwc", "via": [[340, 346]], "at": 0.7 },
+    { "if": "if/S5", "label": "S5-U", "from": "sgw", "to": "upfpgwu", "via": [[440, 496]], "plane": "user", "at": 0.55 },
+    { "if": "if/S11", "from": "mme", "to": "sgw", "at": 0.45 },
+    { "if": "if/S1-MME", "from": "eutran", "to": "mme" },
+    { "if": "if/S1-U", "from": "eutran", "to": "sgw", "plane": "user" },
+    { "if": "if/N26", "from": "mme", "to": "amf", "via": [[170, 255], [1030, 255]], "at": 0.62 },
+    { "if": "if/N3", "from": "upfpgwu", "to": "ngran", "via": [[900, 464]], "plane": "user" },
+    { "if": "if/N2", "from": "ngran", "to": "amf" },
+    { "if": "if/N1", "from": "ue5g", "to": "amf", "via": [[1120, 585], [1120, 330]], "at": 0.5 },
+    { "if": "if/LTE-Uu", "from": "ue4g", "to": "eutran", "plane": "user" },
+    { "if": "if/NR-Uu", "from": "ue5g", "to": "ngran", "plane": "user" }
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 name: telecom-ref
-description: "Look up 3GPP Rel-18 Diameter AVP and command codes, flag rules, message formats (ABNF), applications, EPC/CUPS/IMS/5GC interfaces, network functions, 5GC SBI services (producer, consumers, operations), and protocols with the telecom_ref_lookup tool or bb telecom-ref, instead of recalling them from memory."
+description: "Look up 3GPP Rel-18 Diameter AVP and command codes, flag rules, message formats (ABNF), applications, EPC/CUPS/IMS/5GC interfaces, network functions, 5GC SBI services (producer, consumers, operations), and protocols with the telecom_ref_lookup tool or bb telecom-ref, instead of recalling them from memory. Also reads the EPC, 5GC, interworking, IMS, and roaming architecture diagrams as text."
 ---
 
 # Telecom reference
@@ -41,12 +41,41 @@ for commands every application's message format), then lists other matches.
 ```
 bb telecom-ref search <query> [--kind cmd|avp|app|if|nf|svc|proto] [--interface <name>] [--limit 1-20] [--json]
 bb telecom-ref show <id | exact key> [--json]
+bb telecom-ref diagram list [--json]
+bb telecom-ref diagram show <diagram id> [--json]
 ```
 
 - `search` prints the best matches as markdown blocks with a fact line,
   summary, spec reference, and id. It exits 1 when nothing matches.
 - `show` prints one entry with its cross-links. It fails with a hint when the
   key matches more than one entry; run `search` and pass the id.
+
+## Architecture diagrams
+
+The plugin draws the 3GPP reference architectures, each from the spec
+figures it cites:
+
+| Id | Diagram | Figures |
+| --- | --- | --- |
+| `epc-cups` / `epc` | EPC non-roaming, CUPS split or combined gateways, with PCC and untrusted non-3GPP access | TS 23.401 Fig 4.2.1-1, TS 23.214 Fig 4.2.1-1, TS 23.402 Fig 4.2.2-1 |
+| `5gc-sba` / `5gc-rp` | 5GC non-roaming, service-based or reference points | TS 23.501 Fig 4.2.3-1, 4.2.3-2 |
+| `interworking` | EPC and 5GC interworking (HSS + UDM, SMF + PGW-C, UPF + PGW-U, N26) | TS 23.501 Fig 4.3.1-1 |
+| `ims` | IMS, and how the P-CSCF reaches the PCRF (Rx) or PCF (N5) | TS 23.228 Fig 4.0 |
+| `epc-roaming-hr` / `epc-roaming-lbo` | EPC roaming, home routed (S8) or local breakout (S9) | TS 23.401 Fig 4.2.2-1, 4.2.2-2 |
+| `5gc-roaming-hr` / `5gc-roaming-lbo` | 5GC roaming with vSEPP and hSEPP over N32 | TS 23.501 Fig 4.2.4-3, 4.2.4-1 |
+
+`diagram show <id>` prints a diagram as an adjacency list: each box with
+its network function ids, then each interface line as `label (interface
+id, protocol, plane): end — end`, then the interfaces the cited figures
+show that the diagram leaves out, with the reason. Use it to answer "what
+connects to what" for a whole architecture; use `show` or the lookup tool
+for one interface. When a lookup names one entry exactly, its result ends
+with `Diagrams:` and the diagrams that draw it.
+
+In bb the diagrams page is at `/plugins/telecom-ref/ref/diagram/<id>`, and
+`/plugins/telecom-ref/ref/diagram/<id>/<entity id>` opens it with that
+network function or interface picked, for example
+`/plugins/telecom-ref/ref/diagram/interworking/if/N26`.
 
 ## Reading results
 
