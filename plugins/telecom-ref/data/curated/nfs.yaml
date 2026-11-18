@@ -643,6 +643,18 @@
   aliases: [MRF]
   spec: ["TS 23.228 §4", "TS 23.002"]
 
+- id: MRB
+  name: MRB
+  fullName: Media Resource Broker
+  generations: [IMS]
+  description: >-
+    The broker that lets many application servers share a pool of MRF resources. It picks suitable MRFs
+    for a call from the attributes the application asks for, either answering a query from the AS over Rc
+    or sitting in the SIP path itself (In-Line mode) on ISC.
+  replaces: []
+  aliases: []
+  spec: ["TS 23.002 §4a.7.4b", "TS 23.218"]
+
 - id: MRFP
   name: MRFP
   fullName: Multimedia Resource Function Processor

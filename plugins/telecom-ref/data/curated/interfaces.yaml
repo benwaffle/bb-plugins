@@ -138,13 +138,13 @@
 - id: S1-U
   name: S1-U
   generations: [4G]
-  endpoints: [eNodeB, SGW]
+  endpoints: [eNodeB, SGW, SGW-U]
   protocol: GTP-U
   aliases: []
   description: >-
     The user-plane interface between the eNodeB and the SGW. It carries per-bearer GTP-U tunnels with the
     UE's uplink and downlink packets.
-  spec: ["TS 23.401 §4.2", "TS 29.281"]
+  spec: ["TS 23.401 §4.2", "TS 29.281", "TS 23.214 §4.2.1"]
 
 # --- EPC control and user plane ---
 
@@ -162,35 +162,35 @@
 - id: S4
   name: S4
   generations: [3G, 4G]
-  endpoints: [SGSN, SGW]
+  endpoints: [SGSN, SGW, SGW-C, SGW-U]
   protocol: GTPv2-C / GTP-U
   aliases: []
   description: >-
     The interface between an SGSN and the SGW. It carries bearer control and user data for 2G/3G access
     anchored in the EPC.
-  spec: ["TS 23.401 §4.2", "TS 29.274"]
+  spec: ["TS 23.401 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S5
   name: S5
   generations: [4G]
-  endpoints: [SGW, PGW]
+  endpoints: [SGW, PGW, SGW-C, SGW-U, PGW-C, PGW-U]
   protocol: GTPv2-C / GTP-U
   aliases: []
   description: >-
     The interface between the SGW and PGW within one network. It carries bearer and PDN connection
     management and the user-plane tunnels; a PMIPv6 variant also exists.
-  spec: ["TS 23.401 §4.2", "TS 29.274"]
+  spec: ["TS 23.401 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S8
   name: S8
   generations: [4G]
-  endpoints: [SGW, PGW]
+  endpoints: [SGW, PGW, SGW-C, SGW-U, PGW-C, PGW-U]
   protocol: GTPv2-C / GTP-U
   aliases: []
   description: >-
     The roaming form of S5, between a visited-network SGW and a home-network PGW. It carries the same
     bearer signalling and user tunnels across PLMN borders.
-  spec: ["TS 23.401 §4.2", "TS 29.274"]
+  spec: ["TS 23.401 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S10
   name: S10
@@ -206,35 +206,35 @@
 - id: S11
   name: S11
   generations: [4G]
-  endpoints: [MME, SGW]
+  endpoints: [MME, SGW, SGW-C]
   protocol: GTPv2-C
   aliases: []
   description: >-
     The control interface between the MME and the SGW. It creates, modifies, and deletes sessions and
     bearers, and carries downlink data notifications that trigger paging.
-  spec: ["TS 23.401 §4.2", "TS 29.274"]
+  spec: ["TS 23.401 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S12
   name: S12
   generations: [3G, 4G]
-  endpoints: [RNC, SGW]
+  endpoints: [RNC, SGW, SGW-U]
   protocol: GTP-U
   aliases: []
   description: >-
     An optional user-plane path between UTRAN and the SGW when direct tunnel bypasses the SGSN. It
     carries GTP-U user data tunnels.
-  spec: ["TS 23.401 §4.2", "TS 29.281"]
+  spec: ["TS 23.401 §4.2", "TS 29.281", "TS 23.214 §4.2.1"]
 
 - id: SGi
   name: SGi
   generations: [4G]
-  endpoints: [PGW, DN]
+  endpoints: [PGW, DN, PGW-U, TDF-U]
   protocol: IP
   aliases: []
   description: >-
     The interface between the PGW and an external or operator packet data network. It carries the UE's
     IP traffic, and may use RADIUS or Diameter toward external AAA servers.
-  spec: ["TS 23.401 §4.2", "TS 29.061"]
+  spec: ["TS 23.401 §4.2", "TS 29.061", "TS 23.214 §4.2.1"]
 
 - id: Sv
   name: Sv
@@ -333,14 +333,14 @@
 - id: Gx
   name: Gx
   generations: [3G, 4G]
-  endpoints: [PCEF, PCRF]
+  endpoints: [PCEF, PCRF, PGW, PGW-C]
   protocol: Diameter
   apps: [16777238]
   aliases: []
   description: >-
     The policy interface between the PCEF in the PGW or GGSN and the PCRF. The PCRF installs, modifies,
     and removes PCC rules, and the PCEF reports IP-CAN session events and usage.
-  spec: ["TS 23.203", "TS 29.212"]
+  spec: ["TS 23.203", "TS 29.212", "TS 23.214 §4.2.1"]
 
 - id: Gxa
   name: Gxa
@@ -369,14 +369,14 @@
 - id: Sd
   name: Sd
   generations: [4G]
-  endpoints: [TDF, PCRF]
+  endpoints: [TDF, PCRF, TDF-C]
   protocol: Diameter
   apps: [16777303]
   aliases: []
   description: >-
     The interface between the TDF and the PCRF. The PCRF installs application detection and control
     rules, and the TDF reports the start and stop of detected applications.
-  spec: ["TS 23.203", "TS 29.212"]
+  spec: ["TS 23.203", "TS 29.212", "TS 23.214 §4.2.1"]
 
 - id: St
   name: St
@@ -417,14 +417,14 @@
 - id: Rx
   name: Rx
   generations: [4G, IMS]
-  endpoints: [AF, PCRF]
+  endpoints: [AF, PCRF, P-CSCF, PCF]
   protocol: Diameter
   apps: [16777236]
   aliases: []
   description: >-
     The interface between an application function, such as the P-CSCF, and the PCRF. The AF describes
     session media so the PCRF can authorize QoS, and the PCRF reports bearer and access events back.
-  spec: ["TS 23.203", "TS 29.214"]
+  spec: ["TS 23.203", "TS 29.214", "TS 23.501 §4.4.3"]
 
 - id: Np
   name: Np
@@ -465,26 +465,26 @@
 - id: Gy
   name: Gy
   generations: [3G, 4G]
-  endpoints: [PCEF, OCS]
+  endpoints: [PCEF, OCS, PGW, PGW-C]
   protocol: Diameter
   apps: [4]
   aliases: []
   description: >-
     The online charging interface between the PCEF and the OCS. It carries credit control requests that
     reserve quota and report usage for data sessions.
-  spec: ["TS 32.251", "TS 32.299"]
+  spec: ["TS 32.251", "TS 32.299", "TS 23.214 §4.2.1"]
 
 - id: Gz
   name: Gz
   generations: [2G, 3G, 4G]
-  endpoints: [PCEF, OFCS]
+  endpoints: [PCEF, OFCS, PGW, PGW-C]
   protocol: Diameter
   apps: [3]
   aliases: []
   description: >-
     The offline charging interface between the gateway and the OFCS. It carries accounting records for
     data sessions; a GTP' variant toward the CGF also exists.
-  spec: ["TS 32.251", "TS 32.299"]
+  spec: ["TS 32.251", "TS 32.299", "TS 23.214 §4.2.1"]
 
 - id: Ro
   name: Ro
@@ -515,24 +515,24 @@
 - id: S2a
   name: S2a
   generations: [4G]
-  endpoints: [TWAN, PGW]
+  endpoints: [TWAN, PGW, PGW-C, PGW-U]
   protocol: GTPv2-C / GTP-U
   aliases: []
   description: >-
     The interface between trusted non-3GPP access and the PGW. It sets up PDN connections and carries
     user tunnels for UEs on trusted WLAN; a PMIPv6 variant also exists.
-  spec: ["TS 23.402 §4.2", "TS 29.274"]
+  spec: ["TS 23.402 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S2b
   name: S2b
   generations: [4G]
-  endpoints: [ePDG, PGW]
+  endpoints: [ePDG, PGW, PGW-C, PGW-U]
   protocol: GTPv2-C / GTP-U
   aliases: []
   description: >-
     The interface between the ePDG and the PGW. It sets up PDN connections and carries user tunnels for
     UEs on untrusted non-3GPP access, for example VoWiFi.
-  spec: ["TS 23.402 §4.2", "TS 29.274"]
+  spec: ["TS 23.402 §4.2", "TS 29.274", "TS 23.214 §4.2.1"]
 
 - id: S2c
   name: S2c
@@ -630,14 +630,14 @@
 - id: S6b
   name: S6b
   generations: [4G]
-  endpoints: [PGW, AAA-Server]
+  endpoints: [PGW, AAA-Server, PGW-C]
   protocol: Diameter
   apps: [16777272]
   aliases: []
   description: >-
     The interface between the PGW and the 3GPP AAA Server. The PGW registers its identity for a PDN
     connection and can fetch mobility parameters and authorization data.
-  spec: ["TS 23.402 §4.2", "TS 29.273"]
+  spec: ["TS 23.402 §4.2", "TS 29.273", "TS 23.214 §4.2.1"]
 
 # --- Location services ---
 
@@ -1030,37 +1030,37 @@
 - id: Mw
   name: Mw
   generations: [IMS]
-  endpoints: [P-CSCF, S-CSCF]
+  endpoints: [P-CSCF, S-CSCF, I-CSCF]
   protocol: SIP
   aliases: []
   description: >-
     The SIP interface between CSCFs, including P-CSCF to I-CSCF and I-CSCF to S-CSCF. It carries
     registration and session signalling through the IMS core.
-  spec: ["TS 23.228 §4", "TS 24.229"]
+  spec: ["TS 23.228 §4", "TS 24.229", "TS 23.002 §6a.7.7"]
 
 - id: Cx
   name: Cx
   generations: [IMS]
-  endpoints: [S-CSCF, HSS]
+  endpoints: [S-CSCF, HSS, I-CSCF]
   protocol: Diameter
   apps: [16777216]
   aliases: []
   description: >-
     The interface between the I-CSCF or S-CSCF and the HSS. It carries S-CSCF assignment queries,
     authentication vector requests, and user profile download at registration.
-  spec: ["TS 23.228 §4", "TS 29.228"]
+  spec: ["TS 23.228 §4", "TS 29.228", "TS 23.002 §6a.7.1"]
 
 - id: Dx
   name: Dx
   generations: [IMS]
-  endpoints: [S-CSCF, SLF]
+  endpoints: [S-CSCF, SLF, I-CSCF]
   protocol: Diameter
   apps: [16777216]
   aliases: []
   description: >-
     The interface between a CSCF and the SLF. It returns the HSS that holds a given user's data in
     networks with several HSSs.
-  spec: ["TS 23.228 §4", "TS 29.228"]
+  spec: ["TS 23.228 §4", "TS 29.228", "TS 23.002 §6a.7.13"]
 
 - id: Sh
   name: Sh
@@ -1089,13 +1089,13 @@
 - id: ISC
   name: ISC
   generations: [IMS]
-  endpoints: [S-CSCF, AS]
+  endpoints: [S-CSCF, AS, MRB]
   protocol: SIP
   aliases: []
   description: >-
     The SIP interface between the S-CSCF and an application server. The S-CSCF sends requests to the AS
     when initial filter criteria match, so the AS can provide its service.
-  spec: ["TS 23.228 §4", "TS 24.229"]
+  spec: ["TS 23.228 §4", "TS 24.229", "TS 23.002 §6a.7.8a"]
 
 - id: Ma
   name: Ma
@@ -1122,13 +1122,13 @@
 - id: Mg
   name: Mg
   generations: [IMS]
-  endpoints: [MGCF, I-CSCF]
+  endpoints: [MGCF, I-CSCF, S-CSCF]
   protocol: SIP
   aliases: []
   description: >-
     The SIP interface between the MGCF and a CSCF. It carries sessions arriving from the CS network into
     IMS.
-  spec: ["TS 23.228 §4", "TS 24.229"]
+  spec: ["TS 23.228 §4", "TS 24.229", "TS 23.002 §6a.7.4"]
 
 - id: Mi
   name: Mi
@@ -1155,13 +1155,13 @@
 - id: Mk
   name: Mk
   generations: [IMS]
-  endpoints: [BGCF, BGCF]
+  endpoints: [BGCF, BGCF, IBCF]
   protocol: SIP
   aliases: []
   description: >-
     The SIP interface between BGCFs in different networks. It forwards sessions that should break out
     in another network.
-  spec: ["TS 23.228 §4", "TS 24.229"]
+  spec: ["TS 23.228 §4", "TS 24.229", "TS 23.002 §6a.7.12"]
 
 - id: Mr
   name: Mr
@@ -1210,13 +1210,13 @@
 - id: Mx
   name: Mx
   generations: [IMS]
-  endpoints: [S-CSCF, IBCF]
+  endpoints: [S-CSCF, IBCF, I-CSCF, P-CSCF, BGCF]
   protocol: SIP
   aliases: []
   description: >-
     The SIP interface between a CSCF or BGCF and the IBCF. It routes sessions to and from the network
     border for interconnection with other IMS networks.
-  spec: ["TS 23.228 §4", "TS 24.229"]
+  spec: ["TS 23.228 §4", "TS 24.229", "TS 23.002 §6a.7.20"]
 
 - id: Ici
   name: Ici
@@ -1368,13 +1368,13 @@
 - id: N5
   name: N5
   generations: [5G]
-  endpoints: [AF, PCF]
+  endpoints: [AF, PCF, P-CSCF]
   protocol: HTTP/2 (SBI)
   aliases: []
   description: >-
     The reference point between an application function and the PCF. It uses Npcf_PolicyAuthorization
     so the AF can request QoS for its sessions and subscribe to bearer events.
-  spec: ["TS 23.501 §4.2.7", "TS 29.514"]
+  spec: ["TS 23.501 §4.2.7", "TS 29.514", "TS 23.501 §4.4.3"]
 
 - id: N7
   name: N7
@@ -2103,7 +2103,7 @@
 - id: Mb
   name: Mb
   generations: [IMS]
-  endpoints: [IMS-MGW, DN]
+  endpoints: [IMS-MGW, DN, MRFP, TrGW, IMS-AGW]
   protocol: RTP
   aliases: []
   description: >-
@@ -2499,46 +2499,46 @@
 - id: Gyn
   name: Gyn
   generations: [4G]
-  endpoints: [TDF, OCS]
+  endpoints: [TDF, OCS, TDF-C]
   protocol: Diameter
   aliases: []
   description: >-
     The online charging interface between the TDF and the OCS. It uses Diameter credit control to
     request quota and report usage for the application traffic the TDF detects.
-  spec: ["TS 23.002 §6a.13.16", "TS 32.251", "RFC 4006"]
+  spec: ["TS 23.002 §6a.13.16", "TS 32.251", "RFC 4006", "TS 23.214 §4.2.1"]
 
 - id: Gzn
   name: Gzn
   generations: [4G]
-  endpoints: [TDF, OFCS]
+  endpoints: [TDF, OFCS, TDF-C]
   protocol: Diameter (Rf) / GTP'
   aliases: []
   description: >-
     The offline charging interface between the TDF and the OFCS. It transfers charging data and records
     for the application traffic the TDF detects, for later billing.
-  spec: ["TS 23.002 §6a.13.17", "TS 32.295"]
+  spec: ["TS 23.002 §6a.13.17", "TS 32.295", "TS 23.214 §4.2.1"]
 
 - id: Gw
   name: Gw
   generations: [4G]
-  endpoints: [PCEF, PFDF]
+  endpoints: [PCEF, PFDF, PGW, PGW-C]
   protocol: Diameter
   aliases: []
   description: >-
     The reference point between the PFDF and the PCEF. The PFDF provides the Packet Flow Descriptions
     that third parties manage, so the PCEF can detect their application traffic.
-  spec: ["TS 23.002 §6a.13.20"]
+  spec: ["TS 23.002 §6a.13.20", "TS 23.214 §4.2.1"]
 
 - id: Gwn
   name: Gwn
   generations: [4G]
-  endpoints: [TDF, PFDF]
+  endpoints: [TDF, PFDF, TDF-C]
   protocol: Diameter
   aliases: []
   description: >-
     The reference point between the PFDF and the TDF. The PFDF provides the Packet Flow Descriptions
     that third parties manage, so the TDF can detect their application traffic.
-  spec: ["TS 23.002 §6a.13.21"]
+  spec: ["TS 23.002 §6a.13.21", "TS 23.214 §4.2.1"]
 
 - id: J
   name: J
@@ -2689,7 +2689,7 @@
 - id: Mm
   name: Mm
   generations: [IMS]
-  endpoints: [IBCF, DN]
+  endpoints: [IBCF, DN, I-CSCF, S-CSCF]
   protocol: SIP
   aliases: []
   description: >-
@@ -2990,7 +2990,7 @@
 - id: S11-U
   name: S11-U
   generations: [4G]
-  endpoints: [MME, SGW]
+  endpoints: [MME, SGW, SGW-U]
   protocol: GTP-U
   aliases: []
   description: >-
@@ -3041,3 +3041,336 @@
     The offline charging interface between the CDF and the CGF. It carries CDRs over GTP' (GTP prime),
     which the CGF then validates, consolidates, and passes to the billing domain.
   spec: ["TS 32.240", "TS 32.295"]
+
+# --- 5GC service-based interfaces ---
+# The interface each NF exhibits on the SBA, TS 23.501 §4.2.6 (Nsmsf: §4.4.2.3).
+
+- id: Namf
+  name: Namf
+  generations: [5G]
+  endpoints: [AMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an AMF exhibits. Any authorized consumer reaches the AMF's
+    Namf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.518"]
+
+- id: Nsmf
+  name: Nsmf
+  generations: [5G]
+  endpoints: [SMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an SMF exhibits. Any authorized consumer reaches the SMF's
+    Nsmf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.502"]
+
+- id: Nnef
+  name: Nnef
+  generations: [5G]
+  endpoints: [NEF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NEF exhibits. Any authorized consumer reaches the NEF's
+    Nnef_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.522"]
+
+- id: Npcf
+  name: Npcf
+  generations: [5G]
+  endpoints: [PCF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a PCF exhibits. Any authorized consumer reaches the PCF's
+    Npcf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.507"]
+
+- id: Nudm
+  name: Nudm
+  generations: [5G]
+  endpoints: [UDM]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an UDM exhibits. Any authorized consumer reaches the UDM's
+    Nudm_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.503"]
+
+- id: Naf
+  name: Naf
+  generations: [5G]
+  endpoints: [AF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an AF exhibits. Any authorized consumer reaches the AF's
+    Naf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.517"]
+
+- id: Nnrf
+  name: Nnrf
+  generations: [5G]
+  endpoints: [NRF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NRF exhibits. Any authorized consumer reaches the NRF's
+    Nnrf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.510"]
+
+- id: Nnsacf
+  name: Nnsacf
+  generations: [5G]
+  endpoints: [NSACF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NSACF exhibits. Any authorized consumer reaches the NSACF's
+    Nnsacf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.536"]
+
+- id: Nnssaaf
+  name: Nnssaaf
+  generations: [5G]
+  endpoints: [NSSAAF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NSSAAF exhibits. Any authorized consumer reaches the NSSAAF's
+    Nnssaaf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.526"]
+
+- id: Nnssf
+  name: Nnssf
+  generations: [5G]
+  endpoints: [NSSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NSSF exhibits. Any authorized consumer reaches the NSSF's
+    Nnssf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.531"]
+
+- id: Nausf
+  name: Nausf
+  generations: [5G]
+  endpoints: [AUSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an AUSF exhibits. Any authorized consumer reaches the AUSF's
+    Nausf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.509"]
+
+- id: Nudr
+  name: Nudr
+  generations: [5G]
+  endpoints: [UDR]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an UDR exhibits. Any authorized consumer reaches the UDR's
+    Nudr_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.504"]
+
+- id: Nudsf
+  name: Nudsf
+  generations: [5G]
+  endpoints: [UDSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an UDSF exhibits. Any authorized consumer reaches the UDSF's
+    Nudsf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.598"]
+
+- id: N5g-eir
+  name: N5g-eir
+  generations: [5G]
+  endpoints: [5G-EIR]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a 5G-EIR exhibits. Any authorized consumer reaches the 5G-EIR's
+    N5g-eir_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.511"]
+
+- id: Nnwdaf
+  name: Nnwdaf
+  generations: [5G]
+  endpoints: [NWDAF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an NWDAF exhibits. Any authorized consumer reaches the NWDAF's
+    Nnwdaf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.520"]
+
+- id: Nchf
+  name: Nchf
+  generations: [5G]
+  endpoints: [CHF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a CHF exhibits. Any authorized consumer reaches the CHF's
+    Nchf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 32.291"]
+
+- id: Nucmf
+  name: Nucmf
+  generations: [5G]
+  endpoints: [UCMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an UCMF exhibits. Any authorized consumer reaches the UCMF's
+    Nucmf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.534"]
+
+- id: Ndccf
+  name: Ndccf
+  generations: [5G]
+  endpoints: [DCCF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a DCCF exhibits. Any authorized consumer reaches the DCCF's
+    Ndccf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.574"]
+
+- id: Nmfaf
+  name: Nmfaf
+  generations: [5G]
+  endpoints: [MFAF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an MFAF exhibits. Any authorized consumer reaches the MFAF's
+    Nmfaf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.576"]
+
+- id: Nadrf
+  name: Nadrf
+  generations: [5G]
+  endpoints: [ADRF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an ADRF exhibits. Any authorized consumer reaches the ADRF's
+    Nadrf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.575"]
+
+- id: N5g-ddnmf
+  name: N5g-ddnmf
+  generations: [5G]
+  endpoints: [5G-DDNMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a 5G-DDNMF exhibits. Any authorized consumer reaches the 5G-DDNMF's
+    N5g-ddnmf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.555"]
+
+- id: Nmbsmf
+  name: Nmbsmf
+  generations: [5G]
+  endpoints: [MB-SMF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an MB-SMF exhibits. Any authorized consumer reaches the MB-SMF's
+    Nmbsmf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.532"]
+
+- id: Nmbsf
+  name: Nmbsf
+  generations: [5G]
+  endpoints: [MBSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an MBSF exhibits. Any authorized consumer reaches the MBSF's
+    Nmbsf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.580"]
+
+- id: Ntsctsf
+  name: Ntsctsf
+  generations: [5G]
+  endpoints: [TSCTSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a TSCTSF exhibits. Any authorized consumer reaches the TSCTSF's
+    Ntsctsf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.565"]
+
+- id: Nbsp
+  name: Nbsp
+  generations: [5G]
+  endpoints: [GBA-BSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface a GBA-BSF exhibits. Any authorized consumer reaches the GBA-BSF's
+    Nbsp_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 33.220"]
+
+- id: Neasdf
+  name: Neasdf
+  generations: [5G]
+  endpoints: [EASDF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an EASDF exhibits. Any authorized consumer reaches the EASDF's
+    Neasdf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.558"]
+
+- id: Nupf
+  name: Nupf
+  generations: [5G]
+  endpoints: [UPF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an UPF exhibits. Any authorized consumer reaches the UPF's
+    Nupf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.2.6", "TS 29.564"]
+
+- id: Nsmsf
+  name: Nsmsf
+  generations: [5G]
+  endpoints: [SMSF]
+  protocol: HTTP/2 (SBI)
+  aliases: []
+  description: >-
+    The service-based interface an SMSF exhibits. Any authorized consumer reaches the SMSF's
+    Nsmsf_* services over it, directly or through an SCP.
+  spec: ["TS 23.501 §4.4.2.3", "TS 29.540"]
+
+# --- IMS reference points from TS 23.002 §6a.7 ---
+
+- id: Cr
+  name: Cr
+  generations: [IMS]
+  endpoints: [AS, MRFC]
+  aliases: []
+  description: >-
+    The media control interface between an application server and an MRFC. The MRFC fetches and caches
+    documents and resources from the AS over it, and the two exchange media control requests and notifications.
+  spec: ["TS 23.002 §6a.7.5a", "TS 23.218"]
+
+- id: Rc
+  name: Rc
+  generations: [IMS]
+  endpoints: [AS, MRB]
+  aliases: []
+  description: >-
+    The interface an application server uses to ask the MRB to assign media resources to a call, in both
+    the Query and the In-Line mode of the MRB.
+  spec: ["TS 23.002 §6a.7.9a", "TS 23.218"]
