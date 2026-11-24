@@ -76,7 +76,7 @@
     "diagrams:render": "vitest run --config scripts/vitest.render.config.ts"
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.6.68",
