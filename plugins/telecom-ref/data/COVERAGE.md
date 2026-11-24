@@ -13,7 +13,7 @@ summary counts the items the cited specs list and how many have an entry here.
 | 5GC SBI services (TS 23.502 §5.2, TS 23.288, TS 23.273, TS 23.632, TS 32.290, stage 3) | 119 | 119 | 0 |
 | Protocols | 16 | 16 | 0 |
 
-Dataset: 298 interfaces, 148 network functions, 119 SBI services, 36 protocols.
+Dataset: 299 interfaces, 148 network functions, 119 SBI services, 36 protocols.
 
 ## EPC and legacy reference points (TS 23.401 §4.2, TS 23.002 clauses 6, 6a, 7)
 
@@ -66,16 +66,29 @@ labels; each is drawn or listed as omitted with a reason (checked by `diagrams.t
 | ims (IMS · Reference architecture) | TS 23.228 Figure 4.0 | 27 | 27 | 0 |
 | interworking (EPC and 5GC interworking · Non-roaming) | TS 23.501 Figure 4.3.1-1 | 15 | 15 | 0 |
 
-Interfaces drawn in at least one diagram (94 of 298): Cr, Cx, Dh, Dx, Gm, Gx, Gy, Gz, Ici, Iq, ISC, Iu-PS, Ix, Izi, LTE-Uu, Ma, Mb, Mg, Mi, Mj, Mk, Mm, Mn, Mp, Mr, Mr', Ms, Mw, Mx, N1, N10, N11, N12, N13, N14, N15, N2, N22, N26, N3, N32, N4, N5, N58, N59, N6, N7, N8, N80, N81, N9, Naf, Namf, Nausf, Neasdf, Nnef, Nnrf, Nnsacf, Nnssaaf, Nnssf, Npcf, NR-Uu, Nsmf, Nudm, Rc, Rx, S1-MME, S1-U, S10, S11, S11-U, S12, S2b, S3, S4, S5, S6a, S6b, S6d, S8, S9, Sd, SGi, Sh, SWa, SWm, SWn, SWu, SWx, Sxa, Sxb, Sxc, Ut, Uu.
+Interfaces drawn in at least one diagram (94 of 299): Cr, Cx, Dh, Dx, Gm, Gx, Gy, Gz, Ici, Iq, ISC, Iu-PS, Ix, Izi, LTE-Uu, Ma, Mb, Mg, Mi, Mj, Mk, Mm, Mn, Mp, Mr, Mr', Ms, Mw, Mx, N1, N10, N11, N12, N13, N14, N15, N2, N22, N26, N3, N32, N4, N5, N58, N59, N6, N7, N8, N80, N81, N9, Naf, Namf, Nausf, Neasdf, Nnef, Nnrf, Nnsacf, Nnssaaf, Nnssf, Npcf, NR-Uu, Nsmf, Nudm, Rc, Rx, S1-MME, S1-U, S10, S11, S11-U, S12, S2b, S3, S4, S5, S6a, S6b, S6d, S8, S9, Sd, SGi, Sh, SWa, SWm, SWn, SWu, SWx, Sxa, Sxb, Sxc, Ut, Uu.
 
 Network functions drawn in at least one diagram (52 of 148): 3GPP AAA Server, AF, AMF, AS, AUSF, BGCF, DN, EASDF, eNodeB, ePDG, gNB, HSS, I-CSCF, IBCF, IMS-AGW, IMS-MGW, MGCF, MME, MRB, MRFC, MRFP, NEF, NodeB, NRF, NSACF, NSSAAF, NSSF, OCS, OFCS, P-CSCF, PCF, PCRF, PGW, PGW-C, PGW-U, RNC, S-CSCF, SCP, SEPP, SGSN, SGW, SGW-C, SGW-U, SLF, SMF, TDF-C, TDF-U, TrGW, UDM, UE, Untrusted non-3GPP AN, UPF.
 
 Shown in a cited figure but drawn in no diagram: Gn, Gp, Gw, Gwn, Gxa, Gxb, Gxc, Gyn, Gzn, S2a, STa.
 
+## GTP
+
+| Version | Messages | With IE tables | IEs | Causes | Extension headers |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GTPv2-C (TS 29.274, Sv TS 29.280) | 96 | 95 | 164 | 82 | 0 |
+| GTPv1-C (TS 29.060) | 60 | 59 | 125 | 55 | 5 |
+| GTPv1-U (TS 29.281) | 7 | 6 | 7 | 0 | 11 |
+
+Messages without an IE table, because the spec defines none: Version Not Supported (v1c 3), G-PDU (v1u 255), Version Not Supported Indication (v2c 3).
+
+IE table rows that name no single IE type: MM Context (3 rows).
+
 ## Not covered (candidate phase 2)
 
 - PFCP messages and IEs (TS 29.244 clauses 7 and 8): message types, IE types, and grouped IE layouts.
-- GTPv2-C, GTPv1-C, and GTP-U message and IE types (TS 29.274, TS 29.060, TS 29.281).
+- GTP IE field layouts (the octet figures of TS 29.274 clause 8, TS 29.060 §7.7, TS 29.281 clause 8), the
+  condition text of message IE tables, and the GTPv2-C S101/S121 messages of TS 29.276.
 - NGAP, S1AP, XnAP, X2AP, F1AP, and E1AP procedures and IEs (TS 38.413, 36.413, 38.423, 36.423, 38.473, 38.463).
 - 5GS and EPS NAS message types and IEs (TS 24.501, TS 24.301).
 - SBI resources, OpenAPI paths and data types (the TS 29.5xx OpenAPI files), and per-operation stage-3 detail.
