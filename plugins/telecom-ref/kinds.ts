@@ -27,6 +27,10 @@ export const KIND_STYLES: Record<EntityKind, KindStyle> = {
   nf: { label: "NF", hue: 345 },
   svc: { label: "Service", hue: 130 },
   proto: { label: "Protocol", hue: 30 },
+  gtpmsg: { label: "GTP message", hue: 220 },
+  gtpie: { label: "GTP IE", hue: 160 },
+  gtpcause: { label: "GTP cause", hue: 100 },
+  gtpext: { label: "GTP ext header", hue: 275 },
 };
 
 /** Badge text lightness and chroma per theme; the tint behind it is the same color at TINT_ALPHA. */

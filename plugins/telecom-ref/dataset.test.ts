@@ -5,7 +5,8 @@ import { validateDataset } from "./validate";
 
 /**
  * A small consistent dataset: S6a carries ULR, which carries Subscription-Data, which groups MSISDN;
- * S6a runs Diameter, and the HSS produces Nhss_UECM.
+ * S6a runs Diameter, and the HSS produces Nhss_UECM. GTPv2-C has Echo Request, answered by Echo
+ * Response, which carries the Recovery IE, and the Request accepted cause.
  */
 function fixture(): RawDataset {
   return {
@@ -98,6 +99,7 @@ function fixture(): RawDataset {
         protocols: ["proto/Diameter"],
         apps: ["diam.app/16777251"],
         services: [],
+        gtpMessages: [],
         description: null,
         aliases: [],
         spec: [{ doc: "TS 23.401", clause: "4.2" }],
@@ -160,8 +162,100 @@ function fixture(): RawDataset {
         description: null,
         spec: [{ doc: "RFC 6733" }],
         interfaces: ["if/S6a"],
+        messages: [],
+        header: null,
+      },
+      {
+        id: "proto/GTPv2-C",
+        kind: "proto",
+        name: "GTPv2-C",
+        fullName: null,
+        aliases: [],
+        transport: "UDP port 2123",
+        over: [],
+        carries: [],
+        description: null,
+        spec: [{ doc: "TS 29.274" }],
+        interfaces: [],
+        messages: ["gtp.msg/v2c/1", "gtp.msg/v2c/2"],
+        header: null,
       },
     ],
+    gtpMessages: [
+      {
+        id: "gtp.msg/v2c/1",
+        kind: "gtpmsg",
+        protocol: "proto/GTPv2-C",
+        type: 1,
+        name: "Echo Request",
+        initial: true,
+        triggered: false,
+        reply: "gtp.msg/v2c/2",
+        replyTo: [],
+        group: null,
+        flow: null,
+        ieTables: [],
+        description: null,
+        spec: [{ doc: "TS 29.274", clause: "7.1.1" }],
+        interfaces: [],
+      },
+      {
+        id: "gtp.msg/v2c/2",
+        kind: "gtpmsg",
+        protocol: "proto/GTPv2-C",
+        type: 2,
+        name: "Echo Response",
+        initial: false,
+        triggered: true,
+        reply: null,
+        replyTo: ["gtp.msg/v2c/1"],
+        group: null,
+        flow: null,
+        ieTables: [
+          {
+            title: "Information Elements in Echo Response",
+            table: "7.1.2-1",
+            spec: { doc: "TS 29.274", clause: "7.1.2" },
+            rows: [{ ie: "gtp.ie/v2c/3", name: "Recovery", type: "Recovery", presence: ["M"], instance: "0", group: null }],
+          },
+        ],
+        description: null,
+        spec: [{ doc: "TS 29.274", clause: "7.1.2" }],
+        interfaces: [],
+      },
+    ],
+    gtpIes: [
+      {
+        id: "gtp.ie/v2c/3",
+        kind: "gtpie",
+        protocol: "proto/GTPv2-C",
+        type: 3,
+        name: "Recovery (Restart Counter)",
+        abbrev: null,
+        aliases: [],
+        encoding: null,
+        length: "Variable",
+        fixedOctets: null,
+        carriedIn: ["gtp.msg/v2c/2"],
+        description: null,
+        spec: [{ doc: "TS 29.274", clause: "8.5" }],
+        interfaces: [],
+      },
+    ],
+    gtpCauses: [
+      {
+        id: "gtp.cause/v2c/16",
+        kind: "gtpcause",
+        protocol: "proto/GTPv2-C",
+        code: 16,
+        name: "Request accepted",
+        category: "acceptance",
+        description: null,
+        spec: [{ doc: "TS 29.274", clause: "8.4" }],
+        interfaces: [],
+      },
+    ],
+    gtpExtensions: [],
     search: [
       ["diam.app/16777251", ["s6as6d"]],
       ["diam.cmd/316", ["ulr", "updatelocationrequest", "316"]],
@@ -172,6 +266,11 @@ function fixture(): RawDataset {
       ["nf/HSS", ["hss"]],
       ["svc/Nhss_UECM", ["nhssuecm"]],
       ["proto/Diameter", ["diameter"]],
+      ["proto/GTPv2-C", ["gtpv2c"]],
+      ["gtp.msg/v2c/1", ["echorequest", "1"]],
+      ["gtp.msg/v2c/2", ["echoresponse", "2"]],
+      ["gtp.ie/v2c/3", ["recoveryrestartcounter", "3"]],
+      ["gtp.cause/v2c/16", ["requestaccepted", "16"]],
     ],
   };
 }
@@ -231,6 +330,42 @@ describe("validateDataset", () => {
   });
 });
 
+describe("validateDataset on GTP entries", () => {
+  it("reports a reply its target does not mirror", () => {
+    const raw = fixture();
+    raw.gtpMessages[1]!.replyTo = [];
+    expect(validateDataset(raw)).toContainEqual({ id: "gtp.msg/v2c/1", field: "reply", message: "gtp.msg/v2c/2 does not list it in replyTo" });
+  });
+
+  it("reports an IE table row naming a missing IE, and an IE whose carriers do not carry it", () => {
+    const raw = fixture();
+    raw.gtpMessages[1]!.ieTables[0]!.rows[0]!.ie = "gtp.ie/v2c/999";
+    const issues = validateDataset(raw);
+    expect(issues).toContainEqual({ id: "gtp.msg/v2c/2", field: "ieTables[0].rows[0].ie", message: "dangling link to gtp.ie/v2c/999" });
+    expect(issues).toContainEqual({ id: "gtp.ie/v2c/3", field: "carriedIn", message: "gtp.msg/v2c/2 does not carry it" });
+  });
+
+  it("reports an id that disagrees with its value or version, and links across versions", () => {
+    const raw = fixture();
+    raw.gtpCauses[0]!.code = 17;
+    raw.gtpIes[0]!.protocol = "proto/Diameter";
+    const issues = validateDataset(raw);
+    expect(issues).toContainEqual({ id: "gtp.cause/v2c/16", field: "id", message: "id does not end in its value 17" });
+    expect(issues).toContainEqual({
+      id: "gtp.ie/v2c/3",
+      field: "protocol",
+      message: "proto/Diameter is not the protocol of its id's GTP version",
+    });
+    expect(issues).toContainEqual({ id: "gtp.msg/v2c/2", field: "ieTables", message: "gtp.ie/v2c/3 is proto/Diameter, not proto/GTPv2-C" });
+  });
+
+  it("reports a protocol message list that disagrees with the messages", () => {
+    const raw = fixture();
+    raw.protocols[1]!.messages = ["gtp.msg/v2c/1"];
+    expect(validateDataset(raw)).toContainEqual({ id: "gtp.msg/v2c/2", field: "protocol", message: "proto/GTPv2-C does not list it" });
+  });
+});
+
 describe("the committed dataset", () => {
   const raw = bundledRaw();
 
@@ -262,6 +397,10 @@ describe("the committed dataset", () => {
       nfs: raw.nfs.length,
       services: raw.services.length,
       protocols: raw.protocols.length,
+      gtpMessages: raw.gtpMessages.length,
+      gtpIes: raw.gtpIes.length,
+      gtpCauses: raw.gtpCauses.length,
+      gtpExtensions: raw.gtpExtensions.length,
     });
   });
 });

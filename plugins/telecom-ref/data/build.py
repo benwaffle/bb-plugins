@@ -10,6 +10,9 @@ Downloads (cached under data/.cache/):
   - 3GPP Rel-18 specs from the 3GPP FTP "latest/Rel-18" folders: TS 29.230
     for 3GPP application IDs, command codes, and AVP codes, and each spec
     TS 29.230 cites for AVP flag rules, command formats, and grouped AVPs.
+  - The newest Rel-18 versions of the GTP specs from the 3GPP FTP archive:
+    TS 29.274 (GTPv2-C), TS 29.280 (Sv), TS 29.281 (GTPv1-U), TS 29.060
+    (GTPv1-C), for message, IE, cause, and extension header tables.
 
 Merges curated YAML under data/curated/ (applications, interfaces, network
 functions, and per-spec descriptions), computes reverse cross-links, writes
@@ -37,6 +40,7 @@ from pathlib import Path
 import docx
 import yaml
 
+import gtp
 from parse import (
     SERVICE_NAME,
     CommandFormat,
@@ -77,6 +81,9 @@ IANA_RADIUS_CSV = "https://www.iana.org/assignments/radius-types/radius-types-2.
 RADIUS_SKIP = re.compile(r"unassigned|reserved|experimental|implementation|allocated|deprecated", re.I)
 RFC_URL = "https://www.rfc-editor.org/rfc/rfc{n}.txt"
 SPEC_FOLDER = "https://www.3gpp.org/ftp/Specs/latest/Rel-{rel}/{series}_series/"
+SPEC_ARCHIVE = "https://www.3gpp.org/ftp/Specs/archive/{series}_series/{number}/"
+# The GTP specs, read from the archive's newest Rel-18 version.
+GTP_SPECS = ("29.274", "29.280", "29.281", "29.060")
 USER_AGENT = "Mozilla/5.0 (compatible; telecom-ref-build/1.0)"
 
 VENDOR_IETF = 0
@@ -141,8 +148,23 @@ def latest_spec(number: str, offline: bool) -> SpecSource:
     names = sorted(set(re.findall(rf"\b{compact}-[0-9a-z]{{3}}\.zip", listing)))
     if not names:
         return SpecSource(number, None, None, None)
-    name = names[-1]
-    url = folder + name
+    return unpack_spec(number, folder + names[-1], offline)
+
+
+def archive_spec(number: str, offline: bool) -> SpecSource:
+    """The newest version of RELEASE in the spec's archive folder: its version code starts with the release in base 36."""
+    folder = SPEC_ARCHIVE.format(series=number.split(".")[0], number=number)
+    listing = fetch(folder, CACHE / f"archive-{number}-listing.html", offline).read_text("utf-8", "replace")
+    release = "0123456789abcdefghijklmnopqrstuvwxyz"[RELEASE]
+    names = sorted(set(re.findall(rf"\b{number.replace('.', '')}-{release}[0-9a-z]{{2}}\.zip", listing)))
+    if not names:
+        raise SystemExit(f"no Rel-{RELEASE} version of TS {number} in {folder}")
+    return unpack_spec(number, folder + names[-1], offline)
+
+
+def unpack_spec(number: str, url: str, offline: bool) -> SpecSource:
+    name = url.rsplit("/", 1)[1]
+    compact = number.replace(".", "")
     archive = fetch(url, CACHE / "3gpp" / name, offline)
     target = CACHE / "3gpp" / f"{compact}-{spec_version(name)}.docx"
     if target.exists():
@@ -193,6 +215,8 @@ class Model:
     clause_titles: dict[str, dict[str, str]] = field(default_factory=dict)
     # SBI services by name, as load_services merges them across specs.
     services: dict[str, dict] = field(default_factory=dict)
+    # The GTP spec documents by number ("29.274").
+    gtp_docs: dict[str, Path] = field(default_factory=dict)
 
 
 def ref(doc: str, model: Model, clause: str | None = None) -> dict:
@@ -536,6 +560,17 @@ def load_services(model: Model, offline: bool) -> None:
         model.spec_versions.setdefault(doc, latest_spec(doc.removeprefix("TS "), offline).version)
 
 
+def load_gtp(model: Model, offline: bool) -> None:
+    for number in GTP_SPECS:
+        source = archive_spec(number, offline)
+        if source.path is None:
+            raise SystemExit(f"TS {number}: the archive holds no Word document")
+        model.spec_versions[f"TS {number}"] = source.version
+        model.sources.append({"name": f"3GPP TS {number} V{source.version}", "url": source.url})
+        model.gtp_docs[number] = source.path
+        print(f"  TS {number} V{source.version}", file=sys.stderr)
+
+
 def sbi_catalogue(offline: bool) -> list[tuple[str, str]]:
     """Every service the configured specs name, with the clause that names it, for the coverage audit."""
     model = Model()
@@ -840,6 +875,7 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             "apps": [app_id(a) for a in item.get("apps", [])],
             "protocols": [],
             "services": [],
+            "gtpMessages": [],
             "description": item.get("description"),
             "aliases": item.get("aliases", []),
             "spec": ref_list(item.get("spec", [])),
@@ -851,8 +887,18 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             if a in apps_out:
                 apps_out[a]["interfaces"].append(iid)
 
-    protocols_out = assemble_protocols(load_yaml(CURATED / "protocols.yaml") or [], interfaces_out, ref_list)
+    gtp_config = load_yaml(CURATED / "gtp.yaml") or {}
+    protocols_out = assemble_protocols(load_yaml(CURATED / "protocols.yaml") or [], interfaces_out, ref_list,
+                                       gtp_config.get("headers") or {})
     services_out = assemble_services(model, nfs_out, interfaces_out, ref)
+    gtp_log: list[str] = []
+    gtp_data = [gtp.read_v2(model.gtp_docs, gtp_config, gtp_log),
+                gtp.read_v1("v1u", model.gtp_docs["29.281"], gtp_config, gtp_log),
+                gtp.read_v1("v1c", model.gtp_docs["29.060"], gtp_config, gtp_log)]
+    gtp_out = gtp.assemble_gtp(gtp_data, gtp_config, lambda doc, clause=None: ref(doc, model, clause),
+                               nfs_out, interfaces_out, protocols_out, gtp_log)
+    for line in gtp_log:
+        print(f"  {line}", file=sys.stderr)
 
     for cmd in commands_out.values():
         cmd["interfaces"] = sorted({i for a in cmd["apps"] if a in apps_out for i in apps_out[a]["interfaces"]})
@@ -878,11 +924,16 @@ def assemble(model: Model) -> dict[str, list[dict]]:
         "nfs": list(nfs_out.values()),
         "services": list(services_out.values()),
         "protocols": list(protocols_out.values()),
+        **gtp_out,
     }
 
 
-def assemble_protocols(protocols: list[dict], interfaces_out: dict[str, dict], ref_list) -> dict[str, dict]:
-    """Protocol entities, linked to the interfaces whose protocol text matches them or that they list."""
+def assemble_protocols(protocols: list[dict], interfaces_out: dict[str, dict], ref_list,
+                       headers: dict[str, dict]) -> dict[str, dict]:
+    """Protocol entities, linked to the interfaces whose protocol text matches them or that they list.
+
+    `headers` holds the header layouts curated in gtp.yaml, by protocol name.
+    """
     out: dict[str, dict] = {}
     for item in protocols:
         pid = f"proto/{item['id']}"
@@ -906,6 +957,8 @@ def assemble_protocols(protocols: list[dict], interfaces_out: dict[str, dict], r
             "description": item.get("description"),
             "spec": ref_list(item.get("spec", [])),
             "interfaces": sorted(found, key=lambda i: interfaces_out[i]["name"].lower()),
+            "messages": [],
+            "header": protocol_header(headers.get(item["name"]), ref_list),
         }
         for iid in found:
             interfaces_out[iid]["protocols"].append(pid)
@@ -985,6 +1038,14 @@ def assemble_services(model: Model, nfs_out: dict[str, dict], interfaces_out: di
     if unknown:
         print(f"  service consumers that name no network function: {sorted(unknown.items())}", file=sys.stderr)
     return out
+
+
+def protocol_header(header: dict | None, ref_list) -> dict | None:
+    if header is None:
+        return None
+    fields = [{"octets": f["octets"], "bits": f.get("bits"), "name": f["name"], "description": f["description"]}
+              for f in header["fields"]]
+    return {"spec": ref_list([header["spec"]])[0], "fields": fields}
 
 
 ABBREV = re.compile(r"[A-Z]{3}")
@@ -1079,6 +1140,14 @@ def search_keys(entity: dict, protocol_names: dict[str, list[str]]) -> list[str]
         keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
     elif kind in ("svc", "proto"):
         keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
+    elif kind == "gtpmsg":
+        keys += [entity["name"], str(entity["type"])]
+    elif kind == "gtpie":
+        keys += [entity.get("abbrev") or "", entity["name"], *entity.get("aliases", []), str(entity["type"])]
+    elif kind == "gtpcause":
+        keys += [entity["name"], str(entity["code"])]
+    elif kind == "gtpext":
+        keys += [entity["name"], f"0x{entity['type']:02x}", str(entity["type"])]
     out: list[str] = []
     for key in keys:
         normalized = norm_key(key)
@@ -1093,7 +1162,8 @@ def build_search(dataset: dict[str, list[dict]]) -> list[list]:
         for iid in proto["interfaces"]:
             protocol_names.setdefault(iid, []).append(proto["name"])
     docs = []
-    for group in ("commands", "apps", "interfaces", "nfs", "services", "protocols", "avps"):
+    for group in ("commands", "apps", "interfaces", "nfs", "services", "protocols", "avps",
+                  "gtpMessages", "gtpIes", "gtpCauses", "gtpExtensions"):
         for entity in dataset[group]:
             docs.append([entity["id"], search_keys(entity, protocol_names)])
     return docs
@@ -1124,12 +1194,15 @@ def main() -> None:
     load_specs(model, args.offline)
     print("3GPP SBI service specs", file=sys.stderr)
     load_services(model, args.offline)
+    print("3GPP GTP specs", file=sys.stderr)
+    load_gtp(model, args.offline)
 
     dataset = assemble(model)
     counts = {k: len(v) for k, v in dataset.items()}
     counts["avpsDescribed"] = sum(1 for a in dataset["avps"] if a["description"])
     counts["avpsInScope"] = sum(1 for a in dataset["avps"] if a["inScope"])
     counts["commandsWithFormats"] = sum(1 for c in dataset["commands"] if c["formats"])
+    counts["gtpMessagesWithIeTables"] = sum(1 for m in dataset["gtpMessages"] if m["ieTables"])
     meta = {
         "release": RELEASE,
         "built": date.today().isoformat(),

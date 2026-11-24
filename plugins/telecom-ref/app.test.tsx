@@ -110,3 +110,22 @@ describe("architecture diagrams", () => {
     view.unmount();
   });
 });
+
+describe("GTP entry pages", () => {
+  it("shows a message's IE table with grouped IEs nested and links each IE type", () => {
+    const view = renderSlot(panel, { subPath: "gtp.msg/v2c/32" });
+    expect(view.getByRole("heading", { level: 1 }).textContent).toBe("Create Session Request");
+    expect(view.getByRole("heading", { name: "Information Elements in a Create Session Request" })).toBeTruthy();
+    expect(view.getByText("Bearer Context to be created within Create Session Request · Table 7.2.1-2")).toBeTruthy();
+    fireEvent.click(view.getAllByRole("link", { name: "F-TEID" })[0]!);
+    expect(view.navigateCalls.at(-1)).toEqual({ method: "toPluginPanel", path: "ref", options: { subPath: "gtp.ie/v2c/87" } });
+    view.unmount();
+  });
+
+  it("shows a protocol's header layout", () => {
+    const view = renderSlot(panel, { subPath: "proto/GTP-U" });
+    expect(view.getByRole("heading", { name: "Header" })).toBeTruthy();
+    expect(view.getByText("PN (N-PDU Number flag)")).toBeTruthy();
+    view.unmount();
+  });
+});

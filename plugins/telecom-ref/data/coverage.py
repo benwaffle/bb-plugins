@@ -11,8 +11,8 @@ service clauses build.py reads) and from fixed lists for the IMS reference
 points and protocols this reference sets out to cover.
 
 It also lists which interfaces and network functions the architecture
-diagrams in diagrams/*.json draw, and how each diagram covers the spec
-figures it cites.
+diagrams in diagrams/*.json draw, how each diagram covers the spec
+figures it cites, and what the GTP tables hold per GTP version.
 
 Run from the plugin directory after data/build.py: uv run data/coverage.py [--offline]
 """
@@ -37,7 +37,8 @@ PROTOCOLS = ["PFCP", "GTPv2-C", "GTP-U", "GTP'", "Diameter", "S1AP", "NGAP", "EP
 PHASE_2 = """## Not covered (candidate phase 2)
 
 - PFCP messages and IEs (TS 29.244 clauses 7 and 8): message types, IE types, and grouped IE layouts.
-- GTPv2-C, GTPv1-C, and GTP-U message and IE types (TS 29.274, TS 29.060, TS 29.281).
+- GTP IE field layouts (the octet figures of TS 29.274 clause 8, TS 29.060 §7.7, TS 29.281 clause 8), the
+  condition text of message IE tables, and the GTPv2-C S101/S121 messages of TS 29.276.
 - NGAP, S1AP, XnAP, X2AP, F1AP, and E1AP procedures and IEs (TS 38.413, 36.413, 38.423, 36.423, 38.473, 38.463).
 - 5GS and EPS NAS message types and IEs (TS 24.501, TS 24.301).
 - SBI resources, OpenAPI paths and data types (the TS 29.5xx OpenAPI files), and per-operation stage-3 detail.
@@ -81,6 +82,37 @@ class Item:
     name: str
     source: str
     found: str | None
+
+
+GTP_VERSIONS = {"v2c": "GTPv2-C (TS 29.274, Sv TS 29.280)", "v1c": "GTPv1-C (TS 29.060)", "v1u": "GTPv1-U (TS 29.281)"}
+
+
+def gtp_lines(messages: list[dict], ies: list[dict], causes: list[dict], extensions: list[dict]) -> list[str]:
+    """The GTP section: entries per version, and the messages and IE table rows the tables leave open."""
+    version = lambda e: e["id"].split("/")[1]
+    lines = ["## GTP", "", "| Version | Messages | With IE tables | IEs | Causes | Extension headers |",
+             "| --- | ---: | ---: | ---: | ---: | ---: |"]
+    for key, label in GTP_VERSIONS.items():
+        count = lambda items: sum(1 for e in items if version(e) == key)
+        tables = sum(1 for m in messages if version(m) == key and m["ieTables"])
+        lines.append(f"| {label} | {count(messages)} | {tables} | {count(ies)} | {count(causes)} | {count(extensions)} |")
+    without = [f"{m['name']} ({version(m)} {m['type']})" for m in messages if not m["ieTables"]]
+    lines += ["", f"Messages without an IE table, because the spec defines none: {', '.join(without)}."]
+    unresolved: dict[str, int] = {}
+
+    def visit(table: dict) -> None:
+        for row in table["rows"]:
+            if row["ie"] is None:
+                unresolved[row["type"]] = unresolved.get(row["type"], 0) + 1
+            if row["group"]:
+                visit(row["group"])
+
+    for m in messages:
+        for table in m["ieTables"]:
+            visit(table)
+    rows = ", ".join(f"{name} ({n} rows)" for name, n in sorted(unresolved.items()))
+    lines += ["", f"IE table rows that name no single IE type: {rows or 'none'}.", ""]
+    return lines
 
 
 def entity_index(groups: list[list[dict]]) -> dict[str, str]:
@@ -187,6 +219,7 @@ def main() -> None:
         lines += [f"- {i.name}" + (f" ({i.source})" if i.source else "") for i in missing]
         lines.append("")
     lines += diagram_lines(interfaces, nfs)
+    lines += gtp_lines(load("gtpMessages"), load("gtpIes"), load("gtpCauses"), load("gtpExtensions"))
     lines += PHASE_2.splitlines()
     (DATA / "COVERAGE.md").write_text("\n".join(lines).rstrip() + "\n", "utf-8")
     for title, items in categories.items():

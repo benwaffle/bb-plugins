@@ -1,13 +1,17 @@
 import apps from "./data/apps.json";
 import avps from "./data/avps.json";
 import commands from "./data/commands.json";
+import gtpCauses from "./data/gtpCauses.json";
+import gtpExtensions from "./data/gtpExtensions.json";
+import gtpIes from "./data/gtpIes.json";
+import gtpMessages from "./data/gtpMessages.json";
 import interfaces from "./data/interfaces.json";
 import meta from "./data/meta.json";
 import nfs from "./data/nfs.json";
 import protocols from "./data/protocols.json";
 import search from "./data/search.json";
 import services from "./data/services.json";
-import type { Entity, EntityKind, Meta, RawDataset, SearchDoc } from "./types";
+import type { Entity, EntityKind, GtpVersion, Meta, RawDataset, SearchDoc } from "./types";
 
 export interface Dataset {
   meta: Meta;
@@ -25,6 +29,10 @@ export const KIND_LABELS: Record<EntityKind, string> = {
   nf: "Network functions",
   svc: "SBI services",
   proto: "Protocols",
+  gtpmsg: "GTP messages",
+  gtpie: "GTP IEs",
+  gtpcause: "GTP causes",
+  gtpext: "GTP extension headers",
 };
 
 export const KIND_BADGES: Record<EntityKind, string> = {
@@ -35,9 +43,37 @@ export const KIND_BADGES: Record<EntityKind, string> = {
   nf: "NF",
   svc: "SVC",
   proto: "PROTO",
+  gtpmsg: "GTP-MSG",
+  gtpie: "GTP-IE",
+  gtpcause: "GTP-CAUSE",
+  gtpext: "GTP-EXT",
 };
 
-export const KINDS: readonly EntityKind[] = ["cmd", "avp", "app", "if", "nf", "svc", "proto"];
+export const KINDS: readonly EntityKind[] = ["cmd", "avp", "app", "if", "nf", "svc", "proto", "gtpmsg", "gtpie", "gtpcause", "gtpext"];
+
+/** Each GTP version's protocol entity and the name its entries show: "GTPv2-C 32". */
+export const GTP_VERSIONS: Record<GtpVersion, { protocol: string; label: string }> = {
+  v2c: { protocol: "proto/GTPv2-C", label: "GTPv2-C" },
+  v1c: { protocol: "proto/GTPv1-C", label: "GTPv1-C" },
+  v1u: { protocol: "proto/GTP-U", label: "GTPv1-U" },
+};
+
+/** The GTP version of a GTP entity id: "gtp.ie/v2c/87" -> "v2c". */
+export function gtpVersion(id: string): GtpVersion | null {
+  const version = id.split("/")[1];
+  return version !== undefined && version in GTP_VERSIONS ? (version as GtpVersion) : null;
+}
+
+/** "GTPv2-C" for a GTP entity, else null. */
+export function gtpLabel(id: string): string | null {
+  const version = gtpVersion(id);
+  return entityKind(id)?.startsWith("gtp") && version ? GTP_VERSIONS[version].label : null;
+}
+
+/** "0x85", the form TS 29.281 and TS 29.060 extension header values are usually quoted in. */
+export function hexByte(value: number): string {
+  return `0x${value.toString(16).padStart(2, "0")}`;
+}
 
 export function entityKind(id: string): EntityKind | null {
   const prefix = id.split("/")[0];
@@ -56,13 +92,33 @@ export function entityKind(id: string): EntityKind | null {
       return "svc";
     case "proto":
       return "proto";
+    case "gtp.msg":
+      return "gtpmsg";
+    case "gtp.ie":
+      return "gtpie";
+    case "gtp.cause":
+      return "gtpcause";
+    case "gtp.ext":
+      return "gtpext";
     default:
       return null;
   }
 }
 
 export function allEntities(raw: RawDataset): Entity[] {
-  return [...raw.apps, ...raw.commands, ...raw.avps, ...raw.interfaces, ...raw.nfs, ...raw.services, ...raw.protocols];
+  return [
+    ...raw.apps,
+    ...raw.commands,
+    ...raw.avps,
+    ...raw.interfaces,
+    ...raw.nfs,
+    ...raw.services,
+    ...raw.protocols,
+    ...raw.gtpMessages,
+    ...raw.gtpIes,
+    ...raw.gtpCauses,
+    ...raw.gtpExtensions,
+  ];
 }
 
 export function createDataset(raw: RawDataset): Dataset {
@@ -88,6 +144,10 @@ export function bundledRaw(): RawDataset {
     nfs: nfs as RawDataset["nfs"],
     services: services as RawDataset["services"],
     protocols: protocols as RawDataset["protocols"],
+    gtpMessages: gtpMessages as RawDataset["gtpMessages"],
+    gtpIes: gtpIes as RawDataset["gtpIes"],
+    gtpCauses: gtpCauses as RawDataset["gtpCauses"],
+    gtpExtensions: gtpExtensions as RawDataset["gtpExtensions"],
     search: search as SearchDoc[],
   };
 }
@@ -111,6 +171,8 @@ export function entityTitle(entity: Entity): string {
     case "nf":
     case "proto":
       return entity.fullName ? `${entity.name} · ${entity.fullName}` : entity.name;
+    case "gtpie":
+      return entity.abbrev ? `${entity.abbrev} · ${entity.name}` : entity.name;
     default:
       return entity.name;
   }
@@ -125,6 +187,8 @@ export function entityShortName(entity: Entity): string {
     }
     case "app":
       return entity.short ?? entity.name;
+    case "gtpie":
+      return entity.abbrev ?? entity.name;
     default:
       return entity.name;
   }
@@ -145,8 +209,33 @@ export function entityCode(entity: Entity): string | null {
       return `${entity.code} · vendor ${entity.vendor}`;
     case "app":
       return `App ${entity.appId}`;
+    case "gtpmsg":
+      return `${gtpLabel(entity.id)} type ${entity.type}`;
+    case "gtpie":
+      return `${gtpLabel(entity.id)} IE ${entity.type}`;
+    case "gtpcause":
+      return `${gtpLabel(entity.id)} cause ${entity.code}`;
+    case "gtpext":
+      return `${gtpLabel(entity.id)} ${hexByte(entity.type)}`;
     default:
       return null;
+  }
+}
+
+/** The protocols an entity belongs to, for the protocol filter: a GTP entry's version, an interface's protocols, a protocol itself. */
+export function entityProtocols(entity: Entity): readonly string[] {
+  switch (entity.kind) {
+    case "gtpmsg":
+    case "gtpie":
+    case "gtpcause":
+    case "gtpext":
+      return [entity.protocol];
+    case "if":
+      return entity.protocols;
+    case "proto":
+      return [entity.id];
+    default:
+      return [];
   }
 }
 

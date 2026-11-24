@@ -203,6 +203,17 @@
     tracking area update or handover.
   spec: ["TS 23.401 §4.2", "TS 29.274"]
 
+- id: S16
+  name: S16
+  generations: [3G, 4G]
+  endpoints: [SGSN, SGSN]
+  protocol: GTPv2-C
+  aliases: []
+  description: >-
+    The GTPv2-C interface between two SGSNs. It carries the same mobility messages as S10 between MMEs:
+    identification, context transfer, and forward relocation when the UE moves between SGSNs.
+  spec: ["TS 29.274 §1", "TS 29.274 §6.1"]
+
 - id: S11
   name: S11
   generations: [4G]
