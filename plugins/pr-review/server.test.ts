@@ -155,6 +155,25 @@ const threadRow = (thread: FakeThread) => ({ ...thread, deletedAt: null, titleFa
 
 const SETTINGS = { repos: REPO, jiraProjectKeys: "ACME", jiraSite: "https://example.atlassian.net/" };
 
+type FakeSdk = ReturnType<typeof createFakePluginHost>["harness"]["sdk"];
+
+/**
+ * Answers the GitHub PR Status plugin's `pullRequests` RPC with `row` for
+ * each requested environment, parsed through the caller's output schema as
+ * `bb.sdk.plugins.callRpc` does.
+ */
+function stubEnvironmentPulls(sdk: FakeSdk, row: () => unknown) {
+  sdk.stub(
+    "plugins.callRpc",
+    async (args: { pluginId: string; method: string; input: { keys: string[] }; outputSchema: { parse(value: unknown): unknown } }) => {
+      if (args.pluginId !== "bb--github-pr-status" || args.method !== "pullRequests") {
+        throw new Error(`unexpected RPC ${args.pluginId}.${args.method}`);
+      }
+      return args.outputSchema.parse(Object.fromEntries(args.input.keys.map((key) => [key, row()])));
+    },
+  );
+}
+
 async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = SETTINGS) {
   const runner = fakeRunner(nodes);
   const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
@@ -186,7 +205,7 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
   sdk.stub("threads.promptHistory", async () => [
     { id: "msg_1", createdAt: 1, input: [{ type: "text", text: "Review context", mentions: [] }] },
   ]);
-  sdk.stub("environments.pullRequest", async () => ({
+  stubEnvironmentPulls(sdk, () => ({
     outcome: "available",
     pullRequest: { url: `https://github.com/${REPO}/pull/596` },
   }));
@@ -244,7 +263,7 @@ describe("startReview", () => {
   it("returns once the worktree is on the PR head branch and bb resolves the PR for it", async () => {
     const { harness, runner } = await load();
     let lookups = 0;
-    harness.sdk.stub("environments.pullRequest", async () =>
+    stubEnvironmentPulls(harness.sdk, () =>
       ++lookups < 3
         ? { outcome: "absent" }
         : { outcome: "available", pullRequest: { url: `https://github.com/${REPO}/pull/596` } },
@@ -254,7 +273,9 @@ describe("startReview", () => {
     expect(runner.calls[checkout]?.cwd).toBe("/worktrees/widgets-596");
     expect(runner.calls[checkout + 1]).toMatchObject({ command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"] });
     expect(lookups).toBe(3);
-    expect(harness.sdk.callsTo("environments.pullRequest")[0]).toEqual([{ environmentId: "env_review" }]);
+    expect(harness.sdk.callsTo("plugins.callRpc")[0]).toMatchObject([
+      { pluginId: "bb--github-pr-status", method: "pullRequests", input: { keys: ["env_review"] } },
+    ]);
   });
 
   it("puts the CLI start thread's worktree on the bb server machine", async () => {
