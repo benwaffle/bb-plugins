@@ -170,8 +170,9 @@ A new review thread:
     - [#599](https://github.com/acme/widgets/pull/599): Evict the old catalog entry
   ```
 
-The thread opens after `gh pr checkout` finishes and bb's branch lookup for the
-worktree finds the PR (up to 30 seconds after checkout). The GitHub plugin's
+The thread opens after `gh pr checkout` finishes and the GitHub PR Status
+plugin's `pullRequests` lookup for the worktree finds the PR (up to 30 seconds
+after checkout). The GitHub plugin's
 **GitHub PR** tab reads that lookup once when it opens, so it shows the PR's
 diff and checks instead of a PR picker.
 
