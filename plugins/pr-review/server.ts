@@ -4,6 +4,7 @@ import {
   defineCli,
   type BbPluginApi,
 } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import { REFS_CHANNEL } from "./channel.js";
 import {
   rpcContract,
@@ -65,6 +66,7 @@ import {
 export { rpcContract };
 
 const GITHUB_PLUGIN_ID = "github";
+const GITHUB_PR_STATUS_PLUGIN_ID = "bb--github-pr-status";
 const WORKTREE_PROVIDER_ID = "git-worktree";
 export const REVIEW_COMMAND = "/thermo-nuclear-code-quality-review review pr";
 const TITLE_LIMIT = 120;
@@ -102,6 +104,20 @@ const SIDEBAR_MAX_REFRESH_PASSES = 3;
 const ENVIRONMENT_READY_TIMEOUT_MS = 5 * 60_000;
 const ENVIRONMENT_POLL_MS = 2_000;
 const PULL_LINK_TIMEOUT_MS = 30_000;
+
+/**
+ * The rows of the GitHub PR Status plugin's `pullRequests` RPC, keyed by
+ * environment id. Only the PR URL of an `available` row is read.
+ */
+const environmentPullsSchema = z.record(
+  z.string(),
+  z.union([
+    z.object({ outcome: z.literal("available"), pullRequest: z.object({ url: z.string() }) }),
+    z.object({ outcome: z.enum(["absent", "unavailable"]) }),
+  ]),
+);
+
+type EnvironmentPulls = z.infer<typeof environmentPullsSchema>;
 
 interface Cached<T> {
   value: T;
@@ -914,17 +930,37 @@ export function createPlugin(deps: PluginDeps) {
     }
 
     /**
-     * Polls bb's branch lookup for the environment until it names the PR. The
-     * GitHub plugin's PR tab resolves a thread's PR through this lookup once,
-     * when it mounts, so the thread is opened only after it succeeds.
+     * The URL of the PR the GitHub PR Status plugin finds for the
+     * environment's branch, or null when it finds none or cannot be reached.
+     */
+    async function environmentPullUrl(environmentId: string): Promise<string | null> {
+      const rows = await bb.sdk.plugins
+        .callRpc<EnvironmentPulls>({
+          pluginId: GITHUB_PR_STATUS_PLUGIN_ID,
+          method: "pullRequests",
+          input: { keys: [environmentId] },
+          // The SDK types `outputSchema` with its own copy of zod, which this
+          // plugin's zod does not match structurally; bb only calls `parse`.
+          outputSchema: environmentPullsSchema as never,
+        })
+        .catch(() => null);
+      const row = rows?.[environmentId];
+      return row?.outcome === "available" ? row.pullRequest.url : null;
+    }
+
+    /**
+     * Polls the GitHub PR Status plugin's lookup for the environment until it
+     * names the PR. The GitHub plugin's PR tab resolves a thread's PR through
+     * this lookup once, when it mounts, so the thread is opened only after it
+     * succeeds.
      */
     async function awaitEnvironmentPull(environmentId: string, pull: PullView): Promise<boolean> {
       const deadline = Date.now() + PULL_LINK_TIMEOUT_MS;
       while (!disposed.signal.aborted && Date.now() < deadline) {
-        const result = await bb.sdk.environments.pullRequest({ environmentId }).catch(() => null);
-        if (result?.outcome === "available") {
-          if (result.pullRequest.url === pull.url) return true;
-          bb.log.warn(`environment ${environmentId} resolves to ${result.pullRequest.url}, not ${pull.url}`);
+        const url = await environmentPullUrl(environmentId);
+        if (url !== null) {
+          if (url === pull.url) return true;
+          bb.log.warn(`environment ${environmentId} resolves to ${url}, not ${pull.url}`);
           return false;
         }
         await sleep(deps.pollMs);
@@ -998,9 +1034,9 @@ export function createPlugin(deps: PluginDeps) {
       if (fresh(environmentLookups.get(threadId), QUEUE_TTL_MS * 20, deps.now())) return [];
       environmentLookups.set(threadId, { value: null, at: deps.now() });
       const { repos } = await config();
-      const result = await bb.sdk.environments.pullRequest({ environmentId }).catch(() => null);
-      if (result === null || result.outcome !== "available") return [];
-      const pull = parsePullUrl(result.pullRequest.url);
+      const url = await environmentPullUrl(environmentId);
+      if (url === null) return [];
+      const pull = parsePullUrl(url);
       if (pull === null || !repos.includes(pull.repo)) return [];
       const resolved = await resolvePull(pull.repo, pull.number);
       const refs = resolved.refs.map((ref) =>
