@@ -1,0 +1,509 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/1609":
+    description: >-
+      The geodetic position of the user as reported by the MME or SGSN in its
+      location information. The octet layout follows the MAP definition in
+      TS 29.002.
+  "10415/1610":
+    description: >-
+      Marks that the reported location is fresh rather than cached. Its only
+      value, ACTIVE-LOCATION-RETRIEVAL (0), means the serving node paged an
+      idle UE or queried the eNodeB of a connected UE to get the location.
+  "10415/1611":
+    description: >-
+      How many minutes have passed since the network last had contact with the
+      UE, so the receiver can judge how stale the reported location is.
+  "10415/1612":
+    description: >-
+      Describes an APN that a serving node set up dynamically for the UE (for
+      example a PDN-GW chosen at connection time). The HSS stores it so it can
+      be given back to the node if that state is lost after a restart.
+  "10415/1613":
+    description: >-
+      Per-APN subscription flag saying whether traffic for that APN may use
+      SIPTO above RAN (selected IP traffic offload). Values are
+      SIPTO_above_RAN_ALLOWED (0) and SIPTO_above_RAN_NOTALLOWED (1).
+  "10415/1614":
+    description: >-
+      Extra detail returned with an Update Location error. With an unknown EPS
+      subscription it tells whether GPRS data exists (GPRS_DATA_SUBSCRIBED (0),
+      NO_GPRS_DATA_SUBSCRIBED (1)); with roaming not allowed it names the
+      barring cause, such as ODB_ALL_APN (2), ODB_HPLMN_APN (3), or
+      ODB_VPLMN_APN (4).
+  "10415/1615":
+    description: >-
+      Sent by the serving node to tell the HSS whether the UE can do SRVCC
+      (voice handover from IMS to the circuit-switched domain). Values are
+      UE-SRVCC-NOT-SUPPORTED (0) and UE-SRVCC-SUPPORTED (1).
+  "10415/1616":
+    description: >-
+      Bit mask of the user's Multimedia Priority Service subscriptions. Bit 0
+      MPS-CS-Priority covers CS-domain priority (eMLPP or 1x RTT), and bit 1
+      MPS-EPS-Priority covers MPS in the EPS domain.
+  "10415/1617":
+    description: >-
+      Tells a visited MME or SGSN whether the roaming user may use Local IP
+      Access (LIPA) in that network. Values are LIPA_NOTALLOWED (0) and
+      LIPA_ALLOWED (1).
+  "10415/1618":
+    description: >-
+      Per-APN setting for Local IP Access. LIPA_PROHIBITED (0) forbids LIPA for
+      the APN, LIPA_ONLY (1) allows the APN only through LIPA, and
+      LIPA_CONDITIONAL (2) allows both LIPA and normal access.
+  "10415/1619":
+    description: >-
+      The periodic routing area or tracking area update timer from the user's
+      subscription, in seconds, which the serving node can apply to the UE.
+  "10415/1620":
+    description: >-
+      Extended PDP type carried in a GPRS PDP context to signal dual-stack
+      IPv4v6 support. When it is present the SGSN uses it in place of the
+      PDP-Type value. Defined in clause 7.3.75A.
+  "10415/1621":
+    description: >-
+      A second PDP address for a GPRS PDP context. It holds the other address
+      family when the context is dual-stack IPv4v6.
+  "10415/1622":
+    description: >-
+      Minimization of Drive Tests (MDT) job settings for LTE, UMTS, and MBSFN,
+      as defined in TS 32.422. It groups the job type, the area scope, the
+      measurements to collect, the reporting and logging parameters, and the
+      PLMNs where collection is allowed.
+  "10415/1623":
+    description: >-
+      The kind of trace or MDT job to run, such as immediate MDT, logged MDT,
+      or a combination with trace. The value set comes from TS 32.422.
+  "10415/1624":
+    description: >-
+      Limits an MDT job to a geographic area. The area is given as a list of
+      cells, routing areas, location areas, or tracking areas, for LTE, UMTS,
+      GSM, or NR.
+  "10415/1625":
+    description: >-
+      Bit mask that selects which radio measurements an MDT job collects. The
+      bit meanings are defined in TS 32.422.
+  "10415/1626":
+    description: >-
+      Bit mask that selects what triggers MDT measurement reports, for example
+      periodic reporting or specific radio events. The bit meanings are
+      defined in TS 32.422.
+  "10415/1627":
+    description: >-
+      The period between reports for periodic immediate MDT. The enumerated
+      values are those defined in TS 32.422.
+  "10415/1628":
+    description: >-
+      How many periodic reports an immediate MDT job sends, which can be a
+      fixed count or unlimited. The enumerated values are those defined in
+      TS 32.422.
+  "10415/1629":
+    description: >-
+      The RSRP threshold that triggers event-based MDT reporting in LTE or NR.
+      The allowed range is defined in TS 32.422.
+  "10415/1630":
+    description: >-
+      The RSRQ threshold that triggers event-based MDT reporting in LTE or NR.
+      The allowed range is defined in TS 32.422.
+  "10415/1631":
+    description: >-
+      For logged MDT, how often the UE records measurements while it is idle.
+      The enumerated values are those defined in TS 32.422.
+  "10415/1632":
+    description: >-
+      For logged MDT, how long the UE keeps logging after the job is
+      configured. The enumerated values are those defined in TS 32.422.
+  "10415/1633":
+    description: >-
+      Tells the MME whether the subscription is for an LTE Relay Node rather
+      than an ordinary UE. Values are NOT_RELAY_NODE (0), the default when
+      absent, and RELAY_NODE (1).
+  "10415/1634":
+    description: >-
+      Whether the user has agreed to MDT data collection. Values are
+      CONSENT_NOT_GIVEN (0), assumed when it is missing from ULA, and
+      CONSENT_GIVEN (1). If it is missing from IDR, the stored consent is
+      unchanged.
+  "10415/1635":
+    description: >-
+      Bit mask in a Purge UE request from a combined MME/SGSN. It says which
+      part of the node purged the UE: bit 0 is UE Purged in MME and bit 1 is
+      UE Purged in SGSN.
+  "10415/1636":
+    description: >-
+      Shows that the user subscribes to vSRVCC (video call handover to the CS
+      domain). Its only value is VSRVCC_SUBSCRIBED (0). If it is missing from
+      ULA, the user has no vSRVCC; if it is missing from IDR, nothing changes.
+  "10415/1637":
+    description: >-
+      The list of PLMN IDs that the serving MME or SGSN treats as equivalent
+      to the visited PLMN. The HSS can use it, for example, to return CSG data
+      for those PLMNs.
+  "10415/1638":
+    description: >-
+      Bit mask in a Cancel Location request. Bit 0 S6a/S6d-Indicator says
+      whether the target is the MME part (set) or the SGSN part (clear). Bit 1
+      Reattach-Required asks the serving node to make the UE re-attach
+      immediately.
+  "10415/1642":
+    description: >-
+      The UTC offset of the UE's location in the visited network, as a text
+      string in 15-minute units with a sign, for example "+8" for two hours
+      ahead. The value includes any daylight saving shift.
+  "10415/1643":
+    description: >-
+      An Additional MSISDN for the user. It is an E.164 number encoded as TBCD
+      digits only, with no nature-of-address or numbering plan prefix. It is
+      sent in subscription data in ULA, or in IDR when the value changes.
+  "10415/1645":
+    description: >-
+      The ISDN number of the MME used for mobile-terminated SMS when the MME
+      handles SMS itself. It is an E.164 number encoded as TBCD digits only.
+  "10415/1648":
+    description: >-
+      Sent by the MME or SGSN to state its wish to be registered for SMS.
+      Values are SMS_REGISTRATION_REQUIRED (0), SMS_REGISTRATION_NOT_PREFERRED
+      (1), and NO_PREFERENCE (2).
+  "10415/1649":
+    description: >-
+      The local time information for the UE's location in the visited
+      network. It pairs the UTC offset (Time-Zone) with the daylight saving
+      adjustment (Daylight-Saving-Time).
+  "10415/1650":
+    description: >-
+      The daylight saving adjustment, in whole hours, that applies at the UE's
+      location in the visited network. Values are NO_ADJUSTMENT (0),
+      PLUS_ONE_HOUR_ADJUSTMENT (1), and PLUS_TWO_HOURS_ADJUSTMENT (2).
+  "10415/1654":
+    description: >-
+      Bit mask of subscription attributes for the serving node. Bits include
+      PS-And-SMS-Only-Service-Provision-Indication (0),
+      SMS-In-SGSN-Allowed-Indication (1), User Plane Integrity Protection (2),
+      PDN-Connection-Restricted (3), and a bit (4) that turns off
+      acknowledgement of downlink NAS data PDUs.
+  "10415/1655":
+    description: >-
+      The measurement period for LTE MDT measurements, such as data volume or
+      throughput. The enumerated values are those defined in TS 32.422.
+  "10415/1656":
+    description: >-
+      The measurement period for UMTS MDT measurements. The enumerated values
+      are those defined in TS 32.422.
+  "10415/1657":
+    description: >-
+      The collection period for LTE radio resource management measurements in
+      an MDT job. The enumerated values are those defined in TS 32.422.
+  "10415/1658":
+    description: >-
+      The collection period for UMTS radio resource management measurements
+      in an MDT job. The enumerated values are those defined in TS 32.422.
+  "10415/1659":
+    description: >-
+      A one-octet bit map that selects the positioning methods an MDT job
+      uses to locate the UE. The bit values are defined in TS 32.422.
+  "10415/1660":
+    description: >-
+      A one-octet bit map that selects the measurement quantity, such as
+      CPICH Ec/No or RSCP, for UMTS MDT event reporting. The bit values are
+      defined in TS 32.422.
+  "10415/1661":
+    description: >-
+      The threshold for UMTS radio event 1F, which triggers an MDT report.
+      The allowed values are defined in TS 32.422.
+  "10415/1662":
+    description: >-
+      The threshold for UMTS radio event 1I, which triggers an MDT report.
+      The allowed values are defined in TS 32.422.
+  "10415/1663":
+    description: >-
+      The priority of a user's PDN connection, compared with other
+      connections to the same APN, when the network restores connections
+      after an SGW or PGW failure. Values run from 1 to 16, and 1 is the
+      highest priority.
+  "10415/1664":
+    description: >-
+      The identity of the MME on the SGs interface toward the MSC/VLR, in
+      the format given in TS 23.003. The HSS uses it for SMS and CS
+      interworking.
+  "10415/1665":
+    description: >-
+      Per-APN flag saying whether traffic for that APN may use SIPTO at the
+      local network. Value 0 means allowed and value 1 means not allowed.
+  "10415/1666":
+    description: >-
+      The S6a or S6d Diameter identity of the coupled node. For a combined
+      MME/SGSN, this is the other part of the node, so the HSS can link the
+      two registrations.
+  "10415/1667":
+    description: >-
+      Per-APN settings for offloading traffic to WLAN through WLAN/3GPP radio
+      interworking. It holds separate bit masks for offload from E-UTRAN and
+      offload from UTRAN.
+  "10415/1670":
+    description: >-
+      Identifies a resource in the HSS, unique within the HSS realm, that can
+      fail or restart. In a Reset procedure it selects the affected
+      subscribers, for example when shared subscription data is added,
+      changed, or removed for many users.
+  "10415/1671":
+    description: >-
+      A PLMN (MCC and MNC, encoded as in the 24.008 PLMN list) where MDT data
+      collection is allowed. A job can list several.
+  "10415/1672":
+    description: >-
+      Sent by the MME or SGSN to list the PLMNs next to its own PLMN that a
+      UE is likely to be handed over to. The HSS can return access
+      restriction data for each one.
+  "10415/1673":
+    description: >-
+      Gives the access restriction data that applies to one adjacent PLMN. It
+      pairs a PLMN ID with the RAT restriction bits for that PLMN.
+  "10415/1674":
+    description: >-
+      Says whether the SGW buffers downlink data for longer for a
+      high-latency (for example power-saving) UE. Value 0 means no extended
+      buffering, -1 means buffering with no suggested size, and a positive
+      value suggests how many packets to buffer.
+  "10415/1675":
+    description: >-
+      One IMSI group that the subscriber belongs to, used for group-based
+      features. It holds the service the group applies to, the PLMN that
+      defines the group, and the operator-chosen local group value.
+  "10415/1676":
+    description: >-
+      The service an IMSI group applies to. Value 1 is group-specific NAS
+      level congestion control and value 2 is group-specific monitoring of the
+      number of UEs in an area. Values above 1000 are for home-network
+      specific use.
+  "10415/1677":
+    description: >-
+      The PLMN (MCC and MNC, encoded as in the 24.008 PLMN list) that defines
+      an IMSI group.
+  "10415/1678":
+    description: >-
+      An operator-defined value that identifies a group within its IMSI group
+      definition.
+  "10415/1679":
+    description: >-
+      Bit mask in an Authentication Information request. Bit 0, Send UE Usage
+      Type, asks the HSS to return the UE-Usage-Type with the authentication
+      vectors so that a dedicated core network can be chosen early.
+  "10415/1680":
+    description: >-
+      The usage class of the UE, used to pick a Dedicated Core Network. The
+      range is 0 to 255: 0 to 127 are reserved for standards use and 128 to
+      255 are operator-specific.
+  "10415/1681":
+    description: >-
+      Per-APN flag showing whether the APN uses the Non-IP PDN type. TRUE (1)
+      means it does, and the receiver then ignores PDN-Type. FALSE (0) is the
+      default.
+  "10415/1682":
+    description: >-
+      For a Non-IP APN, how the data is delivered.
+      SGi-BASED-DATA-DELIVERY (0), the default, uses a point-to-point tunnel
+      over SGi; SCEF-BASED-DATA-DELIVERY (1) sends the data through the SCEF.
+  "10415/1683":
+    description: >-
+      The context identifier of a second default APN. It is used when a
+      subscription mixes PDN type categories (IP, Non-IP, Ethernet), so each
+      category can have its own default APN. Defined in clause 7.3.206.
+  "10415/1684":
+    description: >-
+      The Diameter realm of the SCEF. In S6a monitoring event configuration,
+      the HSS fills it from the realm of the SCEF that set up the event, so
+      the MME can route reports to it.
+  "10415/1685":
+    description: >-
+      Used in a Reset (DSR) to name shared subscription data to remove from
+      every affected subscriber. It can point at APN contexts, a trace
+      reference, teleservice or supplementary service codes, or an SCEF's
+      monitoring data.
+  "10415/1686":
+    description: >-
+      Per-APN bit mask for the preferred CIoT data path on E-UTRAN. Bit 0
+      means data over the user plane is preferred and bit 1 means data over
+      the control plane (NAS) is preferred. At least one bit is set, and both
+      may be.
+  "10415/1687":
+    description: >-
+      Holds the PDN-GW used for the UE's emergency PDN connections, so the HSS
+      can store it and give it to a new serving node, for example after a
+      move to non-3GPP access.
+  "10415/1688":
+    description: >-
+      The user's V2X subscription data for network-scheduled LTE sidelink
+      communication. It holds the V2X permission bits and the aggregate
+      bitrate allowed on the LTE PC5 interface.
+  "10415/1689":
+    description: >-
+      Bit mask of the V2X services the user may use over PC5 in the serving
+      PLMN. Bit 0 allows communication as a vehicle UE and bit 1 allows
+      communication as a pedestrian UE.
+  "10415/1690":
+    description: >-
+      Per-APN rule for what happens to a PDN connection when the UE moves
+      between broadband and narrowband RATs. Values are
+      MAINTAIN-PDN-CONNECTION (0),
+      DISCONNECT-PDN-CONNECTION-WITH-REACTIVATION-REQUEST (1), and
+      DISCONNECT-PDN-CONNECTION-WITHOUT-REACTIVATION-REQUEST (2).
+  "10415/1691":
+    description: >-
+      A subscribed extended DRX cycle length together with the RAT type it
+      applies to, for example WB-E-UTRAN or NB-IoT. The subscription can
+      include one per RAT.
+  "10415/1692":
+    description: >-
+      The subscribed extended DRX cycle value for one RAT, in a single octet.
+      The low four bits carry the "eDRX value" field from the 24.008 Extended
+      DRX parameter IE, and the high four bits are zero.
+  "10415/1693":
+    description: >-
+      The aggregate maximum bitrate, in bits per second, that the UE may send
+      over the PC5 sidelink interface for V2X. It applies to LTE or NR PC5,
+      depending on the parent AVP.
+  "10415/1694":
+    description: >-
+      Limits MDT collection to MBSFN areas. With both an area ID and a carrier
+      frequency it names one area. With only a frequency it covers every area
+      on that carrier, and with neither it covers any area.
+  "10415/1695":
+    description: >-
+      The identifier of an MBSFN area, from 0 to 255, as defined in the LTE
+      RRC specification.
+  "10415/1696":
+    description: >-
+      The carrier frequency (EARFCN, from 0 to 262143) of an MBSFN area used
+      in MDT scoping.
+  "10415/1697":
+    description: >-
+      Per-APN flag for the Reliable Data Service used with Non-IP data
+      delivery. Values are DISABLED (0), the default, and ENABLED (1).
+  "10415/1698":
+    description: >-
+      The Service Gap Control time in seconds. After leaving ECM-CONNECTED,
+      the UE must stay idle for at least this long before it may request a
+      new connection.
+  "10415/1699":
+    description: >-
+      Whether the user is subscribed to the Aerial UE (for example drone)
+      function. Values are AERIAL_UE_ALLOWED (0) and AERIAL_UE_NOT_ALLOWED
+      (1). The value is passed on to the eNodeB.
+  "10415/1700":
+    description: >-
+      A 64-bit mask of the positioning SIB types for which the UE subscribes
+      to receive ciphering keys, so it can decrypt broadcast location
+      assistance data. Each bit maps to one SIB type, such as Positioning SIB
+      Type 1-1 (bit 0) or Type 2-1 (bit 7).
+  "10415/1701":
+    description: >-
+      A subscribed eDRX Paging Time Window length together with the operation
+      mode (Iu, WB-S1, or NB-S1) it applies to.
+  "10415/1702":
+    description: >-
+      The radio operation mode a Paging Time Window length applies to.
+      Defined values are 1 (Iu mode), 2 (WB-S1 mode), and 3 (NB-S1 mode);
+      the rest of the 0 to 255 range is spare.
+  "10415/1703":
+    description: >-
+      The subscribed Paging Time Window length for one operation mode, in a
+      single octet. The high four bits carry the PTW field from the 24.008
+      Extended DRX parameter IE, and the low four bits are zero.
+  "10415/1704":
+    description: >-
+      Bit mask of core network types the user is not allowed to use. Bit 1,
+      5GC not allowed, bars access to the 5G core. Bit 0 is reserved and
+      deprecated.
+  "10415/1705":
+    description: >-
+      The RAT types to which an eDRX cycle length relates, given as one or
+      more RAT-Type values.
+  "10415/1706":
+    description: >-
+      Per-APN flag saying whether interworking between EPS and 5GS is
+      subscribed for that APN. Values are NOT-SUBSCRIBED (0), the default,
+      and SUBSCRIBED (1).
+  "10415/1707":
+    description: >-
+      Per-APN flag showing whether the APN uses the Ethernet PDN type. TRUE (1)
+      means it does, and the receiver then ignores PDN-Type. FALSE (0) is the
+      default.
+  "10415/1708":
+    description: >-
+      The subscribed Additional RRM Policy Index for the user. The MME passes
+      it to the RAN so it can apply operator-specific radio resource policies.
+  "10415/1709":
+    description: >-
+      Tells the MME or SGSN whether the UE may act as an Integrated Access and
+      Backhaul (IAB) node. Values are IAB_OPERATION_ALLOWED (0) and
+      IAB_OPERATION_NOTALLOWED (1).
+  "10415/1710":
+    description: >-
+      The user's V2X subscription data for network-scheduled NR sidelink
+      communication. It holds the V2X permissions, the NR PC5 aggregate
+      bitrate, and the PC5 QoS parameters.
+  "10415/1711":
+    description: >-
+      The PC5 QoS parameters for V2X over the NR PC5 reference point. It
+      holds one or more per-flow QoS entries and an optional link aggregate
+      bitrate for non-GBR flows.
+  "10415/1712":
+    description: >-
+      The QoS settings for one PC5 flow: its PQI (a 5QI value), optional GBR
+      bitrates, and an optional communication range.
+  "10415/1713":
+    description: >-
+      A 5G QoS Identifier from TS 23.501. When used for PC5 QoS it carries a
+      PQI, the PC5-specific 5QI defined in TS 23.287.
+  "10415/1714":
+    description: >-
+      The guaranteed and maximum bitrates for a PC5 QoS flow. It applies only
+      to GBR flows.
+  "10415/1715":
+    description: >-
+      The guaranteed bitrate, in bits per second, for a GBR PC5 QoS flow sent
+      by the UE over the PC5 interface.
+  "10415/1716":
+    description: >-
+      The maximum bitrate, in bits per second, for a PC5 QoS flow sent by the
+      UE over the PC5 interface.
+  "10415/1717":
+    description: >-
+      The communication range, in meters, that applies to a PC5 QoS flow for
+      NR V2X.
+  "10415/1718":
+    description: >-
+      The aggregate bitrate limit, in bits per second, shared by all non-GBR
+      QoS flows on a PC5 link.
+  "10415/1720":
+    description: >-
+      MDT job settings for NR, as defined in TS 32.422. This release covers
+      only immediate MDT. It groups the job type, area scope, measurements,
+      reporting triggers and thresholds (including SINR), NR collection
+      periods, positioning, sensor measurements, and allowed PLMNs.
+  "10415/1721":
+    description: >-
+      The SINR threshold that triggers event-based MDT reporting in NR. The
+      allowed values are defined in TS 32.422.
+  "10415/1722":
+    description: >-
+      The collection period for NR radio resource management measurements in
+      an MDT job. The enumerated values are those defined in TS 32.422.
+  "10415/1723":
+    description: >-
+      The collection period for the NR M6 (packet delay) MDT measurement. The
+      enumerated values are those defined in TS 32.422.
+  "10415/1724":
+    description: >-
+      The collection period, in minutes, for the NR M7 (packet loss) MDT
+      measurement. The allowed values are defined in TS 32.422.
+  "10415/1725":
+    description: >-
+      A sensor reading an NR MDT job asks the UE to report. Values are
+      BAROMETRIC_PRESSURE (0), UE_SPEED (1), and UE_ORIENTATION (2).
+  "10415/1727":
+    description: >-
+      The URI of the consumer that receives trace data in streaming-based
+      trace reporting. If a Trace-Collection-Entity is also present, this URI
+      takes precedence.
+commands: {}

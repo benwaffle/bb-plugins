@@ -1,0 +1,75 @@
+{
+  "name": "bb-plugin-wallpaper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local image behind bb's thread and New thread panes, with optional dim and blur.",
+  "license": "MIT",
+  "author": "Ben Iofel",
+  "homepage": "https://github.com/benwaffle/bb-plugins/tree/main/plugins/wallpaper#readme",
+  "bugs": {
+    "url": "https://github.com/benwaffle/bb-plugins/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benwaffle/bb-plugins.git",
+    "directory": "plugins/wallpaper"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "wallpaper",
+    "background"
+  ],
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Wallpaper",
+    "description": "A local image behind the thread and New thread panes, with optional dim and blur.",
+    "branding": {
+      "icon": "Image"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/server.meta.json",
+    "dist/app.js",
+    "dist/app.css",
+    "dist/app.meta.json",
+    "README.md",
+    "skills",
+    "server.ts",
+    "app.tsx",
+    "channel.ts",
+    "contract.ts",
+    "css.ts",
+    "image.ts",
+    "model.ts"
+  ],
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "env -u BB_CLI bb plugin types --check .",
+    "types:refresh": "env -u BB_CLI bb plugin types .",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.68",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "bb-app": "0.46.2-nightly.39799382507.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  }
+}

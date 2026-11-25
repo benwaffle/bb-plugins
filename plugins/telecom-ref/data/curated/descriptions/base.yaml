@@ -1,0 +1,673 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "0/411":
+    description: >-
+      An opaque value that lets a credit-control server link a credit-control
+      session to another related session, such as the access session that
+      triggered it, when the two are handled by different nodes.
+  "0/412":
+    description: >-
+      A count of octets received from the end user (uplink), expressed as a
+      service unit inside a requested, granted, or used service unit group.
+  "0/413":
+    description: >-
+      A monetary amount used as a service unit. It holds a Unit-Value for the
+      amount and an optional Currency-Code that says which currency the amount
+      is in.
+  "0/414":
+    description: >-
+      A count of octets sent to the end user (downlink), expressed as a
+      service unit inside a requested, granted, or used service unit group.
+  "0/415":
+    description: >-
+      A sequence number that identifies each request within one
+      credit-control session. The first request uses 0 and each later request
+      in the session increases it, so the server can match answers and spot
+      duplicates.
+  "0/416":
+    description: >-
+      Says which kind of credit-control request this is. Values are
+      INITIAL_REQUEST (1) to open a session, UPDATE_REQUEST (2) for interim
+      reports, TERMINATION_REQUEST (3) to close it, and EVENT_REQUEST (4) for
+      a one-shot charging event.
+  "0/417":
+    description: >-
+      A number of units whose meaning is specific to the service, such as
+      messages or downloads, used when time, money, or octets do not fit the
+      service being charged.
+  "0/418":
+    description: >-
+      Tells the client whether it may move an ongoing credit-control session
+      to an alternative server if the current one fails. Values are
+      FAILOVER_NOT_SUPPORTED (0) and FAILOVER_SUPPORTED (1).
+  "0/419":
+    description: >-
+      Identifies a sub-session within a credit-control session, so that
+      several separately metered services can share one Diameter session.
+  "0/420":
+    description: >-
+      An amount of time in seconds used as a service unit inside a requested,
+      granted, or used service unit group.
+  "0/421":
+    description: >-
+      A count of octets in both directions combined, used as a service unit
+      inside a requested, granted, or used service unit group.
+  "0/422":
+    description: >-
+      The server's answer to a balance check, telling the client whether the
+      account can cover the requested service. Values are ENOUGH_CREDIT (0)
+      and NO_CREDIT (1).
+  "0/423":
+    description: >-
+      The cost of a service, returned by the server for a price query or to
+      advise the user. It groups the amount, its currency, and an optional
+      label for the unit being priced.
+  "0/424":
+    description: >-
+      A human-readable label for the unit that a cost applies to, such as
+      minutes or megabytes, carried inside Cost-Information.
+  "0/425":
+    description: >-
+      The currency of a monetary amount, given as the ISO 4217 numeric code
+      (for example 978 for the euro).
+  "0/427":
+    description: >-
+      Tells the credit-control client what to do with the service when the
+      server cannot be reached or fails to answer. Values are TERMINATE (0),
+      CONTINUE (1), and RETRY_AND_TERMINATE (2).
+  "0/428":
+    description: >-
+      Tells the client what to do with a one-shot direct debit when the server
+      does not answer. Values are TERMINATE_OR_BUFFER (0), where the request
+      is buffered or the service refused, and CONTINUE (1), where the service
+      is delivered anyway.
+  "0/429":
+    description: >-
+      The power of ten applied to Value-Digits to form a decimal amount. For
+      example, Value-Digits 1234 with Exponent -2 means 12.34.
+  "0/430":
+    description: >-
+      Marks the granted units as the last ones available for the service and
+      says what the client must do when they run out: terminate, redirect the
+      user, or restrict access to selected traffic.
+  "0/431":
+    description: >-
+      The quota the server grants the client, expressed in time, money,
+      octets, or service-specific units. It can also carry a time at which the
+      tariff changes.
+  "0/432":
+    description: >-
+      Identifies a group of services that share the same rating and draw from
+      the same credit pool, so the server can grant and track quota per group
+      rather than per service.
+  "0/433":
+    description: >-
+      The format of the address in Redirect-Server-Address. Values are
+      IPv4_Address (0), IPv6_Address (1), URL (2), and SIP_URI (3).
+  "0/434":
+    description: >-
+      Gives the address of a server that the user is redirected to, typically
+      a top-up portal, when the final granted units are used. It pairs the
+      address with its type.
+  "0/435":
+    description: >-
+      The address the user is redirected to, written in the format named by
+      Redirect-Address-Type.
+  "0/436":
+    description: >-
+      The operation asked for in a one-shot credit-control event. Values are
+      DIRECT_DEBITING (0), REFUND_ACCOUNT (1), CHECK_BALANCE (2), and
+      PRICE_ENQUIRY (3).
+  "0/437":
+    description: >-
+      The amount of quota the client asks the server to reserve, in time,
+      money, octets, or service-specific units. It may be empty to let the
+      server choose the amount.
+  "0/438":
+    description: >-
+      An IP filter rule that limits which traffic the user may still send
+      once the final granted units are used and Final-Unit-Action is
+      RESTRICT_ACCESS.
+  "0/439":
+    description: >-
+      A number that identifies a specific service or service component being
+      charged, with the meaning of each value set by the service provider.
+  "0/440":
+    description: >-
+      Extra service details that the server can use for rating, given as a
+      type and value pair whose meaning is specific to the service.
+  "0/441":
+    description: >-
+      The kind of service information carried in a Service-Parameter-Info
+      group, with values defined per service.
+  "0/442":
+    description: >-
+      The value of the service information whose kind is given by
+      Service-Parameter-Type.
+  "0/443":
+    description: >-
+      Identifies the subscriber that the credit-control request is for, as an
+      identifier type plus its value, such as an E.164 number or an IMSI.
+  "0/444":
+    description: >-
+      The subscriber identifier itself, formatted as named by
+      Subscription-Id-Type, for example an MSISDN or IMSI.
+  "0/445":
+    description: >-
+      A decimal amount made of a digit string and a power-of-ten exponent,
+      used to express money values without floating point.
+  "0/446":
+    description: >-
+      The quota the client reports as consumed since the last report, in
+      time, money, octets, or service-specific units. It can split usage
+      before and after a tariff change.
+  "0/447":
+    description: >-
+      The significant digits of a decimal amount. Combined with Exponent, it
+      forms values such as money amounts.
+  "0/448":
+    description: >-
+      How long, in seconds, the granted quota remains valid. When it expires
+      the client must report usage and ask for new quota even if units
+      remain.
+  "0/449":
+    description: >-
+      The action the client takes when the final granted units are used.
+      Values are TERMINATE (0), REDIRECT (1) to send the user to a server
+      such as a top-up portal, and RESTRICT_ACCESS (2) to allow only selected
+      traffic.
+  "0/450":
+    description: >-
+      The format of the subscriber identifier in Subscription-Id-Data. Values
+      are END_USER_E164 (0), END_USER_IMSI (1), END_USER_SIP_URI (2),
+      END_USER_NAI (3), and END_USER_PRIVATE (4).
+  "0/451":
+    description: >-
+      The time at which the tariff for the granted quota changes. The client
+      reports usage before and after this point separately.
+  "0/452":
+    description: >-
+      Says whether reported units fall before or after a tariff change.
+      Values are UNIT_BEFORE_TARIFF_CHANGE (0), UNIT_AFTER_TARIFF_CHANGE (1),
+      and UNIT_INDETERMINATE (2).
+  "0/453":
+    description: >-
+      Identifies a credit pool that several services or rating groups share,
+      so quota granted to them is drawn from one common amount.
+  "0/454":
+    description: >-
+      The type of unit that a credit pool reference applies to. Values include
+      TIME (0), MONEY (1), TOTAL-OCTETS (2), INPUT-OCTETS (3), OUTPUT-OCTETS
+      (4), and SERVICE-SPECIFIC-UNITS (5).
+  "0/455":
+    description: >-
+      Says whether the client can handle several independently rated services
+      in one credit-control session. Values are
+      MULTIPLE_SERVICES_NOT_SUPPORTED (0) and MULTIPLE_SERVICES_SUPPORTED (1).
+  "0/456":
+    description: >-
+      The quota management container for one service or rating group in a
+      session. It carries requested, granted, and used units, the service or
+      rating group they apply to, validity time, final-unit handling, and a
+      per-service result code.
+  "0/457":
+    description: >-
+      Links a granted quota to a shared credit pool. It names the pool, the
+      unit type, and a multiplier that converts the units into pool credit.
+  "0/458":
+    description: >-
+      Identifies the user's device for a credit-control session, as an
+      identifier type and value, such as an IMEISV or MAC address.
+  "0/459":
+    description: >-
+      The format of the device identifier in User-Equipment-Info-Value.
+      Values are IMEISV (0), MAC (1), EUI64 (2), and MODIFIED_EUI64 (3).
+  "0/460":
+    description: >-
+      The device identifier itself, encoded as named by
+      User-Equipment-Info-Type.
+  "0/461":
+    description: >-
+      Names the service-specific document that defines how credit control is
+      applied for this service, letting the server pick the right rating
+      logic. 3GPP charging uses values ending in @3gpp.org, such as
+      32251@3gpp.org.
+  "0/653":
+    description: >-
+      An extensible way to identify the user's device. It holds exactly one
+      typed identifier AVP, such as an IMEI, IMEISV, MAC, or EUI-64 value.
+  "0/654":
+    description: >-
+      The device's IMEISV (IMEI with software version), carried inside
+      User-Equipment-Info-Extension.
+  "0/655":
+    description: >-
+      The device's 48-bit MAC address, carried inside
+      User-Equipment-Info-Extension.
+  "0/656":
+    description: >-
+      The device's 64-bit EUI-64 identifier, carried inside
+      User-Equipment-Info-Extension.
+  "0/657":
+    description: >-
+      The device's modified EUI-64 identifier, the form used for IPv6
+      interface identifiers, carried inside User-Equipment-Info-Extension.
+  "0/658":
+    description: >-
+      The device's IMEI, carried inside User-Equipment-Info-Extension.
+  "0/659":
+    description: >-
+      An extensible way to identify the subscriber. It holds exactly one
+      typed identifier AVP, such as an E.164 number, IMSI, SIP URI, NAI, or
+      private identifier.
+  "0/660":
+    description: >-
+      The subscriber's E.164 number (MSISDN), carried inside
+      Subscription-Id-Extension.
+  "0/661":
+    description: >-
+      The subscriber's IMSI, carried inside Subscription-Id-Extension.
+  "0/662":
+    description: >-
+      The subscriber's SIP URI, carried inside Subscription-Id-Extension.
+  "0/663":
+    description: >-
+      The subscriber's Network Access Identifier, carried inside
+      Subscription-Id-Extension.
+  "0/664":
+    description: >-
+      A subscriber identifier private to the service provider, carried inside
+      Subscription-Id-Extension.
+  "0/665":
+    description: >-
+      An extensible form of the redirect server address. It holds exactly one
+      typed address AVP: an IP address, a URL, or a SIP URI.
+  "0/666":
+    description: >-
+      The IPv4 or IPv6 address of the redirect server, carried inside
+      Redirect-Server-Extension.
+  "0/667":
+    description: >-
+      The URL of the redirect server, carried inside
+      Redirect-Server-Extension.
+  "0/668":
+    description: >-
+      The SIP URI of the redirect server, carried inside
+      Redirect-Server-Extension.
+  "0/669":
+    description: >-
+      An extensible form of Final-Unit-Indication. It marks the granted units
+      as final and says what the client does when they run out, using the
+      extended redirect address and filter rules that can also express QoS
+      limits.
+  "0/1":
+    description: >-
+      The user's identity, normally a Network Access Identifier. In 3GPP
+      interfaces it often carries the IMSI. Inherited from RADIUS.
+  "0/25":
+    description: >-
+      An opaque value that the server hands out in an answer and that the
+      client returns unchanged in later messages of the same session, such as
+      accounting. Inherited from RADIUS.
+  "0/33":
+    description: >-
+      Opaque state that a proxy or relay adds to a request so it can recover
+      that state when the answer comes back. The answer must echo it, and
+      only the node that added it reads it.
+  "0/44":
+    description: >-
+      An accounting session identifier inherited from RADIUS. Diameter keeps
+      it mainly for RADIUS translation, since Session-Id serves the same role
+      natively.
+  "0/50":
+    description: >-
+      Links several related accounting sessions, each with its own Session-Id,
+      so that records for one logical service can be correlated.
+  "0/55":
+    description: >-
+      The time, in seconds since 1900 UTC, at which the event that triggered
+      the message occurred, such as a usage report or accounting record.
+  "0/85":
+    description: >-
+      Sent by the server to tell the client how often, in seconds, to send
+      interim accounting records. A value of zero or absence means no interim
+      records are expected.
+  "0/257":
+    description: >-
+      An IP address of the sending Diameter node, advertised in capabilities
+      exchange. A node lists one per local address it can use for the
+      connection.
+  "0/258":
+    description: >-
+      Identifies an authentication and authorization application, by its
+      application id. It appears in capabilities exchange to advertise support
+      and in requests to say which application the message belongs to.
+  "0/259":
+    description: >-
+      Identifies an accounting application, by its application id. It
+      appears in capabilities exchange to advertise support and in accounting
+      messages to say which application the record belongs to.
+  "0/260":
+    description: >-
+      Advertises or identifies a vendor-specific Diameter application. It
+      pairs a Vendor-Id with either an Auth-Application-Id or an
+      Acct-Application-Id. 3GPP applications such as S6a and Gx use it with
+      vendor 10415.
+  "0/261":
+    description: >-
+      Sent by a redirect agent to say how widely a client may cache and reuse
+      the redirect. Values include DONT_CACHE (0), ALL_SESSION (1), ALL_REALM
+      (2), and ALL_HOST (5).
+  "0/262":
+    description: >-
+      How long, in seconds, a client may keep a cached redirect from a
+      redirect agent before discarding it.
+  "0/263":
+    description: >-
+      The identifier of a Diameter session, which must be unique over time.
+      Every message of the session carries it, and it normally starts with
+      the sender's Diameter identity followed by locally chosen values.
+  "0/264":
+    description: >-
+      The Diameter identity (FQDN) of the node that originated the message.
+      Relay and proxy agents leave it unchanged.
+  "0/265":
+    description: >-
+      A vendor id whose vendor-specific AVPs the sender understands, listed in
+      capabilities exchange even where no application of that vendor is
+      advertised.
+  "0/266":
+    description: >-
+      The IANA enterprise number of a vendor. It identifies the sender's
+      vendor in capabilities exchange and qualifies application ids inside
+      Vendor-Specific-Application-Id.
+  "0/268":
+    description: >-
+      Reports the outcome of a request in an answer. The thousands digit
+      gives the class: 1xxx informational, 2xxx success (for example
+      DIAMETER_SUCCESS 2001), 3xxx protocol errors, 4xxx transient failures,
+      and 5xxx permanent failures.
+  "0/269":
+    description: >-
+      A free-text name of the sender's Diameter implementation, sent in
+      capabilities exchange. It is informational and should stay the same
+      across releases.
+  "0/273":
+    description: >-
+      Tells the peer why the sender is closing the transport connection in a
+      disconnect request. Values are REBOOTING (0), BUSY (1), and
+      DO_NOT_WANT_TO_TALK_TO_YOU (2).
+  "0/277":
+    description: >-
+      Says whether the server keeps session state for an authorization
+      session, which decides whether a session termination exchange is needed.
+      Values are STATE_MAINTAINED (0) and NO_STATE_MAINTAINED (1).
+  "0/278":
+    description: >-
+      A value the originating node increases each time it restarts and loses
+      session state. A peer that sees it change knows the sender's earlier
+      sessions are gone.
+  "0/279":
+    description: >-
+      Placed in an error answer to show which AVPs caused the failure. It
+      holds copies of the offending AVPs, or of missing AVPs with a minimal
+      value, so the sender can see what went wrong.
+  "0/280":
+    description: >-
+      The Diameter identity of the proxy or relay that added a Proxy-Info
+      entry, so that node can recognise its own state on the way back.
+  "0/281":
+    description: >-
+      A human-readable text explaining an error result. It is for logging and
+      troubleshooting and is not meant to be parsed.
+  "0/282":
+    description: >-
+      The identity of a node that forwarded the request. Each relay or proxy
+      appends the identity of the peer it received the request from, which
+      lets agents detect routing loops.
+  "0/283":
+    description: >-
+      The realm that a request should be routed to. Diameter agents use it to
+      choose the next hop, and it is required in requests that can be proxied.
+  "0/284":
+    description: >-
+      Holds per-hop state added by a proxy or relay to a request, pairing the
+      agent's Proxy-Host identity with its Proxy-State. The answer returns it
+      so the agent can restore that state.
+  "0/285":
+    description: >-
+      Tells the client, in a re-auth or authorization answer, what to do when
+      the authorization lifetime ends. Values are AUTHORIZE_ONLY (0) and
+      AUTHORIZE_AUTHENTICATE (1).
+  "0/287":
+    description: >-
+      Identifies an accounting sub-session within one Diameter session, used
+      when several services are accounted separately under a single
+      Session-Id.
+  "0/292":
+    description: >-
+      A Diameter URI returned by a redirect agent, naming a node the client
+      should send the request to instead. Several may be listed.
+  "0/293":
+    description: >-
+      The Diameter identity of the exact node a request is meant for. If it is
+      absent, any suitable server in the Destination-Realm can handle the
+      request.
+  "0/294":
+    description: >-
+      The identity of the node that set the error result in an answer when it
+      is not the node in Origin-Host, for example a relay that could not route
+      the request.
+  "0/295":
+    description: >-
+      Says why a session ended, sent in session termination and accounting
+      stop messages. Values include DIAMETER_LOGOUT (1),
+      DIAMETER_SERVICE_NOT_PROVIDED (2), DIAMETER_BAD_ANSWER (3),
+      DIAMETER_ADMINISTRATIVE (4), and DIAMETER_SESSION_TIMEOUT (8).
+  "0/296":
+    description: >-
+      The realm of the node that originated the message. Agents and servers
+      use it to route answers and later server-initiated requests back to the
+      originator's realm.
+  "0/297":
+    description: >-
+      Reports the outcome of a request using a vendor-specific result code
+      instead of Result-Code. It pairs a Vendor-Id with an
+      Experimental-Result-Code, and 3GPP applications use it with vendor
+      10415.
+  "0/298":
+    description: >-
+      A result code defined by a vendor or application, interpreted together
+      with the Vendor-Id in the same Experimental-Result group. It follows
+      the same class ranges as Result-Code.
+  "0/299":
+    description: >-
+      Advertises, in capabilities exchange, which security a peer supports on
+      the connection after the exchange. Values are NO_INBAND_SECURITY (0)
+      and TLS (1). Its use in capabilities exchange is discouraged, with
+      security learned through configuration or peer discovery instead.
+  "0/480":
+    description: >-
+      Says what kind of accounting record this is. Values are EVENT_RECORD
+      (1) for one-time events, and START_RECORD (2), INTERIM_RECORD (3), and
+      STOP_RECORD (4) for the stages of a session.
+  "0/483":
+    description: >-
+      Sent by the server to tell the client what to do with the service when
+      accounting cannot be delivered. Values are DELIVER_AND_GRANT (1),
+      GRANT_AND_STORE (2), and GRANT_AND_LOSE (3).
+  "0/485":
+    description: >-
+      A sequence number for accounting records within a session. Together
+      with Session-Id it identifies a record uniquely and helps detect
+      duplicates.
+  "0/621":
+    description: >-
+      Advertises the overload control features a node supports. A reacting
+      node sends it in requests, and a reporting node returns the features it
+      chose in answers.
+  "0/622":
+    description: >-
+      A bit mask of overload control features. Bit 0, OLR_DEFAULT_ALGO, means
+      the default loss algorithm, where a node is asked to drop a percentage
+      of traffic.
+  "0/623":
+    description: >-
+      An overload report sent by an overloaded node in answers. It says how
+      much traffic to cut, for how long, whether it applies to a host or a
+      realm, and carries a sequence number so stale reports can be ignored.
+  "0/624":
+    description: >-
+      A number that increases with each new overload report from the same
+      source, so a receiver keeps only the newest report and ignores older
+      copies.
+  "0/625":
+    description: >-
+      How long, in seconds, an overload report stays in force. A value of
+      zero ends the overload condition. The default is 30 seconds and the
+      maximum is 86400.
+  "0/626":
+    description: >-
+      Says what an overload report applies to. Values are HOST_REPORT (0) for
+      requests sent to the reporting host and REALM_REPORT (1) for requests
+      sent to the realm. RFC 8581 adds PEER_REPORT (2).
+  "0/627":
+    description: >-
+      The percentage, from 0 to 100, of traffic the receiver should drop
+      compared with what it would otherwise send. 100 asks it to stop all new
+      traffic, and 0 means no reduction is needed.
+  "0/509":
+    description: >-
+      A traffic filter that says which packets match and what to do with
+      them. It can match on direction, addresses, ports, protocols, and time
+      of day, and an action such as permit, drop, or rate limit.
+  "0/510":
+    description: >-
+      The order in which a filter rule is evaluated relative to others. Lower
+      values are checked first.
+  "0/561":
+    description: >-
+      The start of a daily time window, in seconds after midnight, used in a
+      time-of-day condition. If absent, the window starts at midnight.
+  "0/562":
+    description: >-
+      The end of a daily time window, in seconds after midnight, used in a
+      time-of-day condition. If absent, the window runs to the end of the
+      day.
+  "0/563":
+    description: >-
+      A bit mask of the weekdays on which a time window applies. Bit 0 is
+      SUNDAY through bit 6 SATURDAY. If absent, every day matches.
+  "0/8":
+    description: >-
+      The IPv4 address assigned to the user's session. In 3GPP interfaces
+      such as Gx it carries the UE's IPv4 address. Inherited from RADIUS.
+  "0/11":
+    description: >-
+      The name of a filter list that is configured locally on the access
+      device, used to apply a predefined set of traffic rules to the user.
+      Inherited from RADIUS.
+  "0/30":
+    description: >-
+      The number or name the user's session was directed to. In 3GPP
+      interfaces it typically carries the APN. Inherited from RADIUS.
+  "0/97":
+    description: >-
+      An IPv6 prefix assigned to the user's session, encoded as a prefix
+      length followed by the prefix bits. In 3GPP interfaces it carries the
+      UE's IPv6 prefix. Inherited from RADIUS.
+  "0/650":
+    description: >-
+      A load report that a node adds to messages so others can balance
+      traffic. It holds the report type, the load value, and the identity of
+      the node the report describes.
+  "0/651":
+    description: >-
+      Says what a load report describes. Values are HOST (0) for a Diameter
+      server endpoint and PEER (1) for the next-hop peer.
+  "0/652":
+    description: >-
+      A relative load figure from 0 to 65535, read like a DNS SRV weight.
+      Higher numbers mean less load, so 65535 is idle and 0 is fully loaded.
+  "0/334":
+    description: >-
+      The IP address of the mobile node's home agent, assigned or confirmed by
+      the home AAA server for Mobile IP. 3GPP uses it to signal the PGW
+      address for non-3GPP access.
+  "0/348":
+    description: >-
+      Identifies the mobile node's home agent by its Diameter realm and host.
+      3GPP uses it to signal the PGW identity for non-3GPP access.
+  "0/125":
+    description: >-
+      The home network prefix of a Mobile IPv6 node, encoded as a one-octet
+      prefix length followed by the 128-bit prefix. The home AAA server may
+      allocate it or confirm one proposed by the access side.
+  "0/493":
+    description: >-
+      The name of the service or external network that the mobility session
+      should be tied to, in effect an APN for Proxy Mobile IPv6. Defined as a
+      RADIUS attribute for PMIPv6.
+  "0/301":
+    description: >-
+      The routing priority of a Diameter transaction, from PRIORITY_0 (0),
+      the highest, to PRIORITY_15 (15), the lowest. Nodes use it to decide
+      which messages to favour under load or overload.
+  "0/505":
+    description: >-
+      The mobile node's IPv4 home address in Proxy Mobile IPv6, sent by the
+      home AAA server when statically provisioned. On the LMA side, an
+      all-zero value asks the AAA server to assign one.
+  "0/649":
+    description: >-
+      The Diameter identity of the node that inserted the enclosing AVP, such
+      as a peer overload report or a load report, so receivers know which
+      node the report came from.
+commands:
+  257:
+    description: >-
+      The first exchange on a new transport connection between two Diameter
+      peers. Each side announces its identity, addresses, vendor, and the
+      applications and security it supports, and the answer confirms the
+      common set or rejects the connection.
+  258:
+    description: >-
+      Sent by a server to ask the client to re-authorize an existing session,
+      for example after a policy or subscription change, and answered once the
+      client acts. In Gx, the PCRF sends RAR to the PCEF to push PCC rule,
+      QoS, or event trigger changes, or to ask for an IP-CAN session report.
+      Rx and online charging use it in a similar way.
+  271:
+    description: >-
+      Carries accounting records from a client to an accounting server, with
+      start, interim, stop, or event records, and the server acknowledges
+      each one. 3GPP offline charging uses it toward the charging data
+      function.
+  272:
+    description: >-
+      Exchanged during a credit-control session to request and report quota.
+      The client sends initial, update, termination, or one-shot event
+      requests with usage, and the server grants units, sets final-unit
+      handling, or refuses service. In Gx, the PCEF sends CCR to the PCRF to
+      open, modify, or close an IP-CAN session, and the CCA returns PCC rules,
+      QoS, and event triggers.
+  274:
+    description: >-
+      Sent by a server or agent to ask the client to stop a user's session
+      immediately, for example after an administrative action. The client
+      answers and normally follows up with a session termination request.
+  275:
+    description: >-
+      Sent by the client to tell the server that a user's session has ended,
+      with a termination cause, so the server can release its session state.
+      The server confirms in the answer.
+  280:
+    description: >-
+      A keepalive sent on an idle connection between peers to check that the
+      peer and transport are still working. A missing answer triggers
+      failover of pending requests to another peer.
+  282:
+    description: >-
+      Sent by a peer that intends to close the transport connection,
+      with the reason for closing. The receiver answers, and then the
+      connection is torn down without being treated as a failure.

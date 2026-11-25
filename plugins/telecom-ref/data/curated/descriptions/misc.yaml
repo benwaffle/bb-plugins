@@ -1,0 +1,451 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/3111":
+    description: >-
+      An external identifier for a UE (or, on some interfaces, for a group of
+      UEs) that applications outside the operator network use in place of the
+      IMSI or MSISDN. Its format is set in TS 23.003. It appears in S6a
+      subscription data and in Sh user identities.
+  "10415/3113":
+    description: >-
+      One communication pattern request from an SCEF for a UE, as stored with
+      the subscription and passed to the MME or SGSN. It holds the SCEF
+      identity, reference IDs to add or delete, and one or more
+      Communication-Pattern-Set entries that describe expected UE traffic.
+  "10415/3114":
+    description: >-
+      A description of how a UE is expected to communicate: whether traffic
+      is periodic or on demand, interval and duration, scheduled time windows,
+      whether the UE is stationary, its traffic profile, battery type, and an
+      optional time after which the set expires.
+  "10415/3115":
+    description: >-
+      Says whether the UE communicates on a regular schedule or only when
+      needed. Values are PERIODICALLY (0) and ON_DEMAND (1); the duration and
+      period fields are only meaningful with PERIODICALLY.
+  "10415/3116":
+    description: >-
+      The length, in seconds, of each periodic communication session the UE
+      is expected to make, as part of a communication pattern.
+  "10415/3117":
+    description: >-
+      An interval in seconds. In a communication pattern it is the gap
+      between periodic communications; in a location reporting configuration
+      it is the minimum period between location reports.
+  "10415/3118":
+    description: >-
+      A time window in which the UE is expected to communicate, given as days
+      of the week plus start and end times of day. A missing part defaults to
+      every day, start of day, or end of day.
+  "10415/3119":
+    description: >-
+      Says whether the UE is expected to stay in one place. Values are
+      STATIONARY_UE (0) and MOBILE_UE (1).
+  "10415/3122":
+    description: >-
+      A monitoring event request that an SCEF places for a UE or group, which
+      the HSS keeps in the subscription and passes to the MME or SGSN over
+      S6a. It names the monitoring type and SCEF, the reference IDs to create
+      or delete, limits on report count and duration, and type-specific
+      settings.
+  "10415/3123":
+    description: >-
+      A report of a detected monitoring event, sent back toward the SCEF. It
+      carries the SCEF reference, the monitoring type, and the event data,
+      such as reachability, location, roaming status, IMEI change, loss of
+      connectivity reason, idle status, or PDN connectivity status.
+  "10415/3124":
+    description: >-
+      A 32-bit identifier that the SCEF assigns to a monitoring event or
+      communication pattern request. Together with the SCEF-ID it links
+      configurations, status answers, and reports to the original request.
+  "10415/3125":
+    description: >-
+      The Diameter identity of the SCEF that originated a monitoring,
+      communication pattern, or non-IP data delivery request. In S6a
+      subscription data it also names the SCEF to use for an APN.
+  "10415/3126":
+    description: >-
+      A 32-bit SCEF reference ID, scoped by the SCEF-ID, that marks an
+      existing monitoring event or communication pattern configuration for
+      removal.
+  "10415/3127":
+    description: >-
+      The kind of monitoring event being configured or reported. Values
+      include LOSS_OF_CONNECTIVITY (0), UE_REACHABILITY (1),
+      LOCATION_REPORTING (2), CHANGE_OF_IMSI_IMEI(SV)_ASSOCIATION (3),
+      ROAMING_STATUS (4), COMMUNICATION_FAILURE (5), and
+      PDN_CONNECTIVITY_STATUS (10).
+  "10415/3128":
+    description: >-
+      The maximum number of event reports to send to the SCEF before a
+      monitoring configuration lapses. It is limited to one for some request
+      types and is not used for availability after DDN failure.
+  "10415/3129":
+    description: >-
+      Settings for UE reachability monitoring: whether reachability for SMS
+      or for data is wanted, the tolerated downlink latency, how long the UE
+      should stay reachable, and a suggested downlink buffering packet count.
+  "10415/3130":
+    description: >-
+      The absolute time at which a monitoring event configuration expires. If
+      a report limit is also set, the first condition reached ends the
+      configuration.
+  "10415/3131":
+    description: >-
+      The number of seconds without any contact from the UE after which the
+      SCEF is told the UE is unreachable. The HSS uses it when it sets the
+      subscribed periodic RAU/TAU timer.
+  "10415/3132":
+    description: >-
+      A bit mask choosing which reachability to monitor: bit 0 Reachability
+      for SMS (the default) and bit 1 Reachability for Data. Only one bit may
+      be set.
+  "10415/3133":
+    description: >-
+      The longest delay, in seconds, the application accepts before downlink
+      data reaches the UE. The HSS uses it to derive the subscribed periodic
+      RAU/TAU timer.
+  "10415/3134":
+    description: >-
+      How long, in seconds, the UE should remain reachable after it becomes
+      reachable, so that pending downlink data can be delivered. The HSS uses
+      it to set the active time.
+  "10415/3135":
+    description: >-
+      Settings for location reporting as a monitoring event: whether current
+      or last known location is wanted, the granularity required, and the
+      minimum interval between reports.
+  "10415/3136":
+    description: >-
+      The type of location wanted for location reporting. Values are
+      CURRENT_LOCATION (0) and LAST_KNOWN_LOCATION (1), the default.
+  "10415/3137":
+    description: >-
+      The granularity of location wanted in a location reporting request.
+      Values are CGI-ECGI (0), eNB (1), LA-TA-RA (2), PRA (3), and
+      PLMN-ID (4).
+  "10415/3138":
+    description: >-
+      Controls what change in the IMSI and device pairing triggers a report.
+      IMEI-CHANGE (0) reports only a new IMEI; IMEISV-CHANGE (1) also reports
+      when only the software version changes.
+  "10415/3139":
+    description: >-
+      The roaming status reported for a subscriber in a monitoring event.
+      Values are SUBSCRIBER_ROAMING (0) and SUBSCRIBER_NOT_ROAMING (1).
+  "10415/3140":
+    description: >-
+      The kind of reachability reported for a UE in a monitoring event.
+      Values are REACHABLE_FOR_SMS (0) and REACHABLE_FOR_DATA (1).
+  "10415/3141":
+    description: >-
+      A bit mask that reports what changed in the device paired with the
+      IMSI: bit 0 IMEI (the device changed) or bit 1 IMEISV (only the
+      software version changed). The new values can go in
+      Terminal-Information.
+  "10415/3142":
+    description: >-
+      The outcome of processing a monitoring event configuration, tied to its
+      SCEF reference ID. It holds one or more service reports with result
+      codes and the type of node that produced them.
+  "10415/3146":
+    description: >-
+      An error or result code for a requested monitoring action. It holds a
+      Service-Result-Code and a Vendor-Id that shows whether the code is a
+      3GPP experimental result (10415) or a base protocol result (0 or
+      absent).
+  "10415/3147":
+    description: >-
+      The numeric result for a monitoring action, which is either a
+      3GPP-defined Experimental-Result-Code value or a Result-Code from the
+      Diameter base protocol.
+  "10415/3148":
+    description: >-
+      The time at which the communication pattern sets tied to an SCEF
+      reference ID become invalid and are removed. If absent, the set does
+      not expire.
+  "10415/3149":
+    description: >-
+      Reports what has happened to an existing monitoring event, so the SCEF
+      knows its state. Values are SUSPEND (0), RESUME (1), and CANCEL (2).
+  "10415/3152":
+    description: >-
+      The result of a requested monitoring action from one node, with the
+      service result and the type of node (HSS, MME, or SGSN) that produced
+      it.
+  "10415/3153":
+    description: >-
+      The type of node that sent a monitoring result or report. Values are
+      HSS (0), MME (1), and SGSN (2).
+  "10415/3162":
+    description: >-
+      Why a loss of connectivity event was reported. Values include
+      UE_DETACHED_MME (0), UE_DETACHED_SGSN (1),
+      MAX_DETECTION_TIME_EXPIRED_MME (2), and UE_PURGED_MME (4), with matching
+      SGSN variants.
+  "10415/3172":
+    description: >-
+      Says whether roaming status reports should include the serving PLMN
+      ID. Values are TRUE (0), the default, and FALSE (1).
+  "10415/3178":
+    description: >-
+      Information about the MTC service provider or MTC application on whose
+      behalf a monitoring or communication pattern request is made. It holds
+      the MTC-Provider-ID.
+  "10415/3179":
+    description: >-
+      A text identity for the MTC service provider or MTC application behind
+      a request.
+  "10415/3180":
+    description: >-
+      Requests monitoring of PDN connectivity status. If it contains an APN in
+      Service-Selection, monitoring covers that APN only; otherwise it covers
+      all APNs.
+  "10415/3181":
+    description: >-
+      A PDN connectivity status event for one APN. It says whether a PDN
+      connection was created or deleted, whether it is IP (with PDN type and
+      UE addresses) or non-IP, and how non-IP data is delivered.
+  "10415/3182":
+    description: >-
+      Whether a monitored PDN connection was set up or torn down. Values are
+      CREATED (0) and DELETED (1).
+  "10415/3183":
+    description: >-
+      The expected shape of UE traffic in a communication pattern. Values
+      include SINGLE_TRANSMISSION_UL (0), SINGLE_TRANSMISSION_DL (1), dual
+      transmissions with a reply in the other direction (2, 3), and
+      MULTI_TRANSMISSION (4).
+  "10415/3185":
+    description: >-
+      A bit mask that describes the UE power source in a communication
+      pattern: bit 0 NO_BATTERY, bit 1 BATTERY_REPLACEABLE_INDICATION, and
+      bit 2 BATTERY_RECHARGEABLE_INDICATION.
+  "10415/3186":
+    description: >-
+      A 64-bit form of the SCEF reference ID, used in place of
+      SCEF-Reference-ID when the SCEF and HSS both support the Extended
+      Reference IDs feature.
+  "10415/3187":
+    description: >-
+      A 64-bit form of the reference ID that marks a configuration for
+      removal, used in place of SCEF-Reference-ID-for-Deletion when the
+      Extended Reference IDs feature is supported.
+  "10415/3188":
+    description: >-
+      A list of UEs, by External-Identifier or MSISDN, to remove from an
+      existing group monitoring configuration.
+  "10415/3189":
+    description: >-
+      A list of UEs, by External-Identifier or MSISDN, to add to an existing
+      group monitoring configuration.
+  "10415/6":
+    description: >-
+      The IPv4 address of the access-side control plane peer of the gateway:
+      the SGSN for a GGSN, or the S-GW, ePDG, or trusted non-3GPP access for
+      a PGW. On Gx the PCEF reports it to the PCRF, and it can show which
+      network serves the UE.
+  "10415/7":
+    description: >-
+      The IPv4 control plane address of the GGSN or PGW that handles the
+      session. On Gx the PCEF sends it to the PCRF.
+  "10415/12":
+    description: >-
+      The APN selection mode for the PDP context or EPS bearer, as received
+      in session setup signalling. It shows, for example, whether the APN was
+      subscribed or chosen by the UE or network without a subscription check.
+  "10415/13":
+    description: >-
+      The charging characteristics for a PDP context or IP-CAN bearer, which
+      select the charging behaviour to apply. It appears in S6a subscription
+      data at user, APN, and PDP context level, and the PCEF reports it to
+      the PCRF on Gx.
+  "10415/15":
+    description: >-
+      The IPv6 address of the access-side control plane peer of the gateway
+      (SGSN, S-GW, ePDG, or trusted non-3GPP access). It is the IPv6
+      counterpart of 3GPP-SGSN-Address.
+  "10415/16":
+    description: >-
+      The IPv6 control plane address of the GGSN or PGW that handles the
+      session. It is the IPv6 counterpart of 3GPP-GGSN-Address.
+  "10415/18":
+    description: >-
+      The MCC and MNC of the network serving the UE, taken from the RAI or
+      the serving network. On Gx the PCEF reports it to the PCRF, and on Rx
+      the PCRF passes it to the AF.
+  "10415/21":
+    description: >-
+      The radio access technology that currently serves the UE, as a coded
+      value. The PCEF can report it to the PCRF on Gx.
+  "10415/22":
+    description: >-
+      The current location of the UE, such as a cell, service area, routing
+      area, or tracking area identity, coded with a type field. It is
+      reported over Gx and passed to the AF over Rx.
+  "10415/23":
+    description: >-
+      The time zone where the UE is, as an offset from UTC in 15-minute
+      steps plus a daylight saving adjustment. It is reported over Gx and Rx.
+  "10415/29":
+    description: >-
+      The location of a UE that attaches through a trusted WLAN access
+      network, such as the SSID and access point identity. It is reported
+      over Gx and passed to the AF over Rx.
+  "10415/909":
+    description: >-
+      The Routing Area Identity of the SGSN where the UE is registered, as a
+      text string of MCC, MNC, LAC, and RAC digits. The PCEF can report it to
+      the PCRF on Gx.
+  "10415/831":
+    description: >-
+      The SIP or Tel URI of the party that starts a session, taken from the
+      asserted identity. On Rx the AF can send it in the AA-Request, with
+      callee information, so the PCRF can build rules for the call.
+  "10415/848":
+    description: >-
+      An IP address of the served party. In charging it is the address of the
+      calling or called user. In S6a and the SCEF monitoring AVPs it carries a
+      static or assigned UE IPv4 address or IPv6 prefix for a PDN
+      connection.
+  "10415/857":
+    description: >-
+      The party to be charged, such as a public user identity. For monitoring
+      event charging it names the entity that the network charges for the
+      event, and it is carried in Monitoring-Event-Configuration.
+  "10415/1227":
+    description: >-
+      The IP address tied to an IP-CAN bearer session, such as a PDP context
+      or PDN connection. In S6a it holds the static address subscribed for a
+      PDP context.
+  "10415/1241":
+    description: >-
+      The category of location service the LCS client requests. Values are
+      EMERGENCY_SERVICES (0), VALUE_ADDED_SERVICES (1),
+      PLMN_OPERATOR_SERVICES (2), and LAWFUL_INTERCEPT_SERVICES (3). On SLg it
+      goes with a location request.
+  "10415/1242":
+    description: >-
+      An estimate of the position of the UE in geographic coordinates and its
+      uncertainty, coded with the shapes from TS 23.032. On SLg the MME or
+      SGSN returns it to the GMLC.
+  "10415/2050":
+    description: >-
+      A charging ID that groups the charging records of one PDN connection,
+      usually the charging ID of its first bearer. With the PGW address it
+      identifies the connection. The PCEF can send it to the PCRF on Gx.
+  "10415/2051":
+    description: >-
+      Says whether the UE address for the PDP context or PDN connection was
+      assigned dynamically. Values are Static (0) and Dynamic (1); absence
+      means static.
+  "10415/2068":
+    description: >-
+      For an IPv4v6 PDN connection, says whether the IPv4 address was
+      assigned dynamically, while Dynamic-Address-Flag covers the IPv6 part.
+      Values are Static (0) and Dynamic (1).
+  "10415/2319":
+    description: >-
+      Closed Subscriber Group information for the cell the UE uses: the CSG
+      ID, the cell access mode, and whether the user is a member when the cell
+      is hybrid. It is reported over Gx and in S6a location information.
+  "10415/318":
+    description: >-
+      The Diameter identity of the 3GPP AAA Server that serves a user. On SLh
+      and SLg it is part of the serving node data when the UE is attached
+      through non-3GPP access.
+  "0/486":
+    description: >-
+      The identity of a mobility anchor, in 3GPP use the PDN GW, as an IP
+      address, an FQDN, or both, with an optional home link prefix. In S6a
+      APN configuration it gives the PDN GW for an APN or the one in use.
+  "10415/1503":
+    description: >-
+      The decision of the home network on whether a non-3GPP access network
+      is handled as trusted. Values are TRUSTED (0) and UNTRUSTED (1). It is
+      passed to the PCRF on Gx and to the AF on Rx.
+  "10415/1536":
+    description: >-
+      The UTC time, in milliseconds since 1 January 1900, at which the entity
+      that started a request sent it. It is copied from GTPv2, and on Gx the
+      PCEF passes it so the PCRF can resolve colliding session requests.
+  "10415/1537":
+    description: >-
+      How many milliseconds after the origination time stamp the originator
+      waits for a response. A receiver can use it to drop requests that
+      would arrive too late.
+  "10415/1538":
+    description: >-
+      A bit mask for emergency handling. Bit 0, Emergency-Indication, marks a
+      request to set up a PDN connection for emergency services.
+  "10415/3701":
+    description: >-
+      The Proximity Services subscription of a user: the ProSe features the
+      user may use, the PLMNs where each is allowed, and optional charging
+      characteristics. It is held with the S6a subscription data.
+  "10415/3702":
+    description: >-
+      A bit mask of the ProSe features the user is subscribed to. Bits
+      include ProSe Direct Discovery (0), EPC-level ProSe Discovery (1),
+      one-to-many (3) and one-to-one (4) direct communication, UE-to-Network
+      Relay (5), and Remote-UE-access (6).
+  "10415/3703":
+    description: >-
+      A PLMN where the UE may use ProSe discovery or direct communication,
+      with the services allowed there and, for the home PLMN, the authorized
+      discovery range.
+  "10415/3704":
+    description: >-
+      A bit mask of the ProSe direct services the UE may use in one PLMN.
+      Bits include Announce (0), Monitor (1), Communication (2), One-to-one
+      Communication (3), Discoverer (4), Discoveree (5), and restricted
+      discovery options.
+  "10415/3708":
+    description: >-
+      The announcing range (short, medium, or long) that the UE may use for
+      ProSe discovery in the home PLMN, based on its announcing policy.
+  "10415/4322":
+    description: >-
+      Details about a UE that has entered idle mode: when it happened, the
+      active time, periodic RAU/TAU timer, and eDRX cycle granted by the MME
+      or SGSN, and the suggested downlink buffering packet count.
+  "10415/4323":
+    description: >-
+      The time at which the UE entered idle mode, reported as part of an idle
+      status indication.
+  "10415/4324":
+    description: >-
+      An active time in seconds for the UE. It is the time granted by the
+      MME or SGSN in an idle status report, or the subscribed value in S6a
+      subscription data.
+  "10415/4325":
+    description: >-
+      Why a UE is reported as reachable. Values are
+      CHANGE_TO_CONNECTED_MODE (0) and REACHABLE_FOR_PAGING (1).
+  "10415/4008":
+    description: >-
+      The identity of the eNodeB where the UE is now located, coded as in
+      GTPv2. In S6a it is part of MME location information.
+  "10415/4013":
+    description: >-
+      The identity of the eNodeB where the UE is now located, using the
+      extended macro eNodeB ID format from GTPv2. In S6a it is part of MME
+      location information.
+  "10415/530":
+    description: >-
+      Data for sponsored data connectivity on Rx. The AF uses it to name the
+      sponsor and application service provider, enable or disable
+      sponsoring, and set a usage threshold. The PCRF uses it to return the
+      measured usage.
+  "10415/3329":
+    description: >-
+      The UTC time until which a UE that uses a power saving mode, such as
+      extended idle mode DRX, is expected to stay reachable. It is reported in
+      UE reachability and availability notifications.
+  "10415/4202":
+    description: >-
+      An identifier that the PCRF assigns to a background data transfer
+      policy and keeps unique within the PLMN. On Rx the AF supplies it so
+      the PCRF can find that policy in the SPR.
+commands: {}

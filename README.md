@@ -10,9 +10,12 @@ not add commits that have to be carried through every upstream sync.
 | --- | --- | --- |
 | `claude-title` | [plugins/claude-title](plugins/claude-title) | Thread titles and commit messages from your Claude Code login, with a small model. |
 | `plugin-update-review` | [plugins/plugin-update-review](plugins/plugin-update-review) | Agent skill that reviews each plugin update's diff for exfiltration or abuse before applying it. |
+| `leader-keys` | [plugins/leader-keys](plugins/leader-keys) | Doom Emacs style leader keys with a which-key popup and a cheat sheet. |
 | `pr-review` | [plugins/pr-review](plugins/pr-review) | Review queue for open PRs, agent review threads in PR worktrees, and PR/ticket refs per thread. |
 | `project-emoji` | [plugins/project-emoji](plugins/project-emoji) | An emoji before each project name in the sidebar, picked automatically or chosen by hand. |
+| `telecom-ref` | [plugins/telecom-ref](plugins/telecom-ref) | Searchable 3GPP Rel-18 reference: Diameter apps, commands, and AVPs, GTP messages, IEs, and causes, EPC/5GC interfaces, and network functions. |
 | `usage-stats` | [plugins/usage-stats](plugins/usage-stats) | A Usage page with token and API-equivalent cost history per day, model, project, and thread. |
+| `wallpaper` | [plugins/wallpaper](plugins/wallpaper) | A local image behind the thread and New thread panes, with optional dim and blur. |
 | `voice-whisper-local` | [plugins/voice-whisper-local](plugins/voice-whisper-local) | Transcribe voice input locally with whisper.cpp. |
 
 Install one at a time, naming the entry from `.bb/plugins.json`:

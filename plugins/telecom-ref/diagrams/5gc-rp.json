@@ -1,0 +1,56 @@
+{
+  "id": "5gc-rp",
+  "title": "5GC non-roaming",
+  "group": "5gc",
+  "variant": "Reference points",
+  "summary": "The same 5G core drawn with point-to-point reference points: N1 to N4, N6, N9 on the access and user plane, and the Nn reference points that the service-based interfaces realize between pairs of NFs.",
+  "figures": [
+    {
+      "doc": "TS 23.501",
+      "clause": "4.2.3",
+      "figure": "4.2.3-2",
+      "title": "Non-Roaming 5G System Architecture in reference point representation",
+      "shows": ["if/N1", "if/N2", "if/N3", "if/N4", "if/N5", "if/N6", "if/N7", "if/N8", "if/N9", "if/N10", "if/N11", "if/N12", "if/N13", "if/N14", "if/N15", "if/N22", "if/N58", "if/N59", "if/N80", "if/N81"]
+    }
+  ],
+  "width": 1180,
+  "height": 600,
+  "nodes": [
+    { "id": "nssf", "nfs": ["nf/NSSF"], "x": 110, "y": 60 },
+    { "id": "nssaaf", "nfs": ["nf/NSSAAF"], "x": 480, "y": 60, "w": 104 },
+    { "id": "ausf", "nfs": ["nf/AUSF"], "x": 240, "y": 190 },
+    { "id": "udm", "nfs": ["nf/UDM"], "x": 680, "y": 190 },
+    { "id": "nsacf", "nfs": ["nf/NSACF"], "x": 920, "y": 190 },
+    { "id": "amf", "nfs": ["nf/AMF"], "x": 420, "y": 330 },
+    { "id": "smf", "nfs": ["nf/SMF"], "x": 680, "y": 330 },
+    { "id": "pcf", "nfs": ["nf/PCF"], "x": 920, "y": 330 },
+    { "id": "af", "nfs": ["nf/AF"], "x": 1100, "y": 330, "w": 80 },
+    { "id": "ue", "nfs": ["nf/UE"], "x": 80, "y": 520, "w": 80 },
+    { "id": "ran", "nfs": ["nf/gNB"], "labels": ["(R)AN"], "x": 330, "y": 520 },
+    { "id": "upf", "nfs": ["nf/UPF"], "x": 680, "y": 520 },
+    { "id": "dn", "nfs": ["nf/DN"], "x": 980, "y": 520, "w": 110, "shape": "network" }
+  ],
+  "edges": [
+    { "if": "if/N22", "from": "amf", "to": "nssf", "via": [[110, 342]], "at": 0.3 },
+    { "if": "if/N12", "from": "amf", "to": "ausf", "via": [[240, 318]], "at": 0.35 },
+    { "if": "if/N13", "from": "ausf", "to": "udm", "at": 0.6 },
+    { "if": "if/N58", "from": "amf", "to": "nssaaf", "at": 0.25 },
+    { "if": "if/N59", "from": "nssaaf", "to": "udm", "via": [[680, 60]] },
+    { "if": "if/N8", "from": "amf", "to": "udm", "at": 0.45 },
+    { "if": "if/N10", "from": "smf", "to": "udm", "at": 0.25 },
+    { "if": "if/N11", "from": "amf", "to": "smf" },
+    { "if": "if/N7", "from": "smf", "to": "pcf" },
+    { "if": "if/N5", "from": "pcf", "to": "af" },
+    { "if": "if/N15", "from": "amf", "to": "pcf", "via": [[440, 405], [920, 405]], "at": 0.6 },
+    { "if": "if/N14", "from": "amf", "to": "amf", "loop": "top" },
+    { "if": "if/N80", "from": "amf", "to": "nsacf", "at": 0.8 },
+    { "if": "if/N81", "from": "smf", "to": "nsacf", "at": 0.6 },
+    { "if": "if/N1", "from": "ue", "to": "amf", "at": 0.45 },
+    { "if": "if/N2", "from": "ran", "to": "amf", "at": 0.5 },
+    { "if": "if/NR-Uu", "from": "ue", "to": "ran", "plane": "user" },
+    { "if": "if/N3", "from": "ran", "to": "upf", "plane": "user" },
+    { "if": "if/N4", "from": "smf", "to": "upf", "at": 0.7 },
+    { "if": "if/N6", "from": "upf", "to": "dn", "plane": "user" },
+    { "if": "if/N9", "from": "upf", "to": "upf", "loop": "bottom", "plane": "user" }
+  ]
+}

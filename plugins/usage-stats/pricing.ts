@@ -21,18 +21,25 @@ export function cacheHitRatio(tokens: Pick<UsageTokens, "input" | "cacheRead" | 
   return denominator === 0 ? null : tokens.cacheRead / denominator;
 }
 
-interface ModelPrice {
+interface Rates {
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
   cacheWriteUsdPerMTok: number;
   cacheReadUsdPerMTok: number;
 }
 
-function anthropicPrice(
-  inputUsdPerMTok: number,
-  outputUsdPerMTok: number,
-  cacheReadUsdPerMTok = inputUsdPerMTok * 0.1,
-): ModelPrice {
+interface ModelPrice extends Rates {
+  /**
+   * Higher rates for a request whose prompt (input, cache reads, and cache
+   * writes together) is over `overPromptTokens`. The tier applies per API
+   * request, so a row summing several requests is priced at the base rates
+   * unless its own prompt total crosses the threshold.
+   */
+  longPrompt?: { overPromptTokens: number; rates: Rates };
+}
+
+/** Cache writes are the 5-minute rate, 1.25× input; transcripts don't record which TTL was written. */
+function anthropicRates(inputUsdPerMTok: number, outputUsdPerMTok: number, cacheReadUsdPerMTok: number): Rates {
   return {
     inputUsdPerMTok,
     outputUsdPerMTok,
@@ -41,14 +48,40 @@ function anthropicPrice(
   };
 }
 
+function anthropicPrice(
+  inputUsdPerMTok: number,
+  outputUsdPerMTok: number,
+  cacheReadUsdPerMTok = inputUsdPerMTok * 0.1,
+): ModelPrice {
+  return anthropicRates(inputUsdPerMTok, outputUsdPerMTok, cacheReadUsdPerMTok);
+}
+
 /**
- * Anthropic list prices per million tokens, the same table bb prices Claude
- * Code threads with, so transcript rows and ledger rows agree. First match
- * wins, so longer prefixes come first.
+ * Bumped whenever a row of `ANTHROPIC_PRICES` changes, so stored transcript
+ * costs are recomputed once on the next plugin start.
+ */
+export const PRICING_VERSION = 2;
+
+/**
+ * Anthropic first-party list prices per million tokens, from
+ * https://platform.claude.com/docs/en/about-claude/pricing. First match wins,
+ * so a longer prefix comes before the family prefix it would otherwise fall
+ * into (claude-opus-5-5 before claude-opus-5).
  */
 const ANTHROPIC_PRICES: readonly (readonly [prefix: string, price: ModelPrice])[] = [
+  ["claude-fable-5-2", anthropicPrice(8, 40, 0.2)],
+  ["claude-mythos-5-2", anthropicPrice(8, 40, 0.2)],
   ["claude-fable-5-1", anthropicPrice(10, 50, 0.25)],
   ["claude-mythos-5-1", anthropicPrice(10, 50, 0.25)],
+  ["claude-opus-5-5", anthropicPrice(4, 20, 0.2)],
+  ["claude-sonnet-5-5", anthropicPrice(2, 10, 0.1)],
+  [
+    "claude-haiku-5-5",
+    {
+      ...anthropicPrice(0.1, 0.5),
+      longPrompt: { overPromptTokens: 100_000, rates: anthropicRates(0.5, 2.5, 0.05) },
+    },
+  ],
   ["claude-fable-5", anthropicPrice(10, 50)],
   ["claude-mythos-5", anthropicPrice(10, 50)],
   ["claude-opus-5", anthropicPrice(5, 25)],
@@ -71,15 +104,23 @@ function priceFor(model: string): ModelPrice | null {
   return null;
 }
 
+function ratesFor(price: ModelPrice, tokens: UsageTokens): Rates {
+  const long = price.longPrompt;
+  if (long === undefined) return price;
+  const prompt = tokens.input + tokens.cacheRead + tokens.cacheWrite;
+  return prompt > long.overPromptTokens ? long.rates : price;
+}
+
 /** API-equivalent cost in USD, or null for a model without a list price. */
 export function priceTokens(model: string, tokens: UsageTokens): number | null {
   const price = priceFor(model);
   if (price === null) return null;
+  const rates = ratesFor(price, tokens);
   return (
-    (tokens.input * price.inputUsdPerMTok +
-      tokens.output * price.outputUsdPerMTok +
-      tokens.cacheRead * price.cacheReadUsdPerMTok +
-      tokens.cacheWrite * price.cacheWriteUsdPerMTok) /
+    (tokens.input * rates.inputUsdPerMTok +
+      tokens.output * rates.outputUsdPerMTok +
+      tokens.cacheRead * rates.cacheReadUsdPerMTok +
+      tokens.cacheWrite * rates.cacheWriteUsdPerMTok) /
     1_000_000
   );
 }

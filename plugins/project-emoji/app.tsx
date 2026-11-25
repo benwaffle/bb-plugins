@@ -42,10 +42,20 @@ export interface SidebarProjectDecoration {
   tint?: boolean;
 }
 
+/**
+ * What bb passes to a sidebar decoration hook: the project id on its own, or
+ * an object that carries it, depending on the build.
+ */
+export type SidebarDecorationTarget = string | { readonly projectId: string };
+
+export function decorationProjectId(target: SidebarDecorationTarget): string {
+  return typeof target === "string" ? target : target.projectId;
+}
+
 export interface SidebarProjectDecorationRegistration {
   id: string;
   title: string;
-  useDecoration(projectId: string): SidebarProjectDecoration | null;
+  useDecoration(target: SidebarDecorationTarget): SidebarProjectDecoration | null;
 }
 
 /**
@@ -61,7 +71,7 @@ export interface SidebarThreadDecoration {
 export interface SidebarThreadDecorationRegistration {
   id: string;
   title: string;
-  useDecoration(projectId: string): SidebarThreadDecoration | null;
+  useDecoration(target: SidebarDecorationTarget): SidebarThreadDecoration | null;
 }
 
 type SlotsWithProjectDecoration = PluginAppSlots & {
@@ -425,12 +435,12 @@ export default definePluginApp((app) => {
   slots.experimental_sidebarProjectDecoration?.({
     id: "project-emoji",
     title: "Project emoji",
-    useDecoration: (projectId) => useProjectDecoration(store, projectId),
+    useDecoration: (target) => useProjectDecoration(store, decorationProjectId(target)),
   });
   slots.experimental_sidebarThreadDecoration?.({
     id: "project-emoji",
     title: "Project emoji",
-    useDecoration: (projectId) => useThreadDecoration(store, projectId),
+    useDecoration: (target) => useThreadDecoration(store, decorationProjectId(target)),
   });
   app.slots.experimental_appOverlay({
     id: "project-emoji",

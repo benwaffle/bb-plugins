@@ -1,0 +1,410 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/600":
+    description: >-
+      Identifies the network the user is visiting, such as its domain name.
+      The I-CSCF converts the P-Visited-Network-ID header it receives into an
+      octet value that it and the HSS agree on, so the HSS can decide whether
+      roaming from that network is allowed. The home operator chooses the encoding.
+  "10415/601":
+    description: >-
+      An IMS Public User Identity or Public Service Identity, written as a SIP
+      URI or a tel URI in canonical form. On Cx it names the identity being
+      registered, located, authenticated, or de-registered; on Sh it is one of
+      the choices inside User-Identity.
+  "10415/602":
+    description: >-
+      A SIP URI that names a SIP server. On Cx it usually holds the S-CSCF
+      name stored in or returned by the HSS (or an AS name for PSI direct
+      routing); on Sh it names the AS making the request.
+  "10415/603":
+    description: >-
+      A group the HSS returns to the I-CSCF to help it pick an S-CSCF for the
+      user. It lists the mandatory and optional capability codes the S-CSCF
+      needs, and it can also list candidate S-CSCF names.
+  "10415/604":
+    description: >-
+      An operator-defined numeric code for one capability, or a set of
+      capabilities, that the chosen S-CSCF must have. Carried inside
+      Server-Capabilities.
+  "10415/605":
+    description: >-
+      An operator-defined numeric code for one capability, or a set of
+      capabilities, that the I-CSCF should prefer but does not require when it
+      picks an S-CSCF. Carried inside Server-Capabilities.
+  "10415/606":
+    description: >-
+      An opaque XML document with subscriber data. On Cx it is the IMS service
+      profile the HSS gives to the S-CSCF (format in TS 29.228). On Sh it holds
+      the Sh-Data document that an AS reads, updates, or receives in
+      notifications (format in TS 29.328 Annex C).
+  "10415/607":
+    description: >-
+      The number of authentication vectors. In a MAR the S-CSCF states how many
+      it wants, which lets it fetch several in advance; in the MAA the HSS
+      states how many SIP-Auth-Data-Item AVPs it actually returned.
+  "10415/608":
+    description: >-
+      A text name for the SIP authentication scheme. Values include
+      "Digest-AKAv1-MD5" (IMS AKA, used for both AKAv1 and AKAv2 digests),
+      "SIP Digest", "NASS-Bundled", "EarlyIMSSecurity" (GPRS-IMS-Bundled), and
+      "Unknown" when the S-CSCF does not yet know the scheme.
+  "10415/609":
+    description: >-
+      Challenge data that the S-CSCF places in the WWW-Authenticate or
+      Proxy-Authenticate header. For IMS AKA it is 32 binary octets: the
+      16-octet RAND followed by the 16-octet AUTN.
+  "10415/610":
+    description: >-
+      Authorization data related to the SIP Authorization header. In a MAR that
+      requests resynchronization it holds RAND plus the AUTS from the terminal
+      (30 octets); in the MAA it holds the expected response XRES.
+  "10415/612":
+    description: >-
+      One set of authentication data for an IMS user. It names the scheme and,
+      depending on that scheme, carries AKA challenge material and keys, SIP
+      Digest parameters, or the access line and IP address details used by
+      the bundled schemes.
+  "10415/613":
+    description: >-
+      A sequence number for a SIP-Auth-Data-Item. When an MAA returns several
+      authentication vectors, this number shows the order in which the S-CSCF
+      should use them.
+  "10415/614":
+    description: >-
+      Tells the HSS why the S-CSCF sends a SAR, which controls the registration
+      state change. Values include NO_ASSIGNMENT (0), REGISTRATION (1),
+      RE_REGISTRATION (2), UNREGISTERED_USER (3), TIMEOUT_DEREGISTRATION (4),
+      USER_DEREGISTRATION (5), ADMINISTRATIVE_DEREGISTRATION (8), and
+      AUTHENTICATION_FAILURE (9). Values 12 to 14 apply only to SWx.
+  "10415/615":
+    description: >-
+      Explains to the S-CSCF why the HSS de-registers a user in an RTR. It
+      carries a Reason-Code, such as PERMANENT_TERMINATION (0),
+      NEW_SERVER_ASSIGNED (1), SERVER_CHANGE (2), or REMOVE_S-CSCF (3), and
+      optional text that can be shown to the user.
+  "10415/618":
+    description: >-
+      The addresses of the charging functions for the user. It holds primary
+      and secondary online (event) charging function names and primary and
+      secondary charging data function names, as Diameter URIs, so that the
+      receiver can direct its charging requests to them.
+  "10415/623":
+    description: >-
+      Tells the HSS what kind of authorization the I-CSCF asks for in a UAR or
+      LIR. Values are REGISTRATION (0, the default, for registration and
+      re-registration), DE_REGISTRATION (1, when the REGISTER expiry is zero),
+      and REGISTRATION_AND_CAPABILITIES (2, to get capabilities for selecting a
+      new S-CSCF).
+  "10415/624":
+    description: >-
+      Tells the HSS in a SAR whether the S-CSCF already holds the part of the
+      user profile it needs, so the HSS can leave the profile out of the
+      answer. Values are USER_DATA_NOT_AVAILABLE (0) and
+      USER_DATA_ALREADY_AVAILABLE (1).
+  "10415/625":
+    description: >-
+      The cipher key (CK) of an AKA authentication vector, given as binary
+      octets. Cx carries it in SIP-Auth-Data-Item and S6a carries it in
+      UTRAN-Vector.
+  "10415/626":
+    description: >-
+      The integrity key (IK) of an AKA authentication vector, given as binary
+      octets. Cx carries it in SIP-Auth-Data-Item and S6a carries it in
+      UTRAN-Vector.
+  "10415/628":
+    description: >-
+      Lets a node tell its peer which optional features it supports for the
+      Diameter application. The vendor ID and a feature list ID together pick a
+      feature list, and a bit mask marks the supported features. Many 3GPP
+      applications use this AVP.
+  "10415/629":
+    description: >-
+      A number that identifies one feature list when a vendor defines more than
+      one feature list for the same application. It appears in
+      Supported-Features together with Vendor-Id.
+  "10415/630":
+    description: >-
+      A bit mask in Supported-Features. Each set bit marks a feature that the
+      sender supports. The application that uses the list defines each bit;
+      the Cx bits are in clause 7.1.1 of TS 29.229.
+  "10415/632":
+    description: >-
+      The list of Private User Identities, as User-Name values, that belong to
+      the same IMS subscription. The HSS sends it in an SAA, and it appears in
+      an RTR when the de-registration affects several private identities.
+  "10415/633":
+    description: >-
+      Marks an LIR as part of handling an originating SIP request that an AS
+      sends for a user, so the HSS can treat it that way. The only value is
+      ORIGINATING (0).
+  "10415/634":
+    description: >-
+      A wildcarded Public Service Identity or wildcarded Public User Identity,
+      as stored in the HSS, that matches the identity in the request. Its
+      syntax is in TS 23.003. On Sh it holds only a wildcarded PSI.
+  "10415/636":
+    description: >-
+      A wildcarded Public User Identity stored in the HSS, with the syntax from
+      TS 23.003. On Sh it identifies the wildcarded IMPU that covers the user
+      identity in the request or answer.
+  "10415/637":
+    description: >-
+      A bit mask that the I-CSCF sends in a UAR. Bit 0, IMS Emergency
+      Registration, marks the request as part of an emergency registration.
+      The sender clears unused bits and the receiver ignores them.
+  "10415/638":
+    description: >-
+      Tells the S-CSCF whether it must use the loose route mechanism for the
+      registered Public User Identities. Values are LOOSE_ROUTE_NOT_REQUIRED
+      (0) and LOOSE_ROUTE_REQUIRED (1).
+  "10415/639":
+    description: >-
+      Registration state that the S-CSCF stores in the HSS and can get back
+      after an S-CSCF failure. It holds the private identity, the Path,
+      Contact, and subscription details for each registration, the
+      registration expiry, and the authentication scheme.
+  "10415/647":
+    description: >-
+      The Private User Identities, as User-Name values, that are registered
+      with the Public User Identity named in the SAR. The HSS returns it in the
+      SAA.
+  "10415/648":
+    description: >-
+      Tells the HSS in a SAR whether the registration is a multiple
+      registration, where one public identity registers from more than one
+      contact. Values are NOT_MULTIPLE_REGISTRATION (0) and
+      MULTIPLE_REGISTRATION (1).
+  "10415/650":
+    description: >-
+      Gives the priority of the session to the HSS so it can treat priority
+      traffic first. Values run from PRIORITY-0 (0), the highest, to
+      PRIORITY-4 (4). The CSCF or AS maps the SIP priority it receives onto
+      these values in an operator-specific way.
+  "10415/651":
+    description: >-
+      A private and public user identity pair that has an emergency
+      registration. The S-CSCF returns it in an RTA so that the HSS knows which
+      emergency registrations it kept.
+  "10415/652":
+    description: >-
+      Tells the S-CSCF whether to treat the Private User Identity as a
+      privileged sender, for example for priority handling. Values are
+      NOT_PRIVILEDGED_SENDER (0) and PRIVILEDGED_SENDER (1). The spelling
+      "Priviledged" is part of the AVP name.
+  "10415/653":
+    description: >-
+      A bit mask that the HSS returns in an LIA. Bit 0, PSI Direct Routing
+      Indication, shows that Server-Name holds the AS that hosts the PSI
+      rather than an S-CSCF name.
+  "10415/655":
+    description: >-
+      A bit mask that the S-CSCF sends in a SAR. Bit 0, P-CSCF Restoration
+      Indication, asks the HSS to run the P-CSCF restoration procedure. It can
+      appear only with ADMINISTRATIVE_DEREGISTRATION or UNREGISTERED_USER.
+  "10415/656":
+    description: >-
+      The WebRTC Authorization Function (WAF) and WebRTC Web Server Function
+      (WWSF) addresses allowed for the subscription. The HSS sends them to the
+      S-CSCF in an SAA or PPR.
+  "10415/664":
+    description: >-
+      Identifies a P-CSCF that the S-CSCF has found to have failed, by FQDN, by
+      IP addresses, or both. The S-CSCF sends it to the HSS in a SAR as part of
+      P-CSCF restoration.
+  "10415/700":
+    description: >-
+      The user that a Sh request is about. It holds one of these: a Public
+      Identity (SIP or tel URI), an MSISDN, or an External-Identifier. Other
+      applications that reuse it, such as SCEF-related interfaces, use it in
+      the same way.
+  "10415/701":
+    description: >-
+      A subscriber's MSISDN in international E.164 format, encoded as TBCD:
+      two digits in each octet, low nibble first, with 1111 as a filler for an
+      odd number of digits. Sh, S6a, SLg, SLh, and other applications use it.
+  "10415/703":
+    description: >-
+      Names the kind of user data that a Sh request reads, updates, or
+      subscribes to. Values include RepositoryData (0), IMSPublicIdentity (10),
+      IMSUserState (11), S-CSCFName (12), InitialFilterCriteria (13),
+      LocationInformation (14), UserState (15), MSISDN (17), and
+      UEReachabilityForIP (25). Value 20 is reserved.
+  "10415/704":
+    description: >-
+      Names a service or set of services in an AS, and the transparent
+      repository data that the HSS keeps for it. TS 29.364 defines
+      standardized values and data formats.
+  "10415/705":
+    description: >-
+      Tells the HSS in an SNR whether the AS starts or ends a subscription to
+      notifications about changes in user data. Values are Subscribe (0) and
+      Unsubscribe (1).
+  "10415/706":
+    description: >-
+      The access domain for which an AS asks for data such as user state or
+      location in a UDR. Values are CS-Domain (0) and PS-Domain (1).
+  "10415/707":
+    description: >-
+      Tells the HSS whether to start an active location retrieval before it
+      answers a UDR for location data. Values are
+      DoNotNeedInitiateActiveLocationRetrieval (0) and
+      InitiateActiveLocationRetrieval (1).
+  "10415/708":
+    description: >-
+      Chooses which set of IMS Public Identities the HSS returns when an AS
+      asks for IMSPublicIdentity data. Values are ALL_IDENTITIES (0),
+      REGISTERED_IDENTITIES (1), IMPLICIT_IDENTITIES (2), and ALIAS_IDENTITIES
+      (3).
+  "10415/709":
+    description: >-
+      The time when a subscription to notifications ends in the HSS. The AS
+      can propose a time in an SNR, and the HSS gives the time it accepted in
+      the SNA.
+  "10415/710":
+    description: >-
+      Tells the HSS whether to return the current user data in the SNA when it
+      accepts a subscription. Values are USER_DATA_NOT_REQUESTED (0) and
+      USER_DATA_REQUESTED (1).
+  "10415/711":
+    description: >-
+      A tag that selects one instance of Dynamic Service Activation Information
+      (DSAI) for the public identity. An AS uses it with the DSAI data
+      reference to read or subscribe to that instance.
+  "10415/712":
+    description: >-
+      Asks the HSS to send only one notification and then end the
+      subscription. The only value is ONE_TIME_NOTIFICATION_REQUESTED (0). It
+      applies only to UEReachabilityForIP (25) subscriptions.
+  "10415/713":
+    description: >-
+      A bit mask in a UDR that tells which serving nodes the requested data,
+      such as location or user state, apply to. The bits are MME (0), SGSN (1),
+      3GPP-AAA-SERVER-TWAN (2), and AMF for 3GPP access (3).
+  "10415/714":
+    description: >-
+      Tells the HSS that the AS needs only the serving node addresses or names,
+      such as the MME name or VLR number, and no other location data. The only
+      value is ONLY_SERVING_NODES_REQUIRED (0).
+  "10415/715":
+    description: >-
+      Identifies one item of repository data by its Service-Indication and its
+      Sequence-Number. The HSS returns it in a PUA to report the repository
+      data version it now holds.
+  "10415/716":
+    description: >-
+      A version number linked to an item of repository data or other
+      transparent data. The AS and HSS compare it to detect updates that
+      conflict.
+  "10415/717":
+    description: >-
+      Tells the HSS in a UDR whether the AS supports pre-paging for a
+      terminating call. Values are PREPAGING_NOT_SUPPORTED (0), the default,
+      and PREPAGING_SUPPORTED (1).
+  "10415/718":
+    description: >-
+      Asks the HSS for the local time zone and daylight saving time of the
+      visited network where the UE is attached. Values are
+      ONLY_LOCAL_TIME_ZONE_REQUESTED (0) and
+      LOCAL_TIME_ZONE_WITH_LOCATION_INFO_REQUESTED (1).
+  "10415/719":
+    description: >-
+      A bit mask of extra options for a UDR. Bit 0,
+      Location-Information-EPS-Supported, allows EPS location to be returned
+      when CS location is asked for. Bit 1, RAT-Type-Requested, asks for the
+      RAT type with PS or EPS location.
+  "10415/720":
+    description: >-
+      Call details for Mobile Terminating Roaming Retry. It holds a call
+      reference number and the AS number, and the HSS copies these into the
+      MAP Provide Roaming Number request.
+  "10415/721":
+    description: >-
+      The call reference number for a call that uses Mobile Terminating
+      Roaming Retry, coded as in MAP (TS 29.002). Carried inside
+      Call-Reference-Info.
+  "10415/722":
+    description: >-
+      The address of the AS that handles the terminating call, coded like the
+      MAP gmsc-address parameter (TS 29.002). Carried inside
+      Call-Reference-Info for Mobile Terminating Roaming Retry.
+commands:
+  300:
+    description: >-
+      The I-CSCF sends a UAR when it receives a SIP REGISTER. It asks the HSS
+      whether the user may register from the visited network and which S-CSCF
+      serves the user. The UAA returns the result and either the assigned
+      S-CSCF name or capabilities for choosing a new S-CSCF.
+    flow:
+      request: {from: [I-CSCF], to: [HSS]}
+  301:
+    description: >-
+      The S-CSCF sends a SAR to the HSS to store or clear itself as the serving
+      S-CSCF of a user. Server-Assignment-Type tells the HSS whether this is a
+      registration, re-registration, unregistered service, or de-registration.
+      The SAA returns the user profile, charging addresses, and related
+      identities.
+    flow:
+      request: {from: [S-CSCF], to: [HSS]}
+  302:
+    description: >-
+      The I-CSCF sends an LIR to find where to route a SIP request for a public
+      identity. The LIA returns the name of the assigned S-CSCF, capabilities
+      for choosing one, or the AS that hosts a PSI for direct routing.
+    flow:
+      request: {from: [I-CSCF], to: [HSS]}
+  303:
+    description: >-
+      The S-CSCF sends a MAR to get authentication data for an IMS user, such
+      as AKA vectors or SIP Digest credentials. It can also report a
+      synchronization failure. The MAA returns one or more SIP-Auth-Data-Item
+      AVPs for the chosen scheme.
+    flow:
+      request: {from: [S-CSCF], to: [HSS]}
+  304:
+    description: >-
+      The HSS sends an RTR to de-register some or all of a user's public
+      identities in the S-CSCF. Reasons include ending the subscription or
+      moving the user to another S-CSCF. The RTA confirms the result and lists
+      any emergency registrations that the S-CSCF kept.
+    flow:
+      request: {from: [HSS], to: [S-CSCF]}
+  305:
+    description: >-
+      The HSS sends a PPR to push changed data to the S-CSCF, such as an
+      updated user profile, charging addresses, SIP Digest credentials, or
+      allowed WebRTC functions. The PPA confirms that the S-CSCF accepted the
+      update.
+    flow:
+      request: {from: [HSS], to: [S-CSCF]}
+  306:
+    description: >-
+      An AS sends a UDR to read user data from the HSS (the Sh-Pull
+      operation). Data-Reference picks the kind of data, for example
+      repository data, user state, location, or filter criteria. The UDA
+      returns the data as an Sh-Data XML document.
+    flow:
+      request: {from: [AS], to: [HSS]}
+  307:
+    description: >-
+      An AS sends a PUR to change user data in the HSS (the Sh-Update
+      operation), usually transparent repository data or PSI activation
+      state. The PUA reports the result and can return the repository data
+      version that the HSS now holds.
+    flow:
+      request: {from: [AS], to: [HSS]}
+  308:
+    description: >-
+      An AS sends an SNR to subscribe to, or unsubscribe from, notifications
+      about changes in chosen user data (the Sh-Subs-Notif operation). The SNA
+      confirms the subscription and can include its expiry time and the
+      current data.
+    flow:
+      request: {from: [AS], to: [HSS]}
+  309:
+    description: >-
+      The HSS sends a PNR to an AS that has subscribed, to report that user
+      data has changed (the Sh-Notif operation). The changed data is in
+      User-Data. The PNA acknowledges the notification.
+    flow:
+      request: {from: [HSS], to: [AS]}

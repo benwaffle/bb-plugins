@@ -53,6 +53,7 @@
     "format.ts",
     "importer.ts",
     "ledger.ts",
+    "open-command.ts",
     "pricing.ts",
     "summary.ts",
     "styles.ts",

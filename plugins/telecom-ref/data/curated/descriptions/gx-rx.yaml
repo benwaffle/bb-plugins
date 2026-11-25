@@ -1,0 +1,511 @@
+# Summaries written for telecom-ref, not specification text.
+avps:
+  "10415/1000":
+    description: >-
+      Tells the PCRF what a bearer carries. GENERAL (0) means nothing specific
+      is known, and IMS_SIGNALLING (1) marks a bearer reserved for IMS
+      signalling. Once sent, the value holds until a new one arrives.
+  "10415/1001":
+    description: >-
+      The PCRF's instruction to the PCEF to install or modify dynamic PCC
+      rules, or to activate predefined rules and rule groups. It can also
+      give a target bearer, activation and deactivation times, and the access
+      for NBIFOM traffic, all of which apply to every rule in the group.
+  "10415/1002":
+    description: >-
+      The PCRF's instruction to the PCEF to remove dynamic PCC rules or
+      deactivate predefined rules and rule groups, named by rule or rule-base
+      name. It can ask the PCEF to report the resource release and carry the
+      access information an AF asked for.
+  "10415/1006":
+    description: >-
+      Names a policy event. The PCRF sends it to subscribe to an event that
+      makes the PCEF ask for rules again, and the PCEF sends it to report that
+      the event happened. Values include SGSN_CHANGE (0), QOS_CHANGE (1),
+      RAT_CHANGE (2), USER_LOCATION_CHANGE (13), NO_EVENT_TRIGGERS (14),
+      OUT_OF_CREDIT (15), USAGE_REPORT (33), and APPLICATION_START (39).
+  "10415/1008":
+    description: >-
+      Turns offline charging on or off. Inside a PCC rule definition it
+      applies to that rule. At command level in the first CCR or CCA it sets
+      the session's default offline charging method. Values are
+      DISABLE_OFFLINE (0) and ENABLE_OFFLINE (1).
+  "10415/1009":
+    description: >-
+      Turns online charging on or off. Inside a PCC rule definition it applies
+      to that rule. At command level in the first CCR or CCA it sets the
+      session's default online charging method. Values are DISABLE_ONLINE (0)
+      and ENABLE_ONLINE (1).
+  "10415/1013":
+    description: >-
+      One packet filter from a GPRS PDP context's TFT, sent from the PCEF to
+      the PCRF. It holds the filter, its precedence, and optional fields such
+      as ToS or traffic class, IPsec SPI, flow label, and direction.
+  "10415/1016":
+    description: >-
+      A QoS profile with a QCI, maximum and guaranteed bit rates, ARP, and
+      APN-AMBR values. From the PCEF it carries the QoS that the UE or a
+      bearer requested, or the subscribed APN QoS. From the PCRF it carries
+      the QoS authorized for a bearer, a service data flow, a QCI, or an APN.
+  "10415/1018":
+    description: >-
+      The PCEF's report on the status of PCC rules. It names the rules that
+      are active, inactive, or failed, and can carry a failure code, a final
+      unit indication when credit runs out, or a RAN/NAS release cause.
+  "10415/1020":
+    description: >-
+      Identifies one IP-CAN bearer within an IP-CAN session. The PCEF assigns
+      it. In a CCR, the AVPs that follow apply to the named bearer.
+  "10415/1021":
+    description: >-
+      The kind of UE-initiated bearer event that makes the PCEF ask for PCC
+      rules. Values are TERMINATION (0), ESTABLISHMENT (1), and
+      MODIFICATION (2).
+  "10415/1022":
+    description: >-
+      Sent from the PCEF to the PCRF with an access network charging
+      identifier, for example a GCID, and the PCC rules it covers. With no
+      rule names it covers the whole IP-CAN session. The PCRF can pass it on
+      to the AF to correlate charging.
+  "10415/1023":
+    description: >-
+      The bearer control mode that the PCRF picks for the session. UE_ONLY (0)
+      lets only the UE request bearer resources. UE_NW (2) lets both the UE
+      and the network do so. Value 1 is reserved.
+  "10415/1024":
+    description: >-
+      Says whether the UE and the access network support bearer setup started
+      by the network. Values are NETWORK_REQUEST NOT SUPPORTED (0), which is
+      assumed when the AVP is absent, and NETWORK_REQUEST SUPPORTED (1).
+  "10415/1027":
+    description: >-
+      The kind of IP connectivity access network the user is on. It is
+      required at session setup and is sent again when the access type
+      changes. Values include 3GPP-GPRS (0), 3GPP-EPS (5), Non-3GPP-EPS (6),
+      FBA (7), and 3GPP-5GS (8).
+  "10415/1028":
+    description: >-
+      The QoS Class Identifier. It selects a standard set of QoS traits, apart
+      from bit rates and ARP, for a bearer or service data flow. Values follow
+      the QCI table in TS 23.203, for example QCI_1 (1) for conversational
+      voice through QCI_9 (9), plus QCIs such as QCI_65 (65) and QCI_69 (69).
+  "10415/1029":
+    description: >-
+      Says whether the PCRF may answer one PCC rule request with authorized
+      QoS that differs from what was asked. Values are NO_QoS_NEGOTIATION (0)
+      and QoS_NEGOTIATION_SUPPORTED (1), the default.
+  "10415/1030":
+    description: >-
+      Says whether the SGSN accepts a GGSN raising the QoS above the requested
+      level for a PDP context. When upgrades are not supported, the PCRF must
+      not authorize bit rates above the request. Values are
+      QoS_UPGRADE_NOT_SUPPORTED (0), the default, and QoS_UPGRADE_SUPPORTED (1).
+  "10415/1032":
+    description: >-
+      The radio access technology serving the UE. Codes below 1000 are generic
+      and codes from 1000 are 3GPP-specific. Values include WLAN (0),
+      VIRTUAL (1), UTRAN (1000), GERAN (1001), EUTRAN (1004),
+      EUTRAN-NB-IoT (1005), and NR (1006).
+  "10415/1033":
+    description: >-
+      Carries event details through the PCRF. Toward the PCEF it relays an
+      event that an access gateway (BBERF) saw, together with the related
+      location, RAT, or trace data. From the PCEF it lists the event triggers
+      that the PCEF wants the PCRF to subscribe to.
+  "10415/1034":
+    description: >-
+      The Allocation and Retention Priority for a service data flow or for the
+      default EPS bearer. It holds a priority level and two flags: whether
+      the flow may pre-empt other flows, and whether it may be pre-empted.
+  "10415/1039":
+    description: >-
+      A care-of address and its tunnel details, sent from the PCEF to the
+      PCRF for mobility cases. It carries the CoA IP address and the tunnel
+      header length and filter that go with it.
+  "10415/1042":
+    description: >-
+      An NTP timestamp by which the PCEF must ask the PCRF for PCC rules
+      again. It applies only when the REVALIDATION_TIMEOUT event trigger is
+      also set.
+  "10415/1045":
+    description: >-
+      Why the PCRF is ending an IP-CAN session. Values include
+      UNSPECIFIED_REASON (0), UE_SUBSCRIPTION_REASON (1),
+      INSUFFICIENT_SERVER_RESOURCES (2), and two values meant for Sd only:
+      IP_CAN_SESSION_TERMINATION (3) and UE_IP_ADDRESS_RELEASE (4).
+  "10415/1046":
+    description: >-
+      The ARP priority level, from 1 (highest) to 15. It decides whether a
+      bearer request is admitted when resources are short, and which existing
+      bearers can be pre-empted. Levels 1 to 8 are for services that are
+      prioritized within one operator's network.
+  "10415/1047":
+    description: >-
+      Says whether a service data flow or default bearer may take resources
+      held by a lower-priority flow or bearer. Values are
+      PRE-EMPTION_CAPABILITY_ENABLED (0) and
+      PRE-EMPTION_CAPABILITY_DISABLED (1), the default.
+  "10415/1048":
+    description: >-
+      Says whether a service data flow or default bearer can have its
+      resources taken by a higher-priority flow or bearer. Values are
+      PRE-EMPTION_VULNERABILITY_ENABLED (0), the default, and
+      PRE-EMPTION_VULNERABILITY_DISABLED (1).
+  "10415/1049":
+    description: >-
+      The QoS of the EPS default bearer: a non-GBR QCI and an ARP. From the
+      PCEF it gives the subscribed or retained default bearer QoS. From the
+      PCRF it gives the authorized value.
+  "10415/1050":
+    description: >-
+      The control plane IPv4 and/or IPv6 address of the access gateway, which
+      is the SGW for 3GPP access or the access gateway or ePDG for non-3GPP
+      access. A separate instance carries each address family.
+  "10415/1061":
+    description: >-
+      One packet filter from a UE resource request, sent from the PCEF to the
+      PCRF. Depending on the operation it carries the filter identifier,
+      precedence, filter content, direction, and optional ToS, SPI, and flow
+      label. A deletion carries only the identifier.
+  "10415/1062":
+    description: >-
+      The UE-initiated packet filter operation that makes the PCEF ask for
+      PCC rules. Values are DELETION (0), ADDITION (1), and MODIFICATION (2).
+  "10415/1065":
+    description: >-
+      Identifies the PDN connection that the other information in the message
+      applies to.
+  "10415/1067":
+    description: >-
+      Usage monitoring control for one monitoring key. The PCRF uses it to set
+      volume or time thresholds, and the PCEF uses it to report measured usage.
+      It can also set a quota consumption time and the monitoring level, ask
+      for a report, or turn monitoring off.
+  "10415/1071":
+    description: >-
+      Sent by the PCRF to ask the PCEF to report changes in the user's CSG
+      information to the OFCS. Values are CHANGE_CSG_CELL (0),
+      CHANGE_CSG_SUBSCRIBED_HYBRID_CELL (1), and
+      CHANGE_CSG_UNSUBSCRIBED_HYBRID_CELL (2).
+  "10415/1075":
+    description: >-
+      Removes IP flow mobility or NBIFOM routing rules for an IP-CAN session.
+      Each rule is named by its routing rule identifier.
+  "10415/1081":
+    description: >-
+      Carries IP flow mobility or NBIFOM routing rule definitions from the
+      PCEF to the PCRF, to install new rules or change existing ones.
+  "10415/1082":
+    description: >-
+      A bit mask that tells why the charging system limited or denied service
+      for a rule or session. Bits include End User Service Denied (0), Credit
+      Control Not Applicable (1), Authorization Rejected (2), User Unknown (3),
+      and Rating Failed (4).
+  "10415/1087":
+    description: >-
+      Tells the PCRF which TDF should do application detection for the
+      session. The PCEF sends it in the initial CCR. It gives the TDF's
+      Diameter realm and host or its IP address. The PCRF then opens the Sd
+      session with that TDF.
+  "10415/1098":
+    description: >-
+      Reports that the start or stop of an application's traffic was
+      detected, when the PCRF subscribed to APPLICATION_START or
+      APPLICATION_STOP. It names the application and, when known, an instance
+      ID and the detected flows.
+  "10415/2804":
+    description: >-
+      The local IPv4 or IPv6 address of an H(e)NB. It is used when the access
+      interworks with fixed broadband access.
+  "10415/2805":
+    description: >-
+      The UE's local IPv4 or IPv6 address, as seen outside the 3GPP tunnel.
+      It is used for fixed broadband interworking and untrusted WLAN access.
+  "10415/2806":
+    description: >-
+      A UDP source port seen when NAT is detected. For fixed broadband
+      interworking it is the port of the UE traffic after NAT. For untrusted
+      WLAN over S2b it is the port of the UDP-wrapped IKEv2 tunnel to the
+      ePDG.
+  "10415/2811":
+    description: >-
+      Sent from the PCEF to tell the PCRF the status of the SGW. The defined
+      value AN_GW_FAILED (0) asks the PCRF to stop sending policy decisions
+      until the gateway comes back.
+  "10415/2812":
+    description: >-
+      The NTP time when the UE was last known to be at the reported location.
+      The PCEF sends it to the PCRF, and the PCRF can forward it to the AF.
+      The spec defines this AVP as type Time.
+  "10415/2816":
+    description: >-
+      The default QoS for an IP-CAN session over fixed broadband access. It is
+      either a QCI with uplink and downlink maximum bit rates, or the name of
+      a QoS profile preconfigured at the PCEF. From the PCEF it is what the
+      network offers. From the PCRF it is the authorized value.
+  "10415/2819":
+    description: >-
+      The release cause from the RAN or NAS for EPS access, or from the TWAN
+      or untrusted WLAN for non-3GPP EPS access. It is encoded like the GTPv2
+      RAN/NAS Cause field.
+  "10415/2822":
+    description: >-
+      Describes one Presence Reporting Area. It carries the area ID, the UE's
+      status for that area or the area's own status, and, for an area that
+      is specific to one UE, the list of its cells or tracking areas.
+  "10415/2824":
+    description: >-
+      The level of NetLoc support offered by the access network now serving
+      the UE. The value NETLOC_ACCESS_NOT_SUPPORTED (0) means that the access
+      cannot supply access network information.
+  "10415/2825":
+    description: >-
+      The UE's location in a fixed access network. It is given by WLAN SSID
+      and BSSID, or by logical and physical access identifiers.
+  "10415/2826":
+    description: >-
+      Asks for P-CSCF restoration for the UE. Its only value is
+      PCSCF_RESTORATION (0).
+  "10415/2829":
+    description: >-
+      The default access for an NBIFOM multi-access session. From the PCEF it
+      is the access that the UE chose. From the PCRF it is the access that
+      the PCRF chose. It takes IP-CAN-Type values, in practice 3GPP-EPS or
+      Non-3GPP-EPS.
+  "10415/2830":
+    description: >-
+      The NBIFOM mode. In the initial CCR it is the mode the UE suggests, and
+      in the CCA it is the mode the PCRF picks. Values are UE_INITIATED (0)
+      and NETWORK_INITIATED (1).
+  "10415/2831":
+    description: >-
+      NBIFOM support. In the initial CCR it says the UE and network support
+      NBIFOM. In the CCA it says whether the PCRF allows NBIFOM for the
+      session. Values are NBIFOM_NOT_SUPPORTED (0) and NBIFOM_SUPPORTED (1).
+  "10415/2832":
+    description: >-
+      Says the network supports the RAN rule indication used in WLAN
+      offloading decisions. The defined value is 0 (RAN rule indication
+      support).
+  "10415/2833":
+    description: >-
+      Why the PCEF reports a change in whether an access is available in a
+      multi-access session. Values are 0 (Access stratum indication) and
+      1 (Access usable/unusable).
+  "10415/2835":
+    description: >-
+      Reports NBIFOM routing rules that the PCRF could not install or modify,
+      for example because of policy or subscription. It carries the rule
+      identifiers, their status, and a failure code.
+  "10415/2840":
+    description: >-
+      Policy values that the PCRF sends to take effect at a given execution
+      time. It can carry default bearer QoS, APN-AMBR values, and conditional
+      APN-AMBR values.
+  "10415/2842":
+    description: >-
+      Sent by the PCRF to remove one access from a multi-access IP-CAN
+      session. Its only value is REMOVAL_OF_ACCESS (0).
+  "10415/2843":
+    description: >-
+      The TCP source port of an IKEv2 tunnel between the UE and the ePDG for
+      untrusted WLAN over S2b. It applies when NAT and a firewall force the
+      tunnel through a firewall traversal tunnel.
+  "10415/2845":
+    description: >-
+      Gives a list of new or changed Presence Reporting Areas for an IP-CAN
+      session to report on. Each area is a Presence-Reporting-Area-Information
+      entry.
+  "10415/2846":
+    description: >-
+      Stops reporting for a list of Presence Reporting Areas on an IP-CAN
+      session. Each area is named by its identifier.
+  "10415/2847":
+    description: >-
+      The 3GPP PS Data Off state that the UE reports. Values are ACTIVE (0),
+      when the user has turned on PS Data Off, and INACTIVE (1), the default.
+  "10415/500":
+    description: >-
+      Why the PCRF aborts an Rx session or reports a bearer release to the AF.
+      Values include BEARER_RELEASED (0), INSUFFICIENT_SERVER_RESOURCES (1),
+      INSUFFICIENT_BEARER_RESOURCES (2), PS_TO_CS_HANDOVER (3), and
+      SPONSORED_DATA_CONNECTIVITY_DISALLOWED (4).
+  "10415/501":
+    description: >-
+      The IP address of the access network node that does charging, such as
+      the GGSN or PGW. It is sent to the AF for charging correlation and
+      should not cross operator borders.
+  "10415/502":
+    description: >-
+      An access network charging identifier, such as a GCID, that the PCRF
+      sends to the AF. It names the flows that the identifier covers. With no
+      flows listed it covers the whole AF session. The AF uses it to link
+      session-layer and bearer-layer charging.
+  "10415/504":
+    description: >-
+      Identifies the application service that an AF session belongs to. The
+      PCRF can use it to pick QoS, to fill in default service settings, or to
+      start application detection at the PCEF or TDF.
+  "10415/505":
+    description: >-
+      The AF's charging identifier for the session, such as the IMS ICID. It
+      lets charging records from the session layer be matched with those from
+      the bearer layer.
+  "10415/510":
+    description: >-
+      Names a set of IP flows by media component number and, optionally, flow
+      numbers. With no flow numbers it means all flows of that media
+      component. Reports can add the final unit action, media component
+      status, or content version.
+  "10415/513":
+    description: >-
+      An event about the access network bearer. In an AAR the AF uses it to
+      subscribe, and in a PCRF RAR it says which event is being reported.
+      Values include CHARGING_CORRELATION_EXCHANGE (1),
+      INDICATION_OF_LOSS_OF_BEARER (2), INDICATION_OF_RELEASE_OF_BEARER (4),
+      IP-CAN_CHANGE (6), and INDICATION_OF_SUCCESSFUL_RESOURCES_ALLOCATION (8).
+  "10415/515":
+    description: >-
+      The maximum downlink bandwidth, in bits per second, for an IP flow,
+      counting IP-layer and higher overhead. In an AAR it is the AF's request,
+      and in an AAA it is the most the PCRF will accept. Larger values use
+      Extended-Max-Requested-BW-DL.
+  "10415/516":
+    description: >-
+      The maximum uplink bandwidth, in bits per second, for an IP flow,
+      counting IP-layer and higher overhead. In an AAR it is the AF's request,
+      and in an AAA it is the most the PCRF will accept. Larger values use
+      Extended-Max-Requested-BW-UL.
+  "10415/517":
+    description: >-
+      Service information for one media component of an AF session, usually
+      taken from SDP. It carries the media type, bandwidths, flow status,
+      codec data, and sub-components. The PCRF uses it to derive authorized
+      QoS and flow filters for PCC rules.
+  "10415/523":
+    description: >-
+      Says whether an Rx session covers one SIP dialogue or several, as with
+      SIP forking. Values are SINGLE_DIALOGUE (0), the default, and
+      SEVERAL_DIALOGUES (1).
+  "10415/525":
+    description: >-
+      Marks an AF session as emergency or restricted local operator service
+      (RLOS) traffic. It holds the service URN without its "urn:service:"
+      prefix, for example "sos" or "sos.police".
+  "10415/526":
+    description: >-
+      Sent by the PCRF when it rejects the AF's service information. It gives
+      the most bandwidth the PCRF would authorize, either for the whole AF
+      session or for each media component.
+  "10415/527":
+    description: >-
+      Says whether the AF's service information is final or still being
+      negotiated. Values are FINAL SERVICE INFORMATION (0), the default, and
+      PRELIMINARY SERVICE INFORMATION (1), used for example when the
+      information comes from an SDP offer with no answer yet.
+  "10415/528":
+    description: >-
+      Marks an AF session as a Multimedia Priority Service (MPS) session. It
+      holds the national name of the MPS service, for example NGN GETS.
+  "10415/533":
+    description: >-
+      Why the AF sends an AA-Request. Values are INITIAL_REQUEST (0), which
+      opens an Rx session, UPDATE_REQUEST (1), which changes one, and
+      PCSCF_RESTORATION (2).
+  "10415/536":
+    description: >-
+      Access network information that the AF wants for its session. Values are
+      USER_LOCATION (0), for the user's location and serving network, and
+      MS_TIME_ZONE (1), for the user's time zone.
+  "10415/537":
+    description: >-
+      Information about the IP address domain. The PCRF uses it to bind the
+      Rx session to the right IP-CAN session when address spaces overlap.
+  "10415/538":
+    description: >-
+      Marks an AF session as a group communication session that needs
+      priority. The format of the value is not specified.
+  "10415/541":
+    description: >-
+      How long, in seconds, the AF should wait before it sends the same
+      service information again after the PCRF rejects it for a temporary
+      reason such as cell congestion.
+  "10415/547":
+    description: >-
+      Marks an AF session as Mission Critical Push To Talk (MCPTT). It holds
+      an MCPTT resource priority namespace from RFC 8101 and can also name
+      the MCPTT service provider.
+  "10415/548":
+    description: >-
+      A bit mask with the result of checking the AF's request against a
+      background data transfer policy. Bits mean that the transfer policy is
+      unknown (0), that it has expired (1), or that its time window has not
+      yet started (2).
+  "10415/551":
+    description: >-
+      A bit mask of the information the AF wants the PCRF to expose. Bit 0
+      asks for EPC-level identities of the IP-CAN session (MSISDN, IMSI, and
+      IMEI(SV)).
+  "10415/553":
+    description: >-
+      A bit mask that tells the PCRF which media flow to pre-empt when several
+      candidates have the same priority. Only one bit may be set: most recent
+      added flow (0), least recent added flow (1), or highest bandwidth
+      flow (2).
+  "10415/554":
+    description: >-
+      The maximum downlink bandwidth for an IP flow in kbit/s, for values too
+      large for the bits-per-second AVP. In an AAR it is the AF's request,
+      and in an AAA it is the most the PCRF will accept.
+  "10415/555":
+    description: >-
+      The maximum uplink bandwidth for an IP flow in kbit/s, for values too
+      large for the bits-per-second AVP. In an AAR it is the AF's request,
+      and in an AAA it is the most the PCRF will accept.
+  "10415/562":
+    description: >-
+      Marks an AF session as a Mission Critical Video (MCVideo) session and
+      holds the MCVideo service provider's name. The PCRF can use it to
+      prioritize the session.
+  "10415/563":
+    description: >-
+      Identifies the IMS communication service or dialogue that an AF session
+      belongs to. The PCRF can use it, for example, to charge different
+      dialogues in one IMS session in different ways.
+  "10415/564":
+    description: >-
+      The kind of IMS communication service that the AF session is for. Values
+      are NO_CONTENT_DETAIL (0), CAT (1) for customized alerting tones, and
+      CONFERENCE (2) for a three-party conference.
+  "10415/565":
+    description: >-
+      Identifies the callee of an AF session by the called, requested, and
+      asserted party addresses. The PCRF can use it in PCC decisions, for
+      example for volume-based charging.
+  "10415/569":
+    description: >-
+      The 44-bit Network Identifier (NID), as 11 hex digits. Together with the
+      PLMN ID it identifies a stand-alone non-public network (SNPN) in 5GS.
+  "10415/570":
+    description: >-
+      For a multi-access (MA) PDU session, the IP-CAN type and RAT type of an
+      access that was added or released, with the action taken.
+  "10415/572":
+    description: >-
+      The release cause for 3GPP or non-3GPP 5GS access. It carries a 5GMM
+      cause, a 5GSM cause, or an NGAP cause.
+  "10415/578":
+    description: >-
+      The user's location on a wireline access. For cable it is an HFC node
+      identifier. For BBF access it is a Global Line Identifier and line type.
+commands:
+  265:
+    description: >-
+      AA-Request and AA-Answer come from the NASREQ application (RFC 7155),
+      where they carry authentication and authorization. On Rx the AF, such
+      as a P-CSCF, sends an AAR to give the PCRF service information for a
+      new or changed AF session and to subscribe to bearer events. The PCRF
+      answers with an AAA that gives the authorization result and can include
+      acceptable bandwidth or access network details.
+    flow:
+      request: {from: [AF, P-CSCF], to: [PCRF]}

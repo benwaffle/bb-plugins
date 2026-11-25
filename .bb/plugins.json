@@ -26,6 +26,18 @@
     {
       "name": "usage-stats",
       "source": "./plugins/usage-stats"
+    },
+    {
+      "name": "telecom-ref",
+      "source": "./plugins/telecom-ref"
+    },
+    {
+      "name": "leader-keys",
+      "source": "./plugins/leader-keys"
+    },
+    {
+      "name": "wallpaper",
+      "source": "./plugins/wallpaper"
     }
   ]
 }
