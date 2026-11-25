@@ -9,6 +9,7 @@ interface Call {
   command: string;
   args: readonly string[];
   cwd: string | undefined;
+  timeoutMs: number;
 }
 
 type CheckCounts = Array<{ state: string; count: number }>;
@@ -38,6 +39,7 @@ function graphqlNode(number: number, title: string, body: string, baseRefName = 
     mergeable: "MERGEABLE",
     author: { login: "bob", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=32" },
     commits: { nodes: [{ commit: { statusCheckRollup: rollup as CheckRollup | null } }] },
+    headRollup: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
     reviewRequests: {
       nodes: [{ requestedReviewer: { __typename: "Team", combinedSlug: "acme/platform" } }],
     },
@@ -56,7 +58,7 @@ const OPEN_PULL_NODES = [
 ];
 
 function openPulls(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>): string {
-  return JSON.stringify({ data: { repository: { pullRequests: { nodes } } } });
+  return JSON.stringify({ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
 }
 
 const JIRA = new Map([
@@ -110,17 +112,22 @@ const PULL_VIEW = JSON.stringify({
 function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
   const calls: Call[] = [];
   const twg: { jira: typeof JIRA; fail: boolean; gate: Promise<void> | null } = { jira: JIRA, fail: false, gate: null };
+  const github: { down: boolean; gate: Promise<void> | null } = { down: false, gate: null };
   const run = async (command: string, args: readonly string[], options: RunOptions): Promise<string> => {
-    calls.push({ command, args, cwd: options.cwd });
+    calls.push({ command, args, cwd: options.cwd, timeoutMs: options.timeoutMs });
     const line = [command, ...args].join(" ");
     if (args[0] === "--version") return "1.0\n";
+    if (command === "gh") {
+      await github.gate;
+      if (github.down) throw new Error(`${line.split(" ").slice(0, 4).join(" ")}: error connecting to api.github.com`);
+    }
     if (line.startsWith("gh api user --jq")) return "benwaffle\n";
     if (line.startsWith("gh api user/teams")) return "acme/platform\n";
-    if (line.startsWith("gh api graphql")) return openPulls(nodes);
-    if (line.startsWith("gh pr view 596")) return PULL_VIEW;
-    if (line.startsWith("gh pr view 534 -R acme/widgets --json state,isDraft")) {
-      return JSON.stringify({ state: "MERGED", isDraft: false });
+    if (line.startsWith("gh api graphql") && line.includes("pullRequests(states: OPEN")) return openPulls(nodes);
+    if (line.startsWith("gh api graphql") && line.includes("r0: repository(owner: \"acme\", name: \"widgets\") { p534: pullRequest(number: 534) { state isDraft }")) {
+      return JSON.stringify({ data: { r0: { p534: { state: "MERGED", isDraft: false } } } });
     }
+    if (line.startsWith("gh pr view 596")) return PULL_VIEW;
     if (line.startsWith("gh issue view 12")) return JSON.stringify({ title: "Stale prices after a currency change" });
     if (line.startsWith("twg jira workitem get ")) {
       await twg.gate;
@@ -132,8 +139,19 @@ function fakeRunner(nodes: ReadonlyArray<ReturnType<typeof graphqlNode>>) {
     if (line === "git rev-parse --abbrev-ref HEAD") return "bob/catalog-cache\n";
     throw new Error(`unexpected command: ${line}`);
   };
-  return { calls, twg, run };
+  return { calls, twg, github, run };
 }
+
+interface FakeThread {
+  id: string;
+  environmentId: string;
+  status: string;
+  title: string | null;
+  /** bb moves a thread's `updatedAt` forward whenever a message is added to it. */
+  updatedAt: number;
+}
+
+const threadRow = (thread: FakeThread) => ({ ...thread, deletedAt: null, titleFallback: null });
 
 const SETTINGS = { repos: REPO, jiraProjectKeys: "ACME", jiraSite: "https://example.atlassian.net/" };
 
@@ -142,7 +160,7 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
   const clock = { now: Date.parse("2026-10-04T09:00:00Z") };
   const plugin = createPlugin({ run: runner.run, pollMs: 1, now: () => clock.now });
   const host = createFakePluginHost({ pluginId: "pr-review", settings });
-  const threads = new Map<string, { id: string; environmentId: string; status: string; title: string }>();
+  const threads = new Map<string, FakeThread>();
   const sdk = host.harness.sdk;
   sdk.stub("projects.list", async () => [
     { id: "proj_widgets", name: "widgets", gitRemoteUrl: "git@github.com:acme/widgets.git", sources: [] },
@@ -150,15 +168,21 @@ async function load(nodes = OPEN_PULL_NODES, settings: Record<string, string> = 
   sdk.stub("plugins.list", async () => ({ plugins: [{ id: "github", enabled: true, status: "running" }] }));
   sdk.stub("system.config", async () => ({ primaryHostId: "host_local" }));
   sdk.stub("threads.spawn", async (args: { title: string }) => {
-    const thread = { id: `thr_${threads.size + 1}`, environmentId: "env_review", status: "active", title: args.title };
+    const thread = { id: `thr_${threads.size + 1}`, environmentId: "env_review", status: "active", title: args.title, updatedAt: 1 };
     threads.set(thread.id, thread);
     return thread;
   });
   sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => {
     const thread = threads.get(threadId);
     if (thread === undefined) throw new Error("not found");
-    return { ...thread, deletedAt: null, titleFallback: null, updatedAt: 1 };
+    return threadRow(thread);
   });
+  sdk.stub("threads.list", async ({ threadIds }: { threadIds: readonly string[] }) =>
+    threadIds.flatMap((id) => {
+      const thread = threads.get(id);
+      return thread === undefined ? [] : [threadRow(thread)];
+    }),
+  );
   sdk.stub("threads.promptHistory", async () => [
     { id: "msg_1", createdAt: 1, input: [{ type: "text", text: "Review context", mentions: [] }] },
   ]);
@@ -303,7 +327,8 @@ describe("agent state", () => {
     };
     return queue.entries.find((entry) => entry.number === 596)?.agent.state;
   };
-  const history = (harness: Awaited<ReturnType<typeof load>>["harness"], messages: Message[]) =>
+  const history = ({ harness, threads }: Awaited<ReturnType<typeof load>>, messages: Message[]) => {
+    threads.get("thr_1")!.updatedAt = Math.max(...messages.map((message) => message.createdAt));
     harness.sdk.stub("threads.promptHistory", async () =>
       messages.map((message, index) => ({
         id: `msg_${index}`,
@@ -311,19 +336,21 @@ describe("agent state", () => {
         input: [{ type: "text", text: message.text, mentions: [] }],
       })),
     );
+  };
 
   it("is reviewing, then reviewed, after the review command, and follow-ups after a later message", async () => {
-    const { harness, threads, clock } = await load();
+    const loaded = await load();
+    const { harness, threads, clock } = loaded;
     await harness.runCli(["review", "596"]);
     expect(await agentStates(harness)).toBe("reviewing");
     threads.get("thr_1")!.status = "idle";
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
     ]);
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: clock.now + 1_000, text: `${REVIEW_COMMAND} 596` },
       { createdAt: clock.now + 2_000, text: "Why?" },
@@ -332,21 +359,22 @@ describe("agent state", () => {
   });
 
   it("finds a review command typed into the thread, on any line, and keeps it once it leaves the history", async () => {
-    const { harness, threads } = await load();
+    const loaded = await load();
+    const { harness, threads } = loaded;
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     threads.get("thr_1")!.status = "idle";
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: 5, text: "What does this change?" },
     ]);
     expect(await agentStates(harness)).toBe("opened");
-    history(harness, [
+    history(loaded, [
       { createdAt: 1, text: "Review context" },
       { createdAt: 5, text: "What does this change?" },
       { createdAt: 9, text: `Look at the cache first.\n${REVIEW_COMMAND} 596` },
     ]);
     expect(await agentStates(harness)).toBe("reviewed");
-    history(harness, [{ createdAt: 12, text: "Fix the first finding" }]);
+    history(loaded, [{ createdAt: 12, text: "Fix the first finding" }]);
     expect(await agentStates(harness)).toBe("follow-ups");
   });
 });
@@ -480,7 +508,7 @@ describe("sidebarGroups", () => {
   });
 
   it("gives each review thread its PR state, read from GitHub for a PR that left the queue, and its agent state", async () => {
-    const { harness, bb } = await load();
+    const { harness, bb, threads } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
     const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
@@ -489,15 +517,9 @@ describe("sidebarGroups", () => {
       { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
     ]);
     store.record("thr_notes", [ticket]);
-    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
-      id: threadId,
-      environmentId: "env_review",
-      status: "idle",
-      title: null,
-      titleFallback: null,
-      deletedAt: null,
-      updatedAt: 1,
-    }));
+    for (const id of ["thr_1", "thr_merged", "thr_notes"]) {
+      threads.set(id, { id, environmentId: "env_review", status: "idle", title: null, updatedAt: 1 });
+    }
     const groups = (await harness.callRpc("sidebarGroups", {})) as {
       threadReviews: Array<{ threadId: string; number: number; pullState: string | null; agent: string }>;
     };
@@ -510,7 +532,7 @@ describe("sidebarGroups", () => {
 
 describe("related threads", () => {
   it("lists the ticket's other threads with PR and agent state, then its open PRs without a thread", async () => {
-    const { harness, bb } = await load();
+    const { harness, bb, threads } = await load();
     await harness.callRpc("startReview", { repo: REPO, number: 596 });
     const store = (await import("./store.js")).createRefStore(bb.storage);
     const ticket = { kind: "jira" as const, key: "ACME-51", url: "https://example.atlassian.net/browse/ACME-51", title: null, source: "title" as const };
@@ -519,15 +541,10 @@ describe("related threads", () => {
       { kind: "gh-pr", key: `${REPO}#534`, url: `https://github.com/${REPO}/pull/534`, title: "ACME-51: Drop the old cache", source: "review-target" },
     ]);
     store.record("thr_notes", [ticket]);
-    harness.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => ({
-      id: threadId,
-      environmentId: "env_review",
-      status: "idle",
-      title: threadId === "thr_notes" ? "Plan ACME-51" : "#534 Drop the old cache",
-      titleFallback: null,
-      deletedAt: null,
-      updatedAt: 1,
-    }));
+    for (const id of ["thr_1", "thr_merged", "thr_notes"]) {
+      const title = id === "thr_notes" ? "Plan ACME-51" : "#534 Drop the old cache";
+      threads.set(id, { id, environmentId: "env_review", status: "idle", title, updatedAt: 1 });
+    }
     const related = await harness.callRpc("relatedThreads", { threadId: "thr_1" });
     expect(related).toEqual({
       githubPanel: true,
@@ -642,5 +659,92 @@ describe("ticket summaries", () => {
       expect.objectContaining({ key: "ACME-51", summary: "Cache the widget catalog", status: "In Progress" }),
     ]);
     expect(twgCalls(runner)).toHaveLength(1);
+  });
+});
+
+describe("sidebarGroups when GitHub is slow or unreachable", () => {
+  type Groups = { pulls: Array<{ entry: { number: number } }> };
+  const ghCalls = (runner: { calls: Call[] }, prefix: string) =>
+    runner.calls.filter((call) => call.command === "gh" && call.args.join(" ").startsWith(prefix));
+  const sidebarWarnings = (logEntries: ReadonlyArray<{ level: string; message: string }>) =>
+    logEntries.filter((entry) => entry.level === "warn" && entry.message.startsWith("sidebar groups"));
+
+  it("gives every gh call a hard timeout of at most 30 seconds, and 10 seconds by default", async () => {
+    const { harness, runner } = await load();
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    await harness.callRpc("sidebarGroups", {});
+    const gh = runner.calls.filter((call) => call.command === "gh" && call.args[0] !== "--version");
+    const reads = gh.filter((call) => call.args[1] !== "checkout");
+    expect(reads.length).toBeGreaterThan(0);
+    for (const call of reads) expect(call.timeoutMs).toBeLessThanOrEqual(30_000);
+    expect(ghCalls(runner, "api user --jq").map((call) => call.timeoutMs)).toEqual([10_000]);
+    expect(ghCalls(runner, "pr view 596").map((call) => call.timeoutMs)).toEqual([10_000]);
+  });
+
+  it("shares one refresh between concurrent calls, so they make one set of gh calls", async () => {
+    const { harness, runner } = await load();
+    let release = () => {};
+    runner.github.gate = new Promise((resolve) => (release = resolve));
+    const calls = Array.from({ length: 5 }, () => harness.callRpc("sidebarGroups", {}) as Promise<Groups>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    const results = await Promise.all(calls);
+    for (const result of results) expect(result).toEqual(results[0]);
+    expect(results[0]!.pulls.map(({ entry }) => entry.number)).toEqual([590, 596, 599]);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(ghCalls(runner, "api graphql")).toHaveLength(1);
+
+    await harness.callRpc("sidebarGroups", {});
+    expect(ghCalls(runner, "api graphql")).toHaveLength(1);
+  });
+
+  it("serves the last result while GitHub is unreachable, logs once per failure streak, and keeps the login", async () => {
+    const { harness, runner, clock } = await load();
+    const first = (await harness.callRpc("sidebarGroups", {})) as Groups;
+    expect(first.pulls).toHaveLength(3);
+
+    runner.github.down = true;
+    for (let minute = 1; minute <= 3; minute++) {
+      clock.now += 61_000;
+      expect(await harness.callRpc("sidebarGroups", {})).toEqual(first);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(ghCalls(runner, "api graphql").length).toBeGreaterThan(1);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(sidebarWarnings(harness.logEntries)).toEqual([
+      { level: "warn", message: expect.stringContaining("error connecting to api.github.com") },
+    ]);
+
+    runner.github.down = false;
+    clock.now += 61_000;
+    await harness.callRpc("sidebarGroups", {});
+    expect(harness.logEntries).toContainEqual({ level: "info", message: "sidebar groups refreshed after GitHub errors" });
+    runner.github.down = true;
+    clock.now += 61_000;
+    await harness.callRpc("sidebarGroups", {});
+    expect(sidebarWarnings(harness.logEntries)).toHaveLength(2);
+  });
+
+  it("returns no groups when GitHub is unreachable before any result, and waits a minute to retry", async () => {
+    const { harness, runner, clock } = await load();
+    runner.github.down = true;
+    const empty = { tickets: [], threadTickets: [], pulls: [], threadPulls: [], threadReviews: [] };
+    expect(await harness.callRpc("sidebarGroups", {})).toEqual(empty);
+    expect(await harness.callRpc("sidebarGroups", {})).toEqual(empty);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(1);
+    expect(sidebarWarnings(harness.logEntries)).toHaveLength(1);
+
+    runner.github.down = false;
+    clock.now += 61_000;
+    expect(((await harness.callRpc("sidebarGroups", {})) as Groups).pulls).toHaveLength(3);
+    expect(ghCalls(runner, "api user --jq")).toHaveLength(2);
+  });
+
+  it("refreshes a cached result when a review starts, so the new thread shows on the next call", async () => {
+    const { harness } = await load();
+    await harness.callRpc("sidebarGroups", {});
+    await harness.callRpc("startReview", { repo: REPO, number: 596 });
+    const groups = (await harness.callRpc("sidebarGroups", {})) as { threadTickets: unknown[] };
+    expect(groups.threadTickets).toEqual([{ threadId: "thr_1", ticketKey: "ACME-51" }]);
   });
 });

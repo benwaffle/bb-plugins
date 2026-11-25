@@ -5,6 +5,7 @@ import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { fireEvent } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import definition, {
+  type SidebarDecorationTarget,
   type SidebarProjectDecorationRegistration,
   type SidebarThreadDecorationRegistration,
 } from "./app.js";
@@ -57,12 +58,23 @@ function setupWithDecorationSlot(): Registrations {
   return registrations;
 }
 
-function renderHeaders(registrations: Registrations, settings: Record<string, boolean>) {
+/** The hook argument in the shape older bb builds pass, or newer ones. */
+type TargetShape = "string" | "object";
+
+function target(projectId: string, shape: TargetShape): SidebarDecorationTarget {
+  return shape === "string" ? projectId : { projectId };
+}
+
+function renderHeaders(
+  registrations: Registrations,
+  settings: Record<string, boolean>,
+  shape: TargetShape = "string",
+) {
   const Overlay = registrations.overlays[0]!.component;
   const decoration = registrations.decorations[0]!;
   const headerPointerDown = vi.fn();
   function Header({ projectId }: { projectId: string }) {
-    const value = decoration.useDecoration(projectId);
+    const value = decoration.useDecoration(target(projectId, shape));
     return (
       <div data-testid={projectId} onPointerDown={headerPointerDown} onClick={headerPointerDown}>
         {value?.leading}
@@ -129,6 +141,13 @@ describe("project-emoji app with the decoration slot", () => {
     expect(document.querySelector(`[${BUTTON_ATTRIBUTE}]`)).toBeNull();
   });
 
+  it("reads the project id from an object argument", async () => {
+    const { view } = renderHeaders(setupWithDecorationSlot(), { tint: true }, "object");
+    const button = await view.findByRole("button", { name: "Change icon for atlas" });
+    expect(button.textContent).toBe("🧭");
+    expect(styleOf(QUILL)).toEqual({ accentColor: "#7fb4ff", tint: true });
+  });
+
   it("keeps the color but drops the tint when the setting is off", async () => {
     const { view } = renderHeaders(setupWithDecorationSlot(), { tint: false });
     await view.findByRole("button", { name: "Change icon for atlas" });
@@ -148,35 +167,42 @@ describe("project-emoji app with the decoration slot", () => {
 });
 
 describe("project-emoji app with the thread decoration slot", () => {
-  it("decorates each project's thread rows with its name and header hue", async () => {
-    const registrations = setupWithDecorationSlot();
-    const Overlay = registrations.overlays[0]!.component;
-    const decoration = registrations.threadDecorations[0]!;
-    expect({ id: decoration.id, title: decoration.title }).toEqual({
-      id: "project-emoji",
-      title: "Project emoji",
-    });
-    function Row({ projectId }: { projectId: string }) {
-      return <output data-testid={projectId}>{JSON.stringify(decoration.useDecoration(projectId))}</output>;
-    }
-    function Harness() {
-      return (
-        <>
-          <Overlay />
-          <Row projectId={ATLAS} />
-          <Row projectId={QUILL} />
-          <Row projectId="proj_unknown" />
-        </>
-      );
-    }
-    const view = renderSlot({ component: Harness }, {}, { rpc, sidebarThreads });
+  it.each<TargetShape>(["string", "object"])(
+    "decorates each project's thread rows with its name and header hue (%s argument)",
+    async (shape) => {
+      const registrations = setupWithDecorationSlot();
+      const Overlay = registrations.overlays[0]!.component;
+      const decoration = registrations.threadDecorations[0]!;
+      expect({ id: decoration.id, title: decoration.title }).toEqual({
+        id: "project-emoji",
+        title: "Project emoji",
+      });
+      function Row({ projectId }: { projectId: string }) {
+        return (
+          <output data-testid={projectId}>
+            {JSON.stringify(decoration.useDecoration(target(projectId, shape)))}
+          </output>
+        );
+      }
+      function Harness() {
+        return (
+          <>
+            <Overlay />
+            <Row projectId={ATLAS} />
+            <Row projectId={QUILL} />
+            <Row projectId="proj_unknown" />
+          </>
+        );
+      }
+      const view = renderSlot({ component: Harness }, {}, { rpc, sidebarThreads });
 
-    await vi.waitFor(() => {
-      expect(JSON.parse(view.getByTestId(QUILL).textContent!)).toEqual({ title: "quill", hue: 257 });
-    });
-    expect(JSON.parse(view.getByTestId(ATLAS).textContent!)).toEqual({ title: "atlas", hue: 164 });
-    expect(view.getByTestId("proj_unknown").textContent).toBe("null");
-  });
+      await vi.waitFor(() => {
+        expect(JSON.parse(view.getByTestId(QUILL).textContent!)).toEqual({ title: "quill", hue: 257 });
+      });
+      expect(JSON.parse(view.getByTestId(ATLAS).textContent!)).toEqual({ title: "atlas", hue: 164 });
+      expect(view.getByTestId("proj_unknown").textContent).toBe("null");
+    },
+  );
 });
 
 describe("project-emoji app without the decoration slot", () => {

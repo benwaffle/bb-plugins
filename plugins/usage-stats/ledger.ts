@@ -98,6 +98,8 @@ export const MIGRATIONS = [
        OR NOT EXISTS (
          SELECT 1 FROM usage t WHERE t.source = 'transcript' AND t.session_id = u.session_id
        )`,
+  `ALTER TABLE transcript_files ADD COLUMN line_start INTEGER`,
+  `ALTER TABLE transcript_files ADD COLUMN line_hash TEXT`,
 ];
 
 export interface ThreadFacts {
@@ -136,9 +138,18 @@ export interface WindowSample {
 }
 
 export interface FileCursor {
+  /** The file size this cursor accounts for: the stat size once read to the end, else `offset`. */
   size: number;
   mtimeMs: number;
+  /** Byte offset just past the last complete line read. */
   offset: number;
+  /**
+   * The last complete line read, as bytes [`lineStart`, `offset`) and their
+   * hash. A resume first checks the hash, so a file rewritten in place is
+   * read again from the start. Null when no line has been read.
+   */
+  lineStart: number | null;
+  lineHash: string | null;
 }
 
 interface UsageRow {
@@ -242,13 +253,15 @@ export function openLedger(db: Database.Database) {
        cost_usd = CASE WHEN cost_usd IS NULL OR excluded.cost_usd IS NULL THEN NULL
                        ELSE cost_usd + excluded.cost_usd END`,
   );
-  const selectCursor = db.prepare<[string, string], { size: number; mtime_ms: number; offset: number }>(
-    `SELECT size, mtime_ms, offset FROM transcript_files WHERE machine = ? AND path = ?`,
-  );
+  const selectCursor = db.prepare<
+    [string, string],
+    { size: number; mtime_ms: number; offset: number; line_start: number | null; line_hash: string | null }
+  >(`SELECT size, mtime_ms, offset, line_start, line_hash FROM transcript_files WHERE machine = ? AND path = ?`);
   const upsertCursor = db.prepare(
-    `INSERT INTO transcript_files (machine, path, size, mtime_ms, offset) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO transcript_files (machine, path, size, mtime_ms, offset, line_start, line_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (machine, path) DO UPDATE SET size = excluded.size, mtime_ms = excluded.mtime_ms,
-       offset = excluded.offset`,
+       offset = excluded.offset, line_start = excluded.line_start, line_hash = excluded.line_hash`,
   );
   const insertSample = db.prepare(
     `INSERT OR REPLACE INTO window_samples (provider, label, ts, used_percent, resets_at, plan)
@@ -258,6 +271,10 @@ export function openLedger(db: Database.Database) {
   const upsertMeta = db.prepare(
     `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
   );
+  const selectTranscriptRows = db.prepare<[], UsageRow & { id: string; model: string }>(
+    `SELECT id, model, input, output, cache_read, cache_write, cost_usd FROM usage WHERE source = 'transcript'`,
+  );
+  const updateCost = db.prepare(`UPDATE usage SET cost_usd = ? WHERE id = ?`);
 
   return {
     db,
@@ -359,11 +376,18 @@ export function openLedger(db: Database.Database) {
 
     cursor(machine: string, path: string): FileCursor | null {
       const row = selectCursor.get(machine, path);
-      return row === undefined ? null : { size: row.size, mtimeMs: row.mtime_ms, offset: row.offset };
+      if (row === undefined) return null;
+      return {
+        size: row.size,
+        mtimeMs: row.mtime_ms,
+        offset: row.offset,
+        lineStart: row.line_start,
+        lineHash: row.line_hash,
+      };
     },
 
     saveCursor(machine: string, path: string, cursor: FileCursor): void {
-      upsertCursor.run(machine, path, cursor.size, cursor.mtimeMs, cursor.offset);
+      upsertCursor.run(machine, path, cursor.size, cursor.mtimeMs, cursor.offset, cursor.lineStart, cursor.lineHash);
     },
 
     addWindowSample(sample: WindowSample): void {
@@ -376,6 +400,27 @@ export function openLedger(db: Database.Database) {
 
     setMeta(key: string, value: string): void {
       upsertMeta.run(key, value);
+    },
+
+    /**
+     * Re-prices every transcript row with the current table, once per
+     * `version`, and returns the rows whose cost changed. Ledger rows keep
+     * the cost bb reported for the turn, and their running totals are
+     * subtracted from bb's next report, so they are left as recorded.
+     */
+    repriceTranscripts(version: string): number {
+      if (selectMeta.get("pricingVersion")?.value === version) return 0;
+      let changed = 0;
+      db.transaction(() => {
+        for (const row of selectTranscriptRows.all()) {
+          const cost = priceTokens(row.model, rowTokens(row));
+          if (cost === row.cost_usd) continue;
+          updateCost.run(cost, row.id);
+          changed += 1;
+        }
+        upsertMeta.run("pricingVersion", version);
+      })();
+      return changed;
     },
   };
 }

@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
+import { open, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { UsageTokens } from "./pricing.js";
@@ -144,30 +144,38 @@ export interface TranscriptLine {
 export interface TranscriptReader {
   readonly machine: string;
   list(): Promise<TranscriptFile[]>;
-  /** Complete lines from `fromOffset` on; a trailing partial line is held back. */
-  read(path: string, fromOffset: number): AsyncIterable<TranscriptLine>;
+  /** Complete lines in bytes [`fromOffset`, `toOffset`); a trailing partial line is held back. */
+  read(path: string, fromOffset: number, toOffset: number): AsyncIterable<TranscriptLine>;
+  /** The bytes in [`fromOffset`, `toOffset`), fewer if the file ends first. */
+  readBytes(path: string, fromOffset: number, toOffset: number): Promise<Buffer>;
 }
 
 const SESSION_FILE = /^([0-9a-f-]{36})\.jsonl$/;
 
-/** Splits a byte stream into complete lines, tracking byte offsets. */
+/**
+ * Splits a byte stream into complete lines, tracking byte offsets. Each byte
+ * is scanned once: the pieces of a line that spans chunks are kept in a list
+ * and joined once its newline arrives.
+ */
 export async function* splitLines(
-  chunks: AsyncIterable<Buffer>,
+  chunks: AsyncIterable<Buffer> | Iterable<Buffer>,
   startOffset: number,
 ): AsyncGenerator<TranscriptLine> {
-  let pending = Buffer.alloc(0);
+  let pending: Buffer[] = [];
   let offset = startOffset;
   for await (const chunk of chunks) {
-    let buffer = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
-    let newline = buffer.indexOf(0x0a);
+    let start = 0;
+    let newline = chunk.indexOf(0x0a);
     while (newline !== -1) {
-      const text = buffer.subarray(0, newline).toString("utf8");
-      offset += newline + 1;
-      yield { text, endOffset: offset };
-      buffer = buffer.subarray(newline + 1);
-      newline = buffer.indexOf(0x0a);
+      const tail = chunk.subarray(start, newline);
+      const bytes = pending.length === 0 ? tail : Buffer.concat([...pending, tail]);
+      pending = [];
+      offset += bytes.length + 1;
+      yield { text: bytes.toString("utf8"), endOffset: offset };
+      start = newline + 1;
+      newline = chunk.indexOf(0x0a, start);
     }
-    pending = Buffer.from(buffer);
+    if (start < chunk.length) pending.push(chunk.subarray(start));
   }
 }
 
@@ -216,8 +224,20 @@ export function localTranscriptReader(root = join(homedir(), ".claude", "project
       }
       return files;
     },
-    read(path, fromOffset) {
-      return splitLines(createReadStream(path, { start: fromOffset }) as AsyncIterable<Buffer>, fromOffset);
+    read(path, fromOffset, toOffset) {
+      if (toOffset <= fromOffset) return splitLines([], fromOffset);
+      const stream = createReadStream(path, { start: fromOffset, end: toOffset - 1 });
+      return splitLines(stream as AsyncIterable<Buffer>, fromOffset);
+    },
+    async readBytes(path, fromOffset, toOffset) {
+      const handle = await open(path, "r");
+      try {
+        const buffer = Buffer.alloc(Math.max(0, toOffset - fromOffset));
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, fromOffset);
+        return buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
     },
   };
 }

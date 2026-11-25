@@ -42,6 +42,12 @@ describe("kind badges", () => {
       app: "Application",
       if: "Interface",
       nf: "NF",
+      svc: "Service",
+      proto: "Protocol",
+      gtpmsg: "GTP message",
+      gtpie: "GTP IE",
+      gtpcause: "GTP cause",
+      gtpext: "GTP ext header",
     });
     expect(new Set(KINDS.map((kind) => KIND_STYLES[kind].hue)).size).toBe(KINDS.length);
   });

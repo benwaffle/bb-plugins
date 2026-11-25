@@ -52,6 +52,16 @@ describe(TOOL_NAME, () => {
     expect(text(result)).toContain('no interface named "Zz9"');
   });
 
+  it("returns an SBI service with its operations and specs", async () => {
+    const harness = await host();
+    const output = text(await harness.behavior.callAgentTool(TOOL_NAME, { query: "Nsmf_PDUSession" }));
+    expect(output).toMatch(/^## SVC Nsmf_PDUSession/);
+    expect(output).toContain("produced by SMF");
+    expect(output).toContain("Operations: ");
+    expect(output).toContain("CreateSMContext");
+    expect(output).toContain("TS 29.502");
+  });
+
   it("rejects an empty query", async () => {
     const harness = await host();
     await expect(harness.behavior.callAgentTool(TOOL_NAME, { query: "" })).rejects.toThrow();
@@ -85,5 +95,34 @@ describe("bb telecom-ref", () => {
     const result = await harness.behavior.runCli(["show", "Subscr"]);
     expect(result.exitCode).not.toBe(0);
     expect(`${result.stderr}`).toContain("bb telecom-ref search Subscr");
+  });
+
+  it("diagram list names every diagram with its figures", async () => {
+    const harness = await host();
+    const result = await harness.behavior.runCli(["diagram", "list"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("5gc-sba\t5GC non-roaming · Service-based\tTS 23.501 Fig 4.2.3-1");
+    expect(result.stdout).toContain("interworking\t");
+  });
+
+  it("diagram show prints the adjacency of one diagram", async () => {
+    const harness = await host();
+    const result = await harness.behavior.runCli(["diagram", "show", "5gc-sba"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("- Namf (if/Namf, HTTP/2 (SBI), control plane): AMF — SBI");
+    expect(result.stdout).toContain("- N4 (if/N4, PFCP, control plane): SMF — UPF");
+  });
+
+  it("diagram show fails with a hint for an unknown id", async () => {
+    const harness = await host();
+    const result = await harness.behavior.runCli(["diagram", "show", "nope"]);
+    expect(result.exitCode).not.toBe(0);
+    expect(`${result.stderr}`).toContain("bb telecom-ref diagram list");
+  });
+
+  it("lookup names the diagrams an exact entry appears in", async () => {
+    const harness = await host();
+    const output = text(await harness.behavior.callAgentTool(TOOL_NAME, { query: "N26" }));
+    expect(output).toContain("Diagrams: interworking (/plugins/telecom-ref/ref/diagram/interworking/if/N26)");
   });
 });

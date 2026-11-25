@@ -100,7 +100,10 @@ export function getWindowNavigate(): BbNavigate | null {
   return windowNavigate;
 }
 
-/** Show the search page, optionally with a fresh query, and focus its search box. */
+/**
+ * Show the search page and focus its search box. A query (even "") starts a
+ * fresh search with no filters; without one the current search carries over.
+ */
 export function openSearch(navigate: BbNavigate | null, query?: string): void {
   if (query !== undefined) setView({ query, kind: null, interfaceId: null });
   navigate?.toPluginPanel(PANEL_PATH, { subPath: querySubPath(state.query) });

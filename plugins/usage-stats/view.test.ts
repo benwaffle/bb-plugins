@@ -22,10 +22,10 @@ describe("chartSeries", () => {
   });
 
   it("sums a day's values per series for tokens and cost", () => {
-    const day: DayUsage = { day: "2026-10-21", models: [slice("claude-opus-5-5", 1_000_000, 5), slice("gpt-y", 10, 0.1)] };
+    const day: DayUsage = { day: "2026-10-21", models: [slice("claude-opus-5-5", 1_000_000, 4), slice("gpt-y", 10, 0.1)] };
     expect(dayValues(day, "model", "tokens", KEYS)).toEqual({ "claude-opus-5-5": 1_000_000, [OTHER_KEY]: 10 });
-    expect(dayValues(day, "model", "cost", KEYS)).toEqual({ "claude-opus-5-5": 5, [OTHER_KEY]: 0.1 });
-    expect(dayValues(day, "type", "cost", KEYS)).toMatchObject({ input: 5, output: 0 });
+    expect(dayValues(day, "model", "cost", KEYS)).toEqual({ "claude-opus-5-5": 4, [OTHER_KEY]: 0.1 });
+    expect(dayValues(day, "type", "cost", KEYS)).toMatchObject({ input: 4, output: 0 });
   });
 });
 

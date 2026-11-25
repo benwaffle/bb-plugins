@@ -1,0 +1,468 @@
+# Summaries written for telecom-ref, not specification text.
+# Protocols carried on the reference points in interfaces.yaml. build.py links a
+# protocol to every interface whose `protocol` text matches `match` (a Python
+# regular expression), plus the interfaces it lists under `interfaces`.
+
+# --- Core network control and user plane ---
+
+- id: PFCP
+  name: PFCP
+  fullName: Packet Forwarding Control Protocol
+  aliases: []
+  transport: UDP port 8805
+  over: []
+  match: '\bPFCP\b'
+  description: >-
+    The protocol a control-plane function uses to program a user-plane function. It sets up sessions and
+    installs packet detection, forwarding, QoS enforcement, usage reporting, and buffering rules, and the
+    user plane reports usage and events back. It runs on N4 in 5GC and on Sxa, Sxb, and Sxc in EPC with
+    separated control and user planes.
+  spec: ["TS 29.244"]
+
+- id: GTPv2-C
+  name: GTPv2-C
+  fullName: GPRS Tunnelling Protocol version 2, control plane
+  aliases: [GTPv2, eGTP-C]
+  transport: UDP port 2123
+  over: []
+  match: 'GTPv2-C'
+  description: >-
+    The EPC control protocol for creating, modifying, and deleting sessions and bearers and for moving UE
+    contexts between nodes. MMEs, SGSNs, SGWs, PGWs, and ePDGs use it on S11, S5/S8, S10, S3, S4, S2b, and
+    on N26 toward the AMF.
+  spec: ["TS 29.274"]
+
+- id: GTPv1-C
+  name: GTPv1-C
+  fullName: GPRS Tunnelling Protocol version 1, control plane
+  aliases: [GTP-C]
+  transport: UDP port 2123
+  over: []
+  match: 'GTPv1-C'
+  description: >-
+    The 2G/3G packet core control protocol that creates and updates PDP contexts between SGSN and GGSN and
+    transfers contexts between SGSNs on Gn and Gp. GTPv2-C replaces it in EPC.
+  spec: ["TS 29.060"]
+
+- id: GTP-U
+  name: GTP-U
+  fullName: GPRS Tunnelling Protocol, user plane
+  aliases: [GTPv1-U]
+  transport: UDP port 2152
+  over: []
+  match: 'GTP-U'
+  description: >-
+    The tunnelling protocol that carries user packets between RAN nodes and gateways, each tunnel named by
+    a TEID. It runs on S1-U, S5/S8 and S12 in EPC, on N3 and N9 in 5GC, on Iu-PS and Gn in 3G, and between
+    RAN nodes on X2, Xn, and F1-U.
+  spec: ["TS 29.281"]
+
+- id: GTPprime
+  name: GTP'
+  fullName: GTP prime
+  aliases: [GTP prime]
+  transport: UDP or TCP port 3386
+  over: []
+  match: "GTP'"
+  description: >-
+    A charging transfer protocol derived from GTP, unrelated to session control. A charging data function
+    sends charging data records over it to a charging gateway function on Ga.
+  spec: ["TS 32.295"]
+
+- id: PMIPv6
+  name: PMIPv6
+  fullName: Proxy Mobile IPv6
+  aliases: [PMIP]
+  transport: IPv6 mobility header
+  over: []
+  match: 'PMIP'
+  interfaces: [S5, S8, S2a, S2b]
+  description: >-
+    A network-based mobility protocol in which a mobile access gateway registers the UE with a local
+    mobility anchor on its behalf. EPC allows it in place of GTP on S5, S8, S2a, and S2b, with the PGW as
+    the anchor.
+  spec: ["TS 29.275", "RFC 5213"]
+
+- id: DSMIPv6
+  name: DSMIPv6
+  fullName: Dual-Stack Mobile IPv6
+  aliases: []
+  transport: IPv6 or IPv4 (UDP encapsulated)
+  over: []
+  match: 'DSMIPv6'
+  description: >-
+    A host-based mobility protocol in which the UE itself registers with the PGW acting as home agent. EPC
+    uses it on S2c for mobility between 3GPP and non-3GPP access.
+  spec: ["TS 24.303", "RFC 5555"]
+
+# --- AAA, policy, and charging ---
+
+- id: Diameter
+  name: Diameter
+  fullName: Diameter base protocol
+  aliases: []
+  transport: TCP or SCTP port 3868 (TLS or DTLS 5658)
+  over: []
+  match: '\bDiameter\b'
+  description: >-
+    The IETF authentication, authorization, and accounting protocol that EPC, IMS, and policy and charging
+    use for subscriber data, authentication, policy, and credit control. Each 3GPP interface defines its
+    own Diameter application with its commands and AVPs.
+  spec: ["RFC 6733", "TS 29.230"]
+
+- id: RADIUS
+  name: RADIUS
+  fullName: Remote Authentication Dial-In User Service
+  aliases: []
+  transport: UDP ports 1812 (authentication) and 1813 (accounting)
+  over: []
+  match: '\bRADIUS\b'
+  interfaces: [SGi, Gi, N6]
+  description: >-
+    The IETF AAA protocol that a PGW, GGSN, or SMF can use toward an external AAA server on SGi, Gi, or N6
+    to authenticate the user of a PDN connection or PDU session, obtain its IP address, and report
+    accounting.
+  spec: ["RFC 2865", "RFC 2866", "TS 29.061", "TS 29.561"]
+
+# --- Service-based architecture ---
+
+- id: SBI
+  name: SBI
+  fullName: Service-based interface (HTTP/2)
+  aliases: [HTTP/2, SBA, Service-based architecture]
+  transport: HTTP/2 over TCP, normally with TLS
+  over: []
+  match: 'HTTP/2'
+  description: >-
+    The 5GC control plane between network functions. Each NF exposes REST services described in OpenAPI,
+    and consumers call them over HTTP/2 with JSON bodies, discovering producers through the NRF and
+    optionally routing through an SCP. N32 between SEPPs carries the same messages between PLMNs.
+  spec: ["TS 29.500", "TS 29.501", "TS 23.501 §4.2.6"]
+
+# --- RAN application protocols ---
+
+- id: S1AP
+  name: S1AP
+  fullName: S1 Application Protocol
+  aliases: [S1-AP]
+  transport: SCTP port 36412
+  over: [SCTP]
+  match: '\bS1AP\b'
+  description: >-
+    The control protocol between an eNodeB and the MME. It sets up and releases E-RABs, carries NAS
+    messages, handles paging, handover, and UE context management, and transfers warning and positioning
+    messages.
+  spec: ["TS 36.413"]
+
+- id: NGAP
+  name: NGAP
+  fullName: NG Application Protocol
+  aliases: [NG-AP]
+  transport: SCTP port 38412
+  over: [SCTP]
+  match: '\bNGAP\b'
+  description: >-
+    The control protocol between a 5G access node (gNB, ng-eNB, N3IWF, TNGF, W-AGF) and the AMF. It
+    manages UE contexts and PDU session resources, carries NAS messages, and handles paging, handover,
+    and warning and positioning messages.
+  spec: ["TS 38.413"]
+
+- id: X2AP
+  name: X2AP
+  fullName: X2 Application Protocol
+  aliases: [X2-AP]
+  transport: SCTP port 36422
+  over: [SCTP]
+  match: '\bX2AP\b'
+  description: >-
+    The control protocol between eNodeBs, and between an eNodeB and an en-gNB for EN-DC. It prepares and
+    executes handovers, coordinates load and interference, and adds and modifies secondary nodes for dual
+    connectivity.
+  spec: ["TS 36.423"]
+
+- id: XnAP
+  name: XnAP
+  fullName: Xn Application Protocol
+  aliases: [Xn-AP]
+  transport: SCTP port 38422
+  over: [SCTP]
+  match: '\bXnAP\b'
+  description: >-
+    The control protocol between NG-RAN nodes. It prepares and executes Xn handovers, retrieves UE
+    contexts for RRC resume, manages dual connectivity, and exchanges cell and resource status.
+  spec: ["TS 38.423"]
+
+- id: F1AP
+  name: F1AP
+  fullName: F1 Application Protocol
+  aliases: [F1-AP]
+  transport: SCTP port 38472
+  over: [SCTP]
+  match: '\bF1AP\b'
+  description: >-
+    The control protocol between a gNB central unit and its distributed units. The CU uses it to set up
+    cells and UE contexts in the DU and to carry RRC messages that the DU relays over the air.
+  spec: ["TS 38.473"]
+
+- id: E1AP
+  name: E1AP
+  fullName: E1 Application Protocol
+  aliases: [E1-AP]
+  transport: SCTP port 38462
+  over: [SCTP]
+  match: '\bE1AP\b'
+  description: >-
+    The control protocol between the control-plane and user-plane parts of a gNB central unit. The CU-CP
+    uses it to set up and modify bearer contexts, PDCP, and SDAP configuration in the CU-UP.
+  spec: ["TS 38.463"]
+
+- id: RANAP
+  name: RANAP
+  fullName: Radio Access Network Application Part
+  aliases: []
+  transport: SCCP over M3UA/SCTP or ATM
+  over: []
+  match: '\bRANAP\b'
+  description: >-
+    The control protocol between the UTRAN and the 3G core on Iu-CS and Iu-PS. It sets up radio access
+    bearers, carries NAS messages, and handles paging, relocation, and security mode control.
+  spec: ["TS 25.413"]
+
+- id: NBAP
+  name: NBAP
+  fullName: Node B Application Part
+  aliases: []
+  transport: ATM or IP (SCTP)
+  over: []
+  match: '\bNBAP\b'
+  description: >-
+    The control protocol between an RNC and its Node Bs on Iub. The RNC uses it to configure cells and set
+    up, reconfigure, and release radio links.
+  spec: ["TS 25.433"]
+
+- id: RNSAP
+  name: RNSAP
+  fullName: Radio Network Subsystem Application Part
+  aliases: []
+  transport: SCCP over M3UA/SCTP or ATM
+  over: []
+  match: '\bRNSAP\b'
+  description: >-
+    The control protocol between RNCs on Iur. It sets up radio links through a drift RNC for soft handover
+    and supports serving RNC relocation.
+  spec: ["TS 25.423"]
+
+- id: BSSAP
+  name: BSSAP
+  fullName: Base Station System Application Part
+  aliases: [BSSMAP]
+  transport: SCCP over MTP or SIGTRAN
+  over: []
+  match: '^BSSAP$'
+  description: >-
+    The GSM signalling protocol between the BSC and the MSC on the A interface. BSSMAP handles call setup,
+    channel assignment, and handover, and DTAP relays NAS messages between the mobile and the MSC.
+  spec: ["TS 48.008"]
+
+- id: BSSAPplus
+  name: BSSAP+
+  fullName: BSSAP+ (Gs interface)
+  aliases: []
+  transport: SCCP over MTP or SIGTRAN
+  over: []
+  match: 'BSSAP\+'
+  description: >-
+    The protocol between the SGSN and the MSC/VLR on Gs. It coordinates combined GPRS and circuit-switched
+    attach and location updates and relays CS paging through the SGSN.
+  spec: ["TS 29.018"]
+
+- id: BSSGP
+  name: BSSGP
+  fullName: Base Station System GPRS Protocol
+  aliases: []
+  transport: Network Service (NS) over Frame Relay or IP
+  over: []
+  match: '\bBSSGP\b'
+  description: >-
+    The GPRS protocol between the BSS and the SGSN on Gb. It carries LLC frames with user data and GMM/SM
+    signalling, along with flow control, paging, and radio status.
+  spec: ["TS 48.018"]
+
+- id: SGsAP
+  name: SGsAP
+  fullName: SGs Application Part
+  aliases: [SGs-AP]
+  transport: SCTP port 29118
+  over: [SCTP]
+  match: '\bSGsAP\b'
+  description: >-
+    The protocol between the MME and the MSC/VLR on SGs. It supports combined EPS/IMSI attach, CS fallback
+    paging, and SMS over SGs.
+  spec: ["TS 29.118"]
+
+- id: SBc-AP
+  name: SBc-AP
+  fullName: SBc Application Part
+  aliases: [SBcAP]
+  transport: SCTP port 29168
+  over: [SCTP]
+  match: 'SBc-AP'
+  description: >-
+    The protocol between the cell broadcast centre and the MME on SBc. The CBC uses it to start and stop
+    public warning messages, and the MME reports back the delivery status from eNodeBs.
+  spec: ["TS 29.168"]
+
+- id: LCS-AP
+  name: LCS-AP
+  fullName: LCS Application Protocol
+  aliases: [LCSAP]
+  transport: SCTP port 9082
+  over: [SCTP]
+  match: 'LCS-AP'
+  description: >-
+    The protocol between the MME and the E-SMLC on SLs. The MME requests a position estimate, and the
+    E-SMLC returns it after running LPP or LPPa positioning through the MME.
+  spec: ["TS 29.171"]
+
+- id: M3AP
+  name: M3AP
+  fullName: M3 Application Protocol
+  aliases: []
+  transport: SCTP
+  over: [SCTP]
+  match: '\bM3AP\b'
+  description: >-
+    The MBMS control protocol between the MME and the MCE on M3. It starts, updates, and stops MBMS
+    sessions for broadcast in E-UTRAN.
+  spec: ["TS 36.444"]
+
+- id: M2AP
+  name: M2AP
+  fullName: M2 Application Protocol
+  aliases: []
+  transport: SCTP
+  over: [SCTP]
+  match: '\bM2AP\b'
+  description: >-
+    The MBMS control protocol between the MCE and eNodeBs on M2. The MCE uses it to schedule MBSFN
+    transmission and to start and stop MBMS sessions in cells.
+  spec: ["TS 36.443"]
+
+# --- UE to network ---
+
+- id: EPS-NAS
+  name: EPS NAS
+  fullName: EPS Non-Access Stratum
+  aliases: [NAS, EMM, ESM]
+  transport: Inside S1AP and LTE RRC messages
+  over: [S1AP]
+  interfaces: [LTE-Uu, S1-MME]
+  description: >-
+    The signalling between the UE and the MME for EPS mobility management (attach, tracking area update,
+    authentication, security) and session management (PDN connections and bearers). It travels in RRC
+    over the air and in S1AP between eNodeB and MME.
+  spec: ["TS 24.301"]
+
+- id: 5GS-NAS
+  name: 5GS NAS
+  fullName: 5GS Non-Access Stratum
+  aliases: [NAS, 5GMM, 5GSM]
+  transport: Inside NGAP and NR RRC messages, or over IPsec on non-3GPP access
+  over: [NGAP]
+  match: '5GS NAS'
+  interfaces: [N2, NWu, NWt]
+  description: >-
+    The N1 signalling between the UE and the AMF for 5GS mobility management (registration, authentication,
+    security, service request), with session management messages that the AMF relays to the SMF. It
+    travels in RRC and NGAP on 3GPP access and over IPsec through an N3IWF or TNGF on non-3GPP access.
+  spec: ["TS 24.501"]
+
+- id: LTE-RRC
+  name: LTE RRC
+  fullName: E-UTRA Radio Resource Control
+  aliases: [E-UTRA RRC]
+  transport: PDCP over the LTE air interface
+  over: []
+  match: 'LTE-Uu RRC'
+  description: >-
+    The radio control protocol between the UE and the eNodeB. It sets up connections and radio bearers,
+    configures measurements and handover, broadcasts system information, and carries NAS messages.
+  spec: ["TS 36.331"]
+
+- id: NR-RRC
+  name: NR RRC
+  fullName: NR Radio Resource Control
+  aliases: []
+  transport: PDCP over the NR air interface
+  over: []
+  match: 'NR RRC'
+  description: >-
+    The radio control protocol between the UE and the gNB. It manages connection setup, suspend and
+    resume, radio bearers, measurements, and mobility, and carries NAS messages.
+  spec: ["TS 38.331"]
+
+- id: IKEv2
+  name: IKEv2
+  fullName: Internet Key Exchange version 2
+  aliases: [IPsec]
+  transport: UDP ports 500 and 4500
+  over: []
+  match: 'IKEv2'
+  description: >-
+    The key exchange that sets up IPsec security associations. A UE on untrusted non-3GPP access uses it
+    to authenticate with EAP-AKA and build tunnels to the ePDG on SWu or to the N3IWF on NWu.
+  spec: ["RFC 7296", "TS 24.302", "TS 24.502"]
+
+# --- Legacy and IMS signalling ---
+
+- id: MAP
+  name: MAP
+  fullName: Mobile Application Part
+  aliases: []
+  transport: TCAP over SCCP (SS7 or SIGTRAN)
+  over: []
+  match: '\bMAP\b'
+  description: >-
+    The SS7 application protocol for 2G/3G mobility, subscriber data, authentication, SMS routing, and
+    supplementary services between MSCs, VLRs, HLRs, SGSNs, EIRs, and SMS centres.
+  spec: ["TS 29.002"]
+
+- id: SIP
+  name: SIP
+  fullName: Session Initiation Protocol
+  aliases: []
+  transport: UDP, TCP, or TLS port 5060 (5061 for TLS)
+  over: []
+  match: '\bSIP\b'
+  description: >-
+    The IMS session signalling protocol. UEs use it to register and to set up, modify, and release voice,
+    video, and messaging sessions, and IMS functions use it among themselves and toward application
+    servers and other networks.
+  spec: ["TS 24.229", "RFC 3261"]
+
+- id: H248
+  name: H.248
+  fullName: Gateway control protocol (H.248 / Megaco)
+  aliases: [Megaco]
+  transport: SCTP, UDP, or TCP
+  over: []
+  match: 'H\.248'
+  description: >-
+    The ITU-T media gateway control protocol. A controller (MSC server, MGCF, MRFC, IBCF, P-CSCF) uses it
+    to create and connect terminations in a media gateway (CS-MGW, IMS-MGW, MRFP, TrGW, IMS-AGW) for each
+    call.
+  spec: ["TS 29.232", "TS 29.332"]
+
+# --- Transport ---
+
+- id: SCTP
+  name: SCTP
+  fullName: Stream Control Transmission Protocol
+  aliases: []
+  transport: IP
+  over: []
+  match: '\b(S1AP|NGAP|X2AP|XnAP|F1AP|E1AP|SGsAP|M2AP|M3AP)\b|SBc-AP|LCS-AP'
+  description: >-
+    The multi-stream, multi-homed transport that carries the RAN and core application protocols (S1AP,
+    NGAP, X2AP, XnAP, F1AP, E1AP, SGsAP, SBc-AP, LCS-AP) and, optionally, Diameter and SIGTRAN.
+  spec: ["RFC 9260"]

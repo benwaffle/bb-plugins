@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { QueueEntry, SidebarGroupsResult } from "./contract";
 import {
+  decorationThreadId,
   groupHeaderLook,
   pullActionLabel,
   pullRowLook,
@@ -264,15 +265,23 @@ describe("styled looks", () => {
     expect(ticket && groupHeaderLook(ticket, "card")).toEqual({
       label: "Speed up the importer",
       keyLabel: "ACME-21",
+      labelHref: "https://jira/ACME-21",
       icon: TICKET_ICON,
     });
     expect(none && groupHeaderLook(none, "card")).toEqual({ label: "No ticket", icon: TICKET_ICON });
-    expect(ticket && groupHeaderLook(ticket, "minimal")).toEqual({ label: "Speed up the importer", keyLabel: "ACME-21" });
+    expect(ticket && groupHeaderLook(ticket, "minimal")).toEqual({
+      label: "Speed up the importer",
+      keyLabel: "ACME-21",
+      labelHref: "https://jira/ACME-21",
+    });
     expect(none && groupHeaderLook(none, "minimal")).toEqual({ label: "No ticket" });
-    expect(ticket && groupHeaderLook(ticket, "legacy")).toEqual({ label: "ACME-21 Speed up the importer" });
+    expect(ticket && groupHeaderLook(ticket, "legacy")).toEqual({
+      label: "ACME-21 Speed up the importer",
+      labelHref: "https://jira/ACME-21",
+    });
   });
 
-  it("decorates flat thread rows with the ticket key, the grouped row's icon and dot, and the PR state", () => {
+  it("decorates flat thread rows with the linked ticket key, the grouped row's icon and dot, and the PR state", () => {
     const groups = result([]);
     const queued: QueueEntry = { ...entry(32, "ACME-21"), conflicting: true, failingChecks: 3 };
     const decorations = threadRowDecorations({
@@ -284,6 +293,7 @@ describe("styled looks", () => {
       thr_merged: {
         icon: { name: "GitMerge", tone: "accent" },
         label: "ACME-21",
+        labelHref: "https://jira/ACME-21",
         description: "merged",
         trailing: { kind: "dot", tone: "success" },
         pullRequest: { number: 31, state: "merged" },
@@ -291,6 +301,7 @@ describe("styled looks", () => {
       thr_followups: {
         icon: { name: "GitPullRequest", tone: "success" },
         label: "ACME-21",
+        labelHref: "https://jira/ACME-21",
         description: "conflicts · 3 failing",
         trailing: { kind: "dot", tone: "accent" },
         pullRequest: { number: 32, state: "open" },
@@ -298,10 +309,11 @@ describe("styled looks", () => {
       thr_running: {
         icon: { name: "GitPullRequestDraft", tone: "muted" },
         label: "ACME-21",
+        labelHref: "https://jira/ACME-21",
         description: "draft",
         pullRequest: { number: 33, state: "draft" },
       },
-      thr_notes: { label: "ACME-21" },
+      thr_notes: { label: "ACME-21", labelHref: "https://jira/ACME-21" },
     });
   });
 
@@ -382,6 +394,16 @@ describe("styled looks", () => {
     expect(pullActionLabel("minimal", true)).toBe("…");
     expect(pullActionLabel("card", false)).toBe("Start");
     expect(pullActionLabel("legacy", true)).toBe("Starting…");
+  });
+});
+
+describe("decorationThreadId", () => {
+  it("reads a bare thread id", () => {
+    expect(decorationThreadId("thr_followups")).toBe("thr_followups");
+  });
+
+  it("reads the thread id from an object", () => {
+    expect(decorationThreadId({ threadId: "thr_followups", projectId: "proj_atlas" })).toBe("thr_followups");
   });
 });
 

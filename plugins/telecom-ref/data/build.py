@@ -10,6 +10,9 @@ Downloads (cached under data/.cache/):
   - 3GPP Rel-18 specs from the 3GPP FTP "latest/Rel-18" folders: TS 29.230
     for 3GPP application IDs, command codes, and AVP codes, and each spec
     TS 29.230 cites for AVP flag rules, command formats, and grouped AVPs.
+  - The newest Rel-18 versions of the GTP specs from the 3GPP FTP archive:
+    TS 29.274 (GTPv2-C), TS 29.280 (Sv), TS 29.281 (GTPv1-U), TS 29.060
+    (GTPv1-C), for message, IE, cause, and extension header tables.
 
 Merges curated YAML under data/curated/ (applications, interfaces, network
 functions, and per-spec descriptions), computes reverse cross-links, writes
@@ -37,21 +40,27 @@ from pathlib import Path
 import docx
 import yaml
 
+import gtp
 from parse import (
+    SERVICE_NAME,
     CommandFormat,
     FlagRow,
     GroupedFormat,
+    SbiService,
+    ServiceTableRow,
     clean_name,
     dedupe_cells,
     docx_flag_rows,
     docx_headings,
     docx_lines,
+    docx_service_tables,
     norm_type,
     parse_abnf,
     rfc_command_abbrevs,
     rfc_flag_rows,
     rfc_lines,
     rfc_numbers,
+    sbi_services,
     spec_numbers,
 )
 
@@ -72,14 +81,18 @@ IANA_RADIUS_CSV = "https://www.iana.org/assignments/radius-types/radius-types-2.
 RADIUS_SKIP = re.compile(r"unassigned|reserved|experimental|implementation|allocated|deprecated", re.I)
 RFC_URL = "https://www.rfc-editor.org/rfc/rfc{n}.txt"
 SPEC_FOLDER = "https://www.3gpp.org/ftp/Specs/latest/Rel-{rel}/{series}_series/"
+SPEC_ARCHIVE = "https://www.3gpp.org/ftp/Specs/archive/{series}_series/{number}/"
+# The GTP specs, read from the archive's newest Rel-18 version.
+GTP_SPECS = ("29.274", "29.280", "29.281", "29.060")
 USER_AGENT = "Mozilla/5.0 (compatible; telecom-ref-build/1.0)"
 
 VENDOR_IETF = 0
 VENDOR_3GPP = 10415
 VENDOR_NAMES = {VENDOR_IETF: "IETF", VENDOR_3GPP: "3GPP"}
 
-# Applications whose AVPs carry full descriptions in phase 1.
-IN_SCOPE_APPS = {0, 3, 4, 16777216, 16777217, 16777236, 16777238, 16777251, 16777252, 16777255, 16777291}
+# Applications whose commands and AVPs carry full descriptions.
+IN_SCOPE_APPS = {0, 3, 4, 16777216, 16777217, 16777236, 16777238, 16777251, 16777252, 16777255, 16777291,
+                 16777309, 16777310, 16777311, 16777312, 16777313, 16777345, 16777346}
 
 # The application an RFC's command formats belong to when the header omits it.
 RFC_DEFAULT_APP = {6733: 0, 8506: 4, 7155: 1, 4072: 5, 4004: 2, 4740: 6}
@@ -135,8 +148,23 @@ def latest_spec(number: str, offline: bool) -> SpecSource:
     names = sorted(set(re.findall(rf"\b{compact}-[0-9a-z]{{3}}\.zip", listing)))
     if not names:
         return SpecSource(number, None, None, None)
-    name = names[-1]
-    url = folder + name
+    return unpack_spec(number, folder + names[-1], offline)
+
+
+def archive_spec(number: str, offline: bool) -> SpecSource:
+    """The newest version of RELEASE in the spec's archive folder: its version code starts with the release in base 36."""
+    folder = SPEC_ARCHIVE.format(series=number.split(".")[0], number=number)
+    listing = fetch(folder, CACHE / f"archive-{number}-listing.html", offline).read_text("utf-8", "replace")
+    release = "0123456789abcdefghijklmnopqrstuvwxyz"[RELEASE]
+    names = sorted(set(re.findall(rf"\b{number.replace('.', '')}-{release}[0-9a-z]{{2}}\.zip", listing)))
+    if not names:
+        raise SystemExit(f"no Rel-{RELEASE} version of TS {number} in {folder}")
+    return unpack_spec(number, folder + names[-1], offline)
+
+
+def unpack_spec(number: str, url: str, offline: bool) -> SpecSource:
+    name = url.rsplit("/", 1)[1]
+    compact = number.replace(".", "")
     archive = fetch(url, CACHE / "3gpp" / name, offline)
     target = CACHE / "3gpp" / f"{compact}-{spec_version(name)}.docx"
     if target.exists():
@@ -185,6 +213,10 @@ class Model:
     sources: list[dict] = field(default_factory=list)
     spec_versions: dict[str, str | None] = field(default_factory=dict)
     clause_titles: dict[str, dict[str, str]] = field(default_factory=dict)
+    # SBI services by name, as load_services merges them across specs.
+    services: dict[str, dict] = field(default_factory=dict)
+    # The GTP spec documents by number ("29.274").
+    gtp_docs: dict[str, Path] = field(default_factory=dict)
 
 
 def ref(doc: str, model: Model, clause: str | None = None) -> dict:
@@ -418,6 +450,139 @@ def load_rfcs(model: Model, offline: bool) -> None:
 
 
 # --------------------------------------------------------------------------
+# SBI services
+
+
+def service_config() -> dict:
+    return load_yaml(CURATED / "services.yaml") or {}
+
+
+def service_prefix(name: str) -> str:
+    return name.split("_", 1)[0]
+
+
+def merge_aliased(found: list[SbiService], canonical) -> list[SbiService]:
+    """One service per canonical name, in document order, with the operations of every name filed under it."""
+    merged: dict[str, SbiService] = {}
+    for service in found:
+        name = canonical(service.name)
+        target = merged.setdefault(name, SbiService(name, service.doc, service.clause))
+        # A name with two underscores is a heading that ran an operation into the service name.
+        target.aliases += [a for a in [service.name, *service.aliases]
+                           if a != name and a.count("_") == 1 and a not in target.aliases]
+        for operation in service.operations:
+            if all(o.name.lower() != operation.name.lower() for o in target.operations):
+                target.operations.append(operation)
+    return list(merged.values())
+
+
+def assign_table_rows(found: list[SbiService], rows: list[ServiceTableRow], canonical) -> None:
+    """Gives each operation the semantics and consumers its service table row lists.
+
+    Table rows name the operation but often split the service name over
+    several rows, so a row goes to the service that has the operation: the
+    current service when it has it, else the only one, else the first in
+    document order after the current one.
+    """
+    by_name = {s.name: s for s in found}
+    order = [s.name for s in found]
+    current: str | None = None
+    for row in rows:
+        label = canonical(row.label) if row.label else ""
+        if label in by_name:
+            current = label
+        op = row.operation.lower()
+        has = [n for n in order if any(o.name.lower() == op for o in by_name[n].operations)]
+        if not has:
+            continue
+        if current not in has:
+            after = [n for n in has if current is None or order.index(n) > order.index(current)]
+            current = (after or has)[0]
+        for operation in by_name[current].operations:
+            if operation.name.lower() == op:
+                operation.semantics = operation.semantics or (row.semantics or "").replace(" / ", "/") or None
+                operation.consumers = sorted(set(operation.consumers) | set(row.consumers))
+
+
+def load_services(model: Model, offline: bool) -> None:
+    config = service_config()
+    aliases: dict[str, str] = config.get("aliases") or {}
+    producers: dict[str, str] = config.get("producers") or {}
+
+    def canonical(name: str) -> str:
+        return aliases.get(name, name)
+
+    def record(name: str) -> dict:
+        return model.services.setdefault(name, {"name": name, "aliases": [], "operations": {}, "stage2": [], "stage3": None})
+
+    for entry in config.get("stage2", []):
+        doc = entry["doc"]
+        source = latest_spec(doc.removeprefix("TS "), offline)
+        assert source.path, f"{doc} must be available"
+        model.spec_versions[doc] = source.version
+        model.sources.append({"name": f"3GPP {doc} V{source.version}", "url": source.url})
+        found = merge_aliased([s for s in sbi_services(docx_headings(docx_lines(source.path)), doc, tuple(entry["clauses"]))
+                               if service_prefix(s.name) in producers], canonical)
+        assign_table_rows(found, docx_service_tables(source.path), canonical)
+        for service in found:
+            out = record(service.name)
+            out["aliases"] += [a for a in service.aliases if a not in out["aliases"]]
+            if (doc, service.clause) not in out["stage2"]:
+                out["stage2"].append((doc, service.clause))
+            for operation in service.operations:
+                existing = out["operations"].setdefault(operation.name.lower(), {
+                    "name": operation.name, "semantics": None, "consumers": []})
+                existing["semantics"] = existing["semantics"] or operation.semantics
+                existing["consumers"] = sorted(set(existing["consumers"]) | set(operation.consumers))
+        print(f"  {doc} V{source.version}: {len(found)} services", file=sys.stderr)
+
+    token = re.compile(rf"\b({SERVICE_NAME})(?=[\s(]|$)")
+    for doc in config.get("stage3", []):
+        source = latest_spec(doc.removeprefix("TS "), offline)
+        assert source.path, f"{doc} must be available"
+        model.spec_versions[doc] = source.version
+        model.sources.append({"name": f"3GPP {doc} V{source.version}", "url": source.url})
+        for clause, title in docx_headings(docx_lines(source.path)).items():
+            if clause.split(".")[0] not in {"4", "5", "6"}:
+                continue
+            for raw in token.findall(title.replace("\xa0", " ")):
+                name = canonical(raw)
+                if raw.count("_") != 1 or service_prefix(name) not in producers:
+                    continue
+                out = record(name)
+                if raw != name and raw not in out["aliases"]:
+                    out["aliases"].append(raw)
+                out["stage3"] = out["stage3"] or (doc, clause)
+    for name, doc in (config.get("stage3Services") or {}).items():
+        if name not in model.services:
+            raise SystemExit(f"services.yaml stage3Services names {name}, which no stage-2 spec lists")
+        model.services[name]["stage3"] = model.services[name]["stage3"] or (doc, None)
+        model.spec_versions.setdefault(doc, latest_spec(doc.removeprefix("TS "), offline).version)
+
+
+def load_gtp(model: Model, offline: bool) -> None:
+    for number in GTP_SPECS:
+        source = archive_spec(number, offline)
+        if source.path is None:
+            raise SystemExit(f"TS {number}: the archive holds no Word document")
+        model.spec_versions[f"TS {number}"] = source.version
+        model.sources.append({"name": f"3GPP TS {number} V{source.version}", "url": source.url})
+        model.gtp_docs[number] = source.path
+        print(f"  TS {number} V{source.version}", file=sys.stderr)
+
+
+def sbi_catalogue(offline: bool) -> list[tuple[str, str]]:
+    """Every service the configured specs name, with the clause that names it, for the coverage audit."""
+    model = Model()
+    load_services(model, offline)
+    out = []
+    for name, service in sorted(model.services.items()):
+        doc, clause = (service["stage2"] or [service["stage3"]])[0]
+        out.append((name, f"{doc} §{clause}" if clause else doc))
+    return out
+
+
+# --------------------------------------------------------------------------
 # Assembly
 
 
@@ -444,23 +609,33 @@ def first_ref(refs: list[str]) -> str | None:
     return None
 
 
-def resolve_name_index(model: Model) -> dict[str, list[tuple[int, int]]]:
-    index: dict[str, list[tuple[int, int]]] = {}
+# Normalized AVP name -> (vendor, code) and registered name of each AVP that normalizes to it.
+NameIndex = dict[str, list[tuple[tuple[int, int], str]]]
+
+
+def resolve_name_index(model: Model) -> NameIndex:
+    index: NameIndex = {}
     for key, avp in model.avps.items():
-        index.setdefault(norm_key(avp["name"]), []).append(key)
+        index.setdefault(norm_key(avp["name"]), []).append((key, avp["name"]))
     return index
 
 
-def resolve(name: str, doc: str, index: dict[str, list[tuple[int, int]]], aliases: dict[str, str]) -> str | None:
+def resolve(name: str, doc: str, index: NameIndex, aliases: dict[str, str]) -> str | None:
     name = aliases.get(name, name)
-    keys = index.get(norm_key(name), [])
-    if not keys:
+    entries = index.get(norm_key(name), [])
+    if not entries:
         return None
     preferred = VENDOR_IETF if doc.startswith("RFC") else VENDOR_3GPP
-    # A RADIUS attribute (code < 256) can share a name with a Diameter-native AVP, as
-    # Service-Selection 146 and 493 do; Diameter command formats mean the latter.
-    keys = sorted(keys, key=lambda k: (k[0] != preferred, k[1] < 256, k))
-    return avp_id(*keys[0])
+
+    # Names that differ only in case, as Service-Id 855 and Service-ID 3103 do, go to the
+    # exact match. A RADIUS attribute (code < 256) can share a name with a Diameter-native
+    # AVP, as Service-Selection 146 and 493 do; Diameter command formats mean the latter.
+    def rank(entry: tuple[tuple[int, int], str]) -> tuple:
+        (vendor, code), registered = entry
+        return (registered != name, vendor != preferred, code < 256, vendor, code)
+
+    key, _ = min(entries, key=rank)
+    return avp_id(*key)
 
 
 def assemble(model: Model) -> dict[str, list[dict]]:
@@ -680,6 +855,7 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             "aliases": nf.get("aliases", []),
             "spec": ref_list(nf.get("spec", [])),
             "interfaces": [],
+            "services": [],
         }
     for nid, nf in nfs_out.items():
         for old in nf["replaces"]:
@@ -697,6 +873,9 @@ def assemble(model: Model) -> dict[str, list[dict]]:
             "endpoints": [f"nf/{e}" for e in item.get("endpoints", [])],
             "protocol": item.get("protocol"),
             "apps": [app_id(a) for a in item.get("apps", [])],
+            "protocols": [],
+            "services": [],
+            "gtpMessages": [],
             "description": item.get("description"),
             "aliases": item.get("aliases", []),
             "spec": ref_list(item.get("spec", [])),
@@ -707,6 +886,19 @@ def assemble(model: Model) -> dict[str, list[dict]]:
         for a in interfaces_out[iid]["apps"]:
             if a in apps_out:
                 apps_out[a]["interfaces"].append(iid)
+
+    gtp_config = load_yaml(CURATED / "gtp.yaml") or {}
+    protocols_out = assemble_protocols(load_yaml(CURATED / "protocols.yaml") or [], interfaces_out, ref_list,
+                                       gtp_config.get("headers") or {})
+    services_out = assemble_services(model, nfs_out, interfaces_out, ref)
+    gtp_log: list[str] = []
+    gtp_data = [gtp.read_v2(model.gtp_docs, gtp_config, gtp_log),
+                gtp.read_v1("v1u", model.gtp_docs["29.281"], gtp_config, gtp_log),
+                gtp.read_v1("v1c", model.gtp_docs["29.060"], gtp_config, gtp_log)]
+    gtp_out = gtp.assemble_gtp(gtp_data, gtp_config, lambda doc, clause=None: ref(doc, model, clause),
+                               nfs_out, interfaces_out, protocols_out, gtp_log)
+    for line in gtp_log:
+        print(f"  {line}", file=sys.stderr)
 
     for cmd in commands_out.values():
         cmd["interfaces"] = sorted({i for a in cmd["apps"] if a in apps_out for i in apps_out[a]["interfaces"]})
@@ -730,7 +922,130 @@ def assemble(model: Model) -> dict[str, list[dict]]:
         "avps": list(avps_out.values()),
         "interfaces": list(interfaces_out.values()),
         "nfs": list(nfs_out.values()),
+        "services": list(services_out.values()),
+        "protocols": list(protocols_out.values()),
+        **gtp_out,
     }
+
+
+def assemble_protocols(protocols: list[dict], interfaces_out: dict[str, dict], ref_list,
+                       headers: dict[str, dict]) -> dict[str, dict]:
+    """Protocol entities, linked to the interfaces whose protocol text matches them or that they list.
+
+    `headers` holds the header layouts curated in gtp.yaml, by protocol name.
+    """
+    out: dict[str, dict] = {}
+    for item in protocols:
+        pid = f"proto/{item['id']}"
+        match = re.compile(item["match"]) if item.get("match") else None
+        found = [iid for iid, i in interfaces_out.items() if match and i["protocol"] and match.search(i["protocol"])]
+        for extra in item.get("interfaces", []):
+            iid = f"if/{extra}"
+            if iid not in interfaces_out:
+                raise SystemExit(f"protocols.yaml: {pid} lists unknown interface {extra}")
+            if iid not in found:
+                found.append(iid)
+        out[pid] = {
+            "id": pid,
+            "kind": "proto",
+            "name": item["name"],
+            "fullName": item.get("fullName"),
+            "aliases": item.get("aliases", []),
+            "transport": item.get("transport"),
+            "over": [f"proto/{x}" for x in item.get("over", [])],
+            "carries": [],
+            "description": item.get("description"),
+            "spec": ref_list(item.get("spec", [])),
+            "interfaces": sorted(found, key=lambda i: interfaces_out[i]["name"].lower()),
+            "messages": [],
+            "header": protocol_header(headers.get(item["name"]), ref_list),
+        }
+        for iid in found:
+            interfaces_out[iid]["protocols"].append(pid)
+    for pid, proto in out.items():
+        for lower in proto["over"]:
+            if lower not in out:
+                raise SystemExit(f"protocols.yaml: {pid} runs over unknown protocol {lower}")
+            out[lower]["carries"].append(pid)
+    unmatched = sorted(i["name"] for i in interfaces_out.values() if i["protocol"] and not i["protocols"])
+    if unmatched:
+        print(f"  interfaces whose protocol no protocol entry matches ({len(unmatched)}): {unmatched}", file=sys.stderr)
+    return out
+
+
+def assemble_services(model: Model, nfs_out: dict[str, dict], interfaces_out: dict[str, dict], ref) -> dict[str, dict]:
+    """SBI service entities: producer, consumers, operations, and the SBI reference points they realize."""
+    config = service_config()
+    producers: dict[str, str] = config.get("producers") or {}
+    consumer_names: dict[str, str] = config.get("consumerNames") or {}
+    ignored = {norm_key(n) for n in config.get("ignoredConsumers") or []}
+    descriptions: dict[str, dict] = config.get("services") or {}
+    nf_index: dict[str, str] = {}
+    for nid, nf in nfs_out.items():
+        for key in [nf["name"], *nf["aliases"]]:
+            nf_index.setdefault(norm_key(key), nid)
+    unknown: dict[str, int] = {}
+
+    def nf_ref(name: str) -> str | None:
+        key = norm_key(consumer_names.get(name, name))
+        if key in ignored or not key:
+            return None
+        if key not in nf_index:
+            unknown[name] = unknown.get(name, 0) + 1
+        return nf_index.get(key)
+
+    sbi = [iid for iid, i in interfaces_out.items() if "proto/SBI" in i["protocols"]]
+    out: dict[str, dict] = {}
+    for name, service in sorted(model.services.items(), key=lambda kv: kv[0].lower()):
+        sid = f"svc/{name}"
+        producer = f"nf/{producers[service_prefix(name)]}"
+        if producer not in nfs_out:
+            raise SystemExit(f"services.yaml producers: {producer} is not a network function")
+        operations = []
+        for operation in service["operations"].values():
+            consumers = sorted({c for c in (nf_ref(n) for n in operation["consumers"]) if c})
+            operations.append({"name": operation["name"], "semantics": operation["semantics"], "consumers": consumers})
+        consumers = sorted({c for o in operations for c in o["consumers"]})
+        curated = descriptions.get(name, {})
+        spec = [ref(doc, model, clause) for doc, clause in service["stage2"]]
+        if service["stage3"]:
+            spec.append(ref(service["stage3"][0], model, service["stage3"][1]))
+        realized = sorted(
+            (iid for iid in sbi
+             if producer in interfaces_out[iid]["endpoints"]
+             and any(c in interfaces_out[iid]["endpoints"] and (c != producer or interfaces_out[iid]["endpoints"].count(c) > 1)
+                     for c in consumers)),
+            key=lambda i: interfaces_out[i]["name"].lower())
+        # The service-based interface the producer exhibits (TS 23.501 §4.2.6) carries every service it produces.
+        exhibited = f"if/{service_prefix(name)}"
+        if interfaces_out.get(exhibited, {}).get("endpoints") == [producer]:
+            realized.insert(0, exhibited)
+        out[sid] = {
+            "id": sid,
+            "kind": "svc",
+            "name": name,
+            "aliases": service["aliases"],
+            "producer": producer,
+            "consumers": consumers,
+            "operations": operations,
+            "description": curated.get("description"),
+            "spec": dedupe_refs(spec),
+            "interfaces": realized,
+        }
+        nfs_out[producer]["services"].append(sid)
+        for iid in realized:
+            interfaces_out[iid]["services"].append(sid)
+    if unknown:
+        print(f"  service consumers that name no network function: {sorted(unknown.items())}", file=sys.stderr)
+    return out
+
+
+def protocol_header(header: dict | None, ref_list) -> dict | None:
+    if header is None:
+        return None
+    fields = [{"octets": f["octets"], "bits": f.get("bits"), "name": f["name"], "description": f["description"]}
+              for f in header["fields"]]
+    return {"spec": ref_list([header["spec"]])[0], "fields": fields}
 
 
 ABBREV = re.compile(r"[A-Z]{3}")
@@ -805,7 +1120,7 @@ def dedupe_refs(refs: list[dict]) -> list[dict]:
 # Search index
 
 
-def search_keys(entity: dict) -> list[str]:
+def search_keys(entity: dict, protocol_names: dict[str, list[str]]) -> list[str]:
     """Normalized keys, best first. The plugin normalizes queries the same way (search.ts normalize)."""
     keys: list[str] = []
     kind = entity["kind"]
@@ -819,9 +1134,20 @@ def search_keys(entity: dict) -> list[str]:
     elif kind == "app":
         keys += [entity.get("short") or "", entity["name"], str(entity["appId"])]
     elif kind == "if":
-        keys += [entity["name"], *entity.get("aliases", [])]
+        # The protocols an interface carries come after its own names, so "PFCP" lists N4 and Sxa after PFCP itself.
+        keys += [entity["name"], *entity.get("aliases", []), *protocol_names.get(entity["id"], [])]
     elif kind == "nf":
         keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
+    elif kind in ("svc", "proto"):
+        keys += [entity["name"], entity.get("fullName") or "", *entity.get("aliases", [])]
+    elif kind == "gtpmsg":
+        keys += [entity["name"], str(entity["type"])]
+    elif kind == "gtpie":
+        keys += [entity.get("abbrev") or "", entity["name"], *entity.get("aliases", []), str(entity["type"])]
+    elif kind == "gtpcause":
+        keys += [entity["name"], str(entity["code"])]
+    elif kind == "gtpext":
+        keys += [entity["name"], f"0x{entity['type']:02x}", str(entity["type"])]
     out: list[str] = []
     for key in keys:
         normalized = norm_key(key)
@@ -831,10 +1157,15 @@ def search_keys(entity: dict) -> list[str]:
 
 
 def build_search(dataset: dict[str, list[dict]]) -> list[list]:
+    protocol_names: dict[str, list[str]] = {}
+    for proto in dataset["protocols"]:
+        for iid in proto["interfaces"]:
+            protocol_names.setdefault(iid, []).append(proto["name"])
     docs = []
-    for group in ("commands", "apps", "interfaces", "nfs", "avps"):
+    for group in ("commands", "apps", "interfaces", "nfs", "services", "protocols", "avps",
+                  "gtpMessages", "gtpIes", "gtpCauses", "gtpExtensions"):
         for entity in dataset[group]:
-            docs.append([entity["id"], search_keys(entity)])
+            docs.append([entity["id"], search_keys(entity, protocol_names)])
     return docs
 
 
@@ -861,18 +1192,24 @@ def main() -> None:
     load_rfcs(model, args.offline)
     print("3GPP specs cited by TS 29.230", file=sys.stderr)
     load_specs(model, args.offline)
+    print("3GPP SBI service specs", file=sys.stderr)
+    load_services(model, args.offline)
+    print("3GPP GTP specs", file=sys.stderr)
+    load_gtp(model, args.offline)
 
     dataset = assemble(model)
     counts = {k: len(v) for k, v in dataset.items()}
     counts["avpsDescribed"] = sum(1 for a in dataset["avps"] if a["description"])
     counts["avpsInScope"] = sum(1 for a in dataset["avps"] if a["inScope"])
     counts["commandsWithFormats"] = sum(1 for c in dataset["commands"] if c["formats"])
+    counts["gtpMessagesWithIeTables"] = sum(1 for m in dataset["gtpMessages"] if m["ieTables"])
     meta = {
         "release": RELEASE,
         "built": date.today().isoformat(),
         "counts": counts,
         "specVersions": {k: v for k, v in sorted(model.spec_versions.items()) if v},
         "sources": sorted({s["url"]: s for s in model.sources}.values(), key=lambda s: s["name"]),
+        "inScopeApps": [app_id(a) for a in sorted(IN_SCOPE_APPS)],
         "notice": "Descriptions are summaries written for this reference, not specification text. "
                   "See the cited clause for the normative definition.",
     }

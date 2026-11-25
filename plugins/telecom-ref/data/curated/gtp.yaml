@@ -1,0 +1,225 @@
+# GTP data the spec tables do not carry in machine-readable form. Every value
+# below is read from the cited clause; the build (data/gtp.py) takes message,
+# IE, cause, and extension header values from the spec tables themselves.
+
+# IE type names that message tables print differently from the IE type table,
+# keyed by GTP version. Values name an IE as the IE type table does.
+ieTypeAliases:
+  v2c:
+    # TS 29.274 message tables abbreviate these; Table 8.1-1 spells them out.
+    PTI: Procedure Transaction ID
+    TWMI: Trusted WLAN Mode Indication
+    # TS 29.280 Tables 5.2.2 and 5.2.3 misspell "Transparent".
+    Source to Target Transparant Container IE: Source to Target Transparent Container
+    Target to Source Transparant Container IE: Target to Source Transparent Container
+  v1u:
+    # TS 29.281 Table 8.1-1 NOTE 1: the GSN Address IE is named GTP-U Peer Address in the rest of the spec.
+    GTP-U Peer Address: GSN Address
+
+# The clause defining an IE whose IE type table row cites a note instead of a clause.
+ieClauses:
+  v2c:
+    # TS 29.274 Table 8.1-1 NOTE 2 points to the IE Type Extension format of §8.2.1A.
+    254: "8.2.1A"
+  v1c:
+    # TS 29.060 Table 37 NOTE 3 points to the IE Type Extension format of §7.7.0A.
+    238: "7.7.0A"
+
+# IE table captions that name a message differently from the message type table.
+messageTableAliases:
+  v1c:
+    # TS 29.060 Tables 22 and 23 drop "GPRS" from the names Table 1 gives messages 36 and 37.
+    Note MS Present Request: Note MS GPRS Present Request
+    Note MS Present Response: Note MS GPRS Present Response
+
+# The interfaces each version's messages run on, where the message type table
+# does not say. GTPv2-C messages take theirs from TS 29.274 Table 6.1-1 and
+# TS 29.280 Table 5.2.1; GTPv1-U messages from the TS 29.281 §1 scope list.
+interfaces:
+  v1c:
+    # TS 29.060 §1: GTP is used on Gn and Gp, and on Iu in UMTS. On Iu only the
+    # user plane runs GTP (TS 29.281 §1); RANAP is the Iu control plane.
+    spec: "TS 29.060 §1"
+    names: [Gn, Gp]
+  v1u:
+    spec: "TS 29.281 §1"
+    # TS 29.281 §1 names Iu, X2, and Xn; this dataset calls their user planes Iu-PS, X2, and Xn.
+    aliases: {Iu: Iu-PS}
+    # TS 29.281 §7.3.2.3: End Marker messages shall not be sent over N19.
+    exclude:
+      254: [N19]
+
+# Bits 8 and 7 of an extension header type: TS 29.281 §5.2.1 Figure 5.2.1-2 and TS 29.060 §6 Figure 4.
+comprehension:
+  0: Comprehension not required; an intermediate node forwards it to the receiver endpoint.
+  1: Comprehension not required; an intermediate node discards it and does not forward it.
+  2: Comprehension required by the endpoint receiver but not by an intermediate node, which forwards it.
+  3: Comprehension required by every recipient, endpoint receiver or intermediate node.
+
+# Header layouts, summarized from the cited clauses.
+headers:
+  GTPv2-C:
+    spec: "TS 29.274 §5.1"
+    fields:
+      - octets: "1"
+        bits: "8-6"
+        name: Version
+        description: 2 (binary 010) for GTPv2-C (§5.5.1).
+      - octets: "1"
+        bits: "5"
+        name: P (Piggybacking flag)
+        description: >-
+          1 when another GTPv2-C message with its own header and length follows in the same UDP datagram;
+          the piggybacked message has P = 0. Only a Create Session Response (carrying a Create Bearer
+          Request) and a Create Bearer Response (carrying a Modify Bearer Request) may set it (§5.5.1).
+      - octets: "1"
+        bits: "4"
+        name: T (TEID flag)
+        description: >-
+          1 when the TEID field is present in octets 5 to 8. Every EPC message sets T = 1 except Echo
+          Request, Echo Response, and Version Not Supported Indication (§5.5.1). A message sent before the
+          peer's TEID is known carries the field set to 0 (§5.5.2).
+      - octets: "1"
+        bits: "3"
+        name: MP (Message Priority flag)
+        description: 1 when bits 8 to 5 of octet 12 carry the message priority (§5.5.1).
+      - octets: "1"
+        bits: "2-1"
+        name: Spare
+        description: Sent as 0, ignored on receipt.
+      - octets: "2"
+        name: Message Type
+        description: The message type value of Table 6.1-1.
+      - octets: "3-4"
+        name: Message Length
+        description: >-
+          The message length in octets, not counting the first 4 octets of the header; the TEID and
+          Sequence Number count (§5.5.1).
+      - octets: "5-8"
+        name: Tunnel Endpoint Identifier (TEID)
+        description: >-
+          Present when T = 1: the control plane TEID the receiving entity assigned (§5.5.1).
+      - octets: "9-11 (5-7 when T = 0)"
+        name: Sequence Number
+        description: >-
+          Matches a triggered message to its initial message and a triggered reply to its triggered
+          message; the reply copies it. Command messages and the messages they trigger set its most
+          significant bit to 1, other requests to 0 (§7.6).
+      - octets: "12"
+        bits: "8-5"
+        name: Message Priority
+        description: When MP = 1, the relative priority of the message, 0 highest to 15 lowest; otherwise 0 (§5.5.1).
+      - octets: "12"
+        bits: "4-1"
+        name: Spare
+        description: Sent as 0, ignored on receipt.
+      - octets: "8 (when T = 0)"
+        name: Spare
+        description: >-
+          The header without a TEID, used by Echo Request, Echo Response, and Version Not Supported
+          Indication, ends with one spare octet after the Sequence Number and has no message priority (§5.3).
+  GTP-U:
+    spec: "TS 29.281 §5.1"
+    fields:
+      - octets: "1"
+        bits: "8-6"
+        name: Version
+        description: 1 for GTPv1-U.
+      - octets: "1"
+        bits: "5"
+        name: PT (Protocol Type)
+        description: 1 for GTP, 0 for GTP' (TS 32.295).
+      - octets: "1"
+        bits: "4"
+        name: Spare
+        description: Sent as 0; the receiver does not evaluate it.
+      - octets: "1"
+        bits: "3"
+        name: E (Extension Header flag)
+        description: 1 when the Next Extension Header Type field is present and meaningful.
+      - octets: "1"
+        bits: "2"
+        name: S (Sequence Number flag)
+        description: >-
+          1 when the Sequence Number field is meaningful. Echo Request, Echo Response, Error Indication,
+          and Supported Extension Headers Notification set it to 1; End Marker and Tunnel Status set it to
+          0. A PGW, SGW, ePDG, eNodeB, or TWAN should send G-PDUs with it set to 0.
+      - octets: "1"
+        bits: "1"
+        name: PN (N-PDU Number flag)
+        description: 1 when the N-PDU Number field is meaningful.
+      - octets: "2"
+        name: Message Type
+        description: The message type value of Table 6.1-1; 255 for a G-PDU.
+      - octets: "3-4"
+        name: Length
+        description: >-
+          The payload length in octets after the first 8 octets; the Sequence Number, N-PDU Number, and
+          extension headers count.
+      - octets: "5-8"
+        name: Tunnel Endpoint Identifier (TEID)
+        description: >-
+          The TEID the receiving end assigned. All zeros in Echo Request, Echo Response, Supported
+          Extension Headers Notification, and Error Indication.
+      - octets: "9-10"
+        name: Sequence Number
+        description: Present when any of S, PN, or E is 1; evaluated only when S = 1.
+      - octets: "11"
+        name: N-PDU Number
+        description: Present when any of S, PN, or E is 1; evaluated only when PN = 1.
+      - octets: "12"
+        name: Next Extension Header Type
+        description: >-
+          Present when any of S, PN, or E is 1; evaluated only when E = 1. The type of the first
+          extension header, 0 for none. Each extension header gives its length in 4-octet units and ends
+          with the next one's type (§5.2.1).
+  GTPv1-C:
+    spec: "TS 29.060 §6"
+    fields:
+      - octets: "1"
+        bits: "8-6"
+        name: Version
+        description: 1 (binary 001) (§8.2).
+      - octets: "1"
+        bits: "5"
+        name: PT (Protocol Type)
+        description: 1 for GTP; 0 is GTP' (§8.2).
+      - octets: "1"
+        bits: "4"
+        name: Spare
+        description: Sent as 0; the receiver does not evaluate it.
+      - octets: "1"
+        bits: "3"
+        name: E (Extension Header flag)
+        description: 1 when the Next Extension Header Type field is present and meaningful.
+      - octets: "1"
+        bits: "2"
+        name: S (Sequence Number flag)
+        description: Always 1 in GTP-C (§8.2).
+      - octets: "1"
+        bits: "1"
+        name: PN (N-PDU Number flag)
+        description: 0 in GTP-C; a receiver does not reject a message with it set (§8.2).
+      - octets: "2"
+        name: Message Type
+        description: The message type value of Table 1; only types marked for GTP-C are valid (§8.2).
+      - octets: "3-4"
+        name: Length
+        description: >-
+          The payload length in octets after the first 8 octets; the Sequence Number, N-PDU Number, and
+          extension headers count.
+      - octets: "5-8"
+        name: Tunnel Endpoint Identifier (TEID)
+        description: >-
+          The control plane TEID the peer assigned. All zeros in Echo, Version Not Supported, Supported
+          Extension Headers Notification, Identification, SGSN Context Request, Forward Relocation
+          Request, and Location Management messages, among others (§8.2).
+      - octets: "9-10"
+        name: Sequence Number
+        description: The transaction identity; a response copies it from its request (§6).
+      - octets: "11"
+        name: N-PDU Number
+        description: Present with the Sequence Number; GTP-C sends PN = 0, so it is not evaluated.
+      - octets: "12"
+        name: Next Extension Header Type
+        description: The type of the first extension header, 0 for none (§6).

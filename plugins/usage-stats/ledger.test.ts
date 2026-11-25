@@ -65,6 +65,41 @@ describe("recordSnapshot", () => {
   });
 });
 
+describe("repriceTranscripts", () => {
+  const message = (messageId: string, model: string) => ({
+    kind: "message" as const,
+    messageId,
+    sessionId: "sess-1",
+    ts: 90,
+    model,
+    cwd: null,
+    tokens: tokens(1_000_000, 0),
+  });
+
+  it("re-prices stored transcript rows once per pricing version and leaves ledger rows as reported", () => {
+    const ledger = memoryLedger();
+    ledger.addTranscriptMessage(message("msg_opus", "claude-opus-5-5"), "local", null);
+    ledger.addTranscriptMessage(message("msg_gpt", "gpt-x"), "local", null);
+    ledger.recordSnapshot(snapshot("t1", 100, [{ model: "claude-opus-5-5", tokens: tokens(1_000_000, 0), costUsd: 5 }]));
+    // A row priced by an older table.
+    ledger.db.prepare(`UPDATE usage SET cost_usd = 5 WHERE id = 'transcript:msg_opus'`).run();
+
+    const costs = () =>
+      ledger.db.prepare(`SELECT id, cost_usd FROM usage ORDER BY id`).all() as { id: string; cost_usd: number | null }[];
+    expect(ledger.repriceTranscripts("2")).toBe(1);
+    expect(costs()).toEqual([
+      { id: "ledger:thr_one:sess-1:t1:claude-opus-5-5", cost_usd: 5 },
+      { id: "transcript:msg_gpt", cost_usd: null },
+      { id: "transcript:msg_opus", cost_usd: 4 },
+    ]);
+    expect(ledger.meta("pricingVersion")).toBe("2");
+
+    ledger.db.prepare(`UPDATE usage SET cost_usd = 5 WHERE id = 'transcript:msg_opus'`).run();
+    expect(ledger.repriceTranscripts("2")).toBe(0);
+    expect(costs().find((row) => row.id === "transcript:msg_opus")?.cost_usd).toBe(5);
+  });
+});
+
 describe("tokenGrowth", () => {
   it("subtracts the previous totals, or restarts when any total went down", () => {
     expect(tokenGrowth(null, tokens(5, 5))).toEqual(tokens(5, 5));

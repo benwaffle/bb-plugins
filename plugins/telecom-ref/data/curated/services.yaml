@@ -1,0 +1,541 @@
+# Inputs for the 5GC service-based interface (SBI) services. build.py reads each
+# service, its operations, their semantics, and their example consumers from the
+# stage-2 clause headings and service tables, and the stage-3 clause from the
+# stage-3 headings. The descriptions further down are summaries written for
+# telecom-ref, not specification text.
+
+# Stage-2 specs and the clauses whose headings name services and operations.
+stage2:
+  - {doc: TS 23.502, clauses: ["5.2"]}
+  - {doc: TS 23.288, clauses: ["7", "8", "9", "10"]}
+  - {doc: TS 23.273, clauses: ["8"]}
+  - {doc: TS 23.632, clauses: ["6"]}
+  - {doc: TS 32.290, clauses: ["6"]}
+
+# Stage-3 specs. A service named in a clause 4-6 heading gets that clause as its
+# stage-3 reference; a name no stage-2 spec lists becomes a stage-3-only service.
+stage3:
+  - TS 29.502
+  - TS 29.503
+  - TS 29.504
+  - TS 29.509
+  - TS 29.510
+  - TS 29.511
+  - TS 29.515
+  - TS 29.518
+  - TS 29.520
+  - TS 29.525
+  - TS 29.523
+  - TS 29.526
+  - TS 29.531
+  - TS 29.536
+  - TS 29.540
+  - TS 29.541
+  - TS 29.542
+  - TS 29.562
+  - TS 29.563
+  - TS 29.564
+  - TS 29.565
+  - TS 29.572
+  - TS 29.574
+  - TS 29.575
+  - TS 29.591
+  - TS 29.598
+  - TS 29.673
+  - TS 32.291
+
+# Stage-3 specs for services whose stage-3 headings do not name them.
+stage3Services:
+  Npcf_AMPolicyControl: TS 29.507
+  Npcf_SMPolicyControl: TS 29.512
+  Npcf_PolicyAuthorization: TS 29.514
+  Npcf_BDTPolicyControl: TS 29.554
+  Npcf_AMPolicyAuthorization: TS 29.534
+  Npcf_PDTQPolicyControl: TS 29.543
+  Nnef_PFDManagement: TS 29.551
+  Nnef_AnalyticsExposure: TS 29.522
+  Nnef_TrafficInfluence: TS 29.522
+  Nnef_ParameterProvision: TS 29.522
+  Nnef_Trigger: TS 29.522
+  Nnef_BDTPNegotiation: TS 29.522
+  Nnef_ChargeableParty: TS 29.522
+  Nnef_AFsessionWithQoS: TS 29.522
+  Nnef_ServiceParameter: TS 29.522
+  Nnef_APISupportCapability: TS 29.522
+  Nnef_NIDDConfiguration: TS 29.522
+  Nnef_NIDD: TS 29.522
+  Nnef_UCMFProvisioning: TS 29.522
+  Nnef_ECRestriction: TS 29.522
+  Nnef_ApplyPolicy: TS 29.522
+  Nnef_Location: TS 29.522
+  Nnef_AMPolicyAuthorization: TS 29.522
+  Nnef_AMInfluence: TS 29.522
+  Nnef_TimeSynchronization: TS 29.522
+  Nnef_ASTI: TS 29.522
+  Nnef_MSISDN-less_MO_SMS: TS 29.522
+  Nnef_PDTQPolicyNegotiation: TS 29.522
+  Nnef_MemberUESelectionAssistance: TS 29.522
+  Nnef_AF_request_for_QoS: TS 29.522
+  Nnef_UEAddress: TS 29.522
+  Nbsf_Management: TS 29.521
+  Naf_EventExposure: TS 29.517
+  Nsmf_EventExposure: TS 29.508
+  Nsmf_TrafficCorrelation: TS 29.508
+  Nchf_SpendingLimitControl: TS 29.594
+  Nmfaf_ContextManagement: TS 29.576
+  Nucmf_Provisioning: TS 29.673
+
+# The NF that produces each service prefix.
+producers:
+  Namf: AMF
+  Nsmf: SMF
+  Nudm: UDM
+  Nausf: AUSF
+  Npcf: PCF
+  Nnssf: NSSF
+  Nnef: NEF
+  Nnrf: NRF
+  Nchf: CHF
+  Nudr: UDR
+  Nudsf: UDSF
+  Nsmsf: SMSF
+  Nbsf: BSF
+  Nlmf: LMF
+  Nnwdaf: NWDAF
+  Ngmlc: GMLC
+  Nucmf: UCMF
+  N5g-eir: 5G-EIR
+  Nhss: HSS
+  Nupf: UPF
+  Naf: AF
+  Nnssaaf: NSSAAF
+  Nnsacf: NSACF
+  Ntsctsf: TSCTSF
+  Ndccf: DCCF
+  Nmfaf: MFAF
+  Nadrf: ADRF
+
+# Other names specs give a service -> the name this reference files it under.
+aliases:
+  Nudm_UEContextManagement: Nudm_UECM
+  Nudm_SDM: Nudm_SubscriberDataManagement
+  Nudm_EE: Nudm_EventExposure
+  Nudm_PP: Nudm_ParameterProvision
+  Nudm_UEAU: Nudm_UEAuthentication
+  Nudm_NIDDAuthorization: Nudm_NIDDAuthorisation
+  Nudm_ServiceSpecificAuthorization: Nudm_ServiceSpecificAuthorisation
+  Nudr_DM: Nudr_DataManagement
+  Nudr_DataRepository: Nudr_DataManagement
+  Nudsf_DataRepository: Nudsf_UnstructuredDataManagement
+  Nnwdaf_EventsSubscription: Nnwdaf_AnalyticsSubscription
+  Nhss_SubscriberDataManagement: Nhss_SDM
+  Nhss_UEContextManagement: Nhss_UECM
+  Nhss_EventExposure: Nhss_EE
+  Nnef_MSISDN-less_MO: Nnef_MSISDN-less_MO_SMS
+  Nupf_GetPrivateUEIPaddrAndIdentifiers: Nupf_GetUEPrivateIPaddrAndIdentifiers
+  Ngmlc_Location_PrivacyCheck: Ngmlc_Location
+
+# Consumer names in the service tables -> NF ids, where they differ.
+consumerNames:
+  Peer AMF: AMF
+  Peer NWDAF: NWDAF
+  Peer SMF: SMF
+  V-SMF: SMF
+  H-SMF: SMF
+  I-SMF: SMF
+  V-PCF: PCF
+  H-PCF: PCF
+  SMF+PGW-C: SMF
+  UPF+PGW-U: UPF
+  HSS+UDM: UDM
+  5G DDNMF: 5G-DDNMF
+  NWDAF containing AnLF: NWDAF
+  NWDAF containing MTLF: NWDAF
+  CBCF: CBC
+  SCEF+NEF: NEF
+  AF (via NEF): AF
+  H-RE-NWDAF: NWDAF
+  V-RE-NWDAF: NWDAF
+  NSSF in a different PLMN: NSSF
+  Primary NSACF: NSACF
+  V-NEF: NEF
+  TSN AF: AF
+  TSNAF: AF
+  IMS-AS: AS
+  MRF: MRFC
+  SMS Router: SMS-Router
+
+# Names in the service tables that are not network functions this reference lists.
+ignoredConsumers:
+  - Any NF
+  - OAM
+  - CEF
+  - MnS Producer
+  - IMS-Node
+  - MMS-Node
+  - EES
+  - CAPIF core function
+  - Messaging Framework
+  - any NF or SCP
+  - MF
+  - DCSF
+
+# Summaries, keyed by service name.
+services:
+  N5g-eir_EquipmentIdentityCheck:
+    description: >-
+      The 5G-EIR service the AMF uses to check a UE's PEI against the equipment identity register and learn whether the device is prohibited from using the network.
+  Nadrf_DataManagement:
+    description: >-
+      The ADRF service through which the NWDAF, DCCF, and other consumers store collected data and analytics, have the ADRF subscribe to data sources itself, and retrieve or subscribe to stored data later.
+  Nadrf_MLModelManagement:
+    description: >-
+      The ADRF service through which an NWDAF containing MTLF stores, retrieves, and deletes ML model files or model addresses so that trained models persist outside the NWDAF.
+  Naf_EventExposure:
+    description: >-
+      The AF service through which the NWDAF or another consumer subscribes to application-side events, such as service experience, performance data, and collective behaviour information, as input for analytics.
+  Namf_Communication:
+    description: >-
+      The AMF service through which other NFs exchange N1 NAS messages with a UE and N2 messages with the access network, and through which AMFs transfer and relocate UE contexts during mobility.
+  Namf_EventExposure:
+    description: >-
+      The AMF service through which NFs such as the NEF, SMF, UDM, and NWDAF subscribe to UE mobility and access events, such as location changes, area-of-interest presence, reachability, and registration or connectivity state.
+  Namf_Location:
+    description: >-
+      The AMF service through which the GMLC requests a UE's current, last-known, or deferred location and network-provided location information, and receives location events for emergency sessions or deferred requests.
+  Namf_MBSBroadcast:
+    description: >-
+      The AMF service through which the MB-SMF sets up, modifies, and releases broadcast MBS session contexts, so the AMF can configure the NG-RAN nodes in the broadcast service area.
+  Namf_MBSCommunication:
+    description: >-
+      The AMF service through which the MB-SMF has the AMF send multicast MBS N2 messages to the NG-RAN nodes serving a multicast session when it is activated, deactivated, or updated.
+  Namf_MT:
+    description: >-
+      The AMF service that makes a UE reachable for mobile-terminated signalling or data by paging it if it is idle, and that provides terminating domain selection information for IMS voice.
+  Nausf_SoRProtection:
+    description: >-
+      The AUSF service the UDM uses to integrity-protect Steering of Roaming information with the UE's home security context before it is sent to the UE.
+  Nausf_UEAuthentication:
+    description: >-
+      The AUSF service through which the AMF (SEAF) authenticates a UE with 5G AKA or EAP-AKA', including resynchronisation after an authentication sequence failure.
+  Nausf_UPUProtection:
+    description: >-
+      The AUSF service the UDM uses to integrity-protect UE Parameters Update data, such as a new Routing Indicator, before it is delivered to the UE.
+  Nbsf_Management:
+    description: >-
+      The BSF service where the PCF registers which PCF serves a PDU session or UE, and where the NEF, AF, TSCTSF, or another PCF discovers that binding or subscribes to its changes.
+  Nchf_ConvergedCharging:
+    description: >-
+      The CHF service that SMF, AMF, SMSF, and other charging trigger functions use to open, update, and close charging sessions, with or without online quota management, and to produce charging records.
+  Nchf_OfflineOnlyCharging:
+    description: >-
+      The CHF service for offline-only charging, through which a charging trigger function reports usage for session-based services so the CHF can generate charging records, without quota management.
+  Nchf_SpendingLimitControl:
+    description: >-
+      The CHF service through which the PCF subscribes to the status of a subscriber's policy counters and is notified when they change, so it can adapt policy to spending limits.
+  Ndccf_ContextManagement:
+    description: >-
+      The DCCF service through which an NWDAF or other collector registers the data or analytics it is already collecting, so the DCCF can reuse those collections for other consumers.
+  Ndccf_DataManagement:
+    description: >-
+      The DCCF service through which consumers such as the NWDAF subscribe to or fetch data and analytics, letting the DCCF coordinate collection from sources and avoid duplicate requests.
+  Ngmlc_Location:
+    description: >-
+      The GMLC service through which the NEF, AMF, or another GMLC requests immediate or deferred location of a target UE, receives location event reports, and asks for ranging-based relative location between UEs.
+  Nhss_EE:
+    description: >-
+      The HSS service through which the UDM subscribes to monitoring events, such as location changes, for UEs served in EPS, supporting event exposure across 5GS and EPC.
+  Nhss_gbaSubscriberDataManagement:
+    description: >-
+      The HSS service through which a GBA BSF retrieves a subscriber's GBA user security settings, the service-based counterpart of the Zh interface.
+  Nhss_gbaUEAuthentication:
+    description: >-
+      The HSS service through which a GBA BSF obtains authentication vectors to run GBA bootstrapping with a UE, the service-based counterpart of the Zh interface.
+  Nhss_imsSubscriberDataManagement:
+    description: >-
+      The HSS service through which IMS NFs such as the S-CSCF and application servers retrieve IMS subscription data and subscribe to its changes, the TS 29.562 counterpart of Cx and Sh data procedures.
+  Nhss_imsUEAuthentication:
+    description: >-
+      The HSS service through which the S-CSCF obtains IMS AKA authentication vectors for a user, the TS 29.562 counterpart of the Cx multimedia authentication procedure.
+  Nhss_imsUEContextManagement:
+    description: >-
+      The HSS service through which IMS NFs register and look up the serving S-CSCF and the user's IMS registration state, the TS 29.562 counterpart of Cx registration procedures.
+  Nhss_SDM:
+    description: >-
+      The HSS service through which the UDM retrieves and subscribes to subscriber data held in the HSS, currently the SMF+PGW-C FQDN used for interworking between EPS and 5GS.
+  Nhss_UEAuthentication:
+    description: >-
+      The HSS service through which the UDM obtains authentication vectors from the HSS, used when a UE whose subscription lives in the HSS authenticates in 5GS.
+  Nhss_UECM:
+    description: >-
+      The HSS service through which the UDM asks the HSS to cancel the UE's EPS or PS serving-node registration and informs it of UE context updates such as an IMEI change.
+  Nlmf_Broadcast:
+    description: >-
+      The LMF service through which the AMF obtains the ciphering keys that protect broadcast positioning assistance data, so it can deliver them to entitled UEs.
+  Nlmf_Location:
+    description: >-
+      The LMF service through which the AMF, or a GMLC, requests that the LMF determine a target UE's location, manage deferred location reporting, and set up user-plane positioning connections.
+  Nmfaf_ContextManagement:
+    description: >-
+      The MFAF service through which another MFAF, typically a target MFAF, retrieves UE context for data and analytics delivery configured earlier, so delivery can continue after relocation.
+  Nnef_AF_request_for_QoS:
+    description: >-
+      The NEF service through which an AF requests a specific QoS for a traffic flow of a UE or a group of UEs, then updates or revokes that request and receives QoS flow events.
+  Nnef_AFsessionWithQoS:
+    description: >-
+      The NEF service through which an external AF requests a specific QoS for an AF session of one or more UEs, and receives QoS flow events about that session.
+  Nnef_AMInfluence:
+    description: >-
+      The NEF service through which an AF stores data in the UDR that PCFs use to influence access and mobility policies for one or many UEs, and subscribes to service coverage events.
+  Nnef_AMPolicyAuthorization:
+    description: >-
+      The NEF service that authorises an external AF's request to influence a UE's access and mobility policy and relays it to the PCF through Npcf_AMPolicyAuthorization.
+  Nnef_AnalyticsExposure:
+    description: >-
+      The NEF service that exposes NWDAF analytics to AFs, letting them subscribe to or fetch analytics without direct access to the NWDAF.
+  Nnef_APISupportCapability:
+    description: >-
+      The NEF service through which an AF subscribes to notifications about whether, and how well, a given service API is expected to be supported for a UE or a group of UEs.
+  Nnef_ApplyPolicy:
+    description: >-
+      The NEF service through which an AF applies a previously negotiated background data transfer policy to a UE or a group of UEs, and later updates or removes it.
+  Nnef_ASTI:
+    description: >-
+      The NEF service through which an AF activates, updates, queries, and removes 5G access stratum time distribution for UEs, with the NEF authorising requests and relaying them to the TSCTSF.
+  Nnef_BDTPNegotiation:
+    description: >-
+      The NEF service through which an AF negotiates a background data transfer policy with the PCF, selecting one of the offered transfer windows and receiving warnings when conditions change.
+  Nnef_ChargeableParty:
+    description: >-
+      The NEF service through which an AF asks to become, or changes, the chargeable party for a UE's data session, sponsoring its traffic, and receives related bearer-level events.
+  Nnef_DNAIMapping:
+    description: >-
+      The NEF service through which the AF or NWDAF subscribes to DNAI information and is notified when the mapping between DNAIs and edge application server addresses changes.
+  Nnef_EASDeployment:
+    description: >-
+      The NEF service through which an AF provisions node-level edge application server deployment information into the UDR, and through which the SMF subscribes to that information.
+  Nnef_ECRestriction:
+    description: >-
+      The NEF service through which an AF queries, enables, or disables enhanced coverage restriction for a UE, mainly for IoT devices.
+  Nnef_ECSAddress:
+    description: >-
+      The V-NEF service through which an AF provisions Edge Configuration Server address information for a group of UEs or any UE, and the V-SMF subscribes to it, to support home-routed session breakout.
+  Nnef_EventExposure:
+    description: >-
+      The NEF service through which AFs subscribe to network events about UEs, such as location, reachability, roaming status, and loss of connectivity, which the NEF gathers from 5GC NFs.
+  Nnef_Location:
+    description: >-
+      The NEF service that delivers UE location estimates to an AF, such as the result of a UE-initiated location request directed at that AF.
+  Nnef_MemberUESelectionAssistance:
+    description: >-
+      The NEF service through which an AF subscribes to member UE selection assistance information, helping it choose suitable UEs, for example for federated learning groups, based on filtering criteria.
+  Nnef_MSISDN-less_MO_SMS:
+    description: >-
+      The NEF service that delivers the payload of a mobile-originated SMS from a UE without an MSISDN to the AF, which the NEF finds from the SME address.
+  Nnef_NIDD:
+    description: >-
+      The NEF service that carries non-IP data delivery between an AF and the NEF, in both mobile-originated and mobile-terminated directions, including group delivery results.
+  Nnef_NIDDConfiguration:
+    description: >-
+      The NEF service through which an AF sets up and removes the NIDD configuration needed before non-IP data can flow between the AF and a UE through the NEF.
+  Nnef_ParameterProvision:
+    description: >-
+      The NEF service through which an AF provisions UE parameters, such as expected UE behaviour and network configuration, and manages 5G VN groups and multicast MBS group information in the UDM.
+  Nnef_PDTQPolicyNegotiation:
+    description: >-
+      The NEF service through which an AF negotiates a planned data transfer with QoS (PDTQ) policy with the PCF and receives warnings when the selected policy can no longer be met.
+  Nnef_PFDManagement:
+    description: >-
+      The NEF (PFDF) service through which AFs add, update, and delete Packet Flow Descriptions for an application, and through which the SMF fetches or subscribes to them for traffic detection.
+  Nnef_ServiceParameter:
+    description: >-
+      The NEF service through which an AF stores, updates, retrieves, and deletes service-specific parameters in the UDR, which the PCF can then deliver to UEs, such as in URSP rules.
+  Nnef_SMContext:
+    description: >-
+      The NEF service through which the SMF sets up and releases the SMF-NEF connection for a UE's NIDD PDU session and exchanges non-IP data over it.
+  Nnef_SMService:
+    description: >-
+      The NEF service through which the SMSF forwards a mobile-originated SMS over the SBI for MSISDN-less MO SMS delivery to an AF.
+  Nnef_TimeSynchronization:
+    description: >-
+      The NEF service through which an AF configures and activates time synchronization services for UEs and subscribes to their time synchronization capabilities, relayed to the TSCTSF.
+  Nnef_TrafficInfluence:
+    description: >-
+      The NEF service through which an external AF influences user-plane traffic routing, for example to steer traffic to a local DNAI, and receives notifications about UP path changes.
+  Nnef_TrafficInfluenceData:
+    description: >-
+      The V-NEF service through which an SMF in the VPLMN subscribes to AF traffic influence request information, used for home-routed session breakout.
+  Nnef_Trigger:
+    description: >-
+      The NEF service through which an AF asks for a device trigger to be sent to an application on a UE and is told whether delivery succeeded.
+  Nnef_UCMFProvisioning:
+    description: >-
+      The NEF service through which an AF provisions manufacturer-assigned UE radio capability IDs and their capability data into the UCMF dictionary.
+  Nnef_UEAddress:
+    description: >-
+      The NEF service through which an AF obtains a UE's IP address or IPv6 prefix from its GPSI.
+  Nnef_UEId:
+    description: >-
+      The NEF service through which an AF obtains an AF-specific UE identifier or MSISDN for a UE, and manages GPSI to application-layer ID mappings for ranging and sidelink positioning.
+  Nnrf_AccessToken:
+    description: >-
+      The NRF service that issues OAuth 2.0 access tokens to consumer NFs, authorising them to call a given producer NF's services.
+  Nnrf_Bootstrapping:
+    description: >-
+      The NRF service that returns the NRF's own service instances and their addresses, letting an NF learn where to reach NRF services before using them.
+  Nnrf_NFDiscovery:
+    description: >-
+      The NRF service that lets a consumer NF or SCP find NF instances and services that match a target NF type, slice, DNN, or other criteria, returning their profiles and addresses.
+  Nnrf_NFManagement:
+    description: >-
+      The NRF service through which NFs register, update, and deregister their NF profiles, and through which NFs or SCPs subscribe to changes in other NFs' profiles and availability.
+  Nnsacf_NSAC:
+    description: >-
+      The NSACF service the AMF and SMF use to check and update the number of UEs registered and PDU sessions established on a slice subject to admission control, against configured maximums.
+  Nnsacf_SliceEventExposure:
+    description: >-
+      The NSACF service through which the NEF or another consumer subscribes to reports of the current number of registered UEs or PDU sessions on a network slice, as numbers or percentages.
+  Nnssaaf_AIW:
+    description: >-
+      The NSSAAF service through which the AUSF authenticates a UE against an external AAA server by relaying EAP messages, for example when an SNPN uses credentials from a separate credentials holder.
+  Nnssaaf_NSSAA:
+    description: >-
+      The NSSAAF service through which the AMF runs network slice-specific authentication with an external AAA server, and through which re-authentication and revocation requests reach the AMF.
+  Nnssf_NSSAIAvailability:
+    description: >-
+      The NSSF service through which AMFs report the S-NSSAIs they support per tracking area and learn which slices are available, restricted, or replaced.
+  Nnssf_NSSelection:
+    description: >-
+      The NSSF service the AMF uses to select network slices during registration and PDU session setup, returning Allowed and Configured NSSAIs and the slice instances or AMF set to use.
+  Nnwdaf_AnalyticsInfo:
+    description: >-
+      The NWDAF service through which a consumer requests analytics and their accuracy on demand, and through which NWDAFs transfer analytics context between each other.
+  Nnwdaf_AnalyticsSubscription:
+    description: >-
+      The NWDAF service through which NFs, AFs, and the OAM subscribe to analytics, such as load, mobility, or QoS predictions, and receive them as notifications, including transfer of subscriptions between NWDAFs.
+  Nnwdaf_DataManagement:
+    description: >-
+      The NWDAF service through which a consumer subscribes to or fetches input data or analytics the NWDAF has collected, so collected data can be reused across NWDAFs and other consumers.
+  Nnwdaf_MLModelInfo:
+    description: >-
+      The NWDAF service through which a consumer, typically an NWDAF containing AnLF, requests information about ML models available from an NWDAF containing MTLF.
+  Nnwdaf_MLModelMonitor:
+    description: >-
+      The NWDAF service through which a consumer subscribes to the monitored accuracy of an ML model and feedback on the analytics it produces, from an NWDAF containing MTLF.
+  Nnwdaf_MLModelProvision:
+    description: >-
+      The NWDAF service through which an NWDAF containing AnLF subscribes to an NWDAF containing MTLF to receive trained ML models and their updates.
+  Nnwdaf_MLModelTraining:
+    description: >-
+      The NWDAF service through which a consumer asks an NWDAF containing MTLF to train or retrain an ML model and is notified when training completes, also used between FL server and client NWDAFs.
+  Nnwdaf_MLModelTrainingInfo:
+    description: >-
+      The NWDAF service through which a consumer requests information about ML model training from an NWDAF containing MTLF, used in federated learning to check FL client availability and capability.
+  Nnwdaf_RoamingAnalytics:
+    description: >-
+      The NWDAF service through which an NWDAF in one PLMN obtains analytics about roaming UEs from a roaming exchange NWDAF in the partner PLMN.
+  Nnwdaf_RoamingData:
+    description: >-
+      The NWDAF service through which an NWDAF subscribes to input data about roaming UEs collected in the partner PLMN, using a roaming exchange NWDAF.
+  Npcf_AMPolicyAuthorization:
+    description: >-
+      The PCF service through which the NEF, AF, or TSCTSF requests changes to a UE's access and mobility policy, such as service coverage or throughput needs, and subscribes to related events.
+  Npcf_AMPolicyControl:
+    description: >-
+      The PCF service through which the AMF creates an AM policy association for a UE and receives access and mobility policies, such as service area restrictions and RFSP index, plus updates as conditions change.
+  Npcf_BDTPolicyControl:
+    description: >-
+      The PCF service through which the NEF obtains and selects background data transfer policies on behalf of an AF, and receives warnings when a selected policy is at risk.
+  Npcf_EventExposure:
+    description: >-
+      The PCF service through which the NEF or NWDAF subscribes to PCF events for a group of UEs or any UE using a given DNN and S-NSSAI.
+  Npcf_PDTQPolicyControl:
+    description: >-
+      The PCF service through which the NEF obtains and selects planned data transfer with QoS (PDTQ) policies for an AF, and receives warnings when a selected policy can no longer be met.
+  Npcf_PolicyAuthorization:
+    description: >-
+      The PCF service through which an AF, the NEF, or the TSCTSF requests QoS and charging treatment for an application session bound to a PDU session, the 5GC counterpart of Rx.
+  Npcf_SMPolicyControl:
+    description: >-
+      The PCF service through which the SMF creates an SM policy association for a PDU session and receives PCC rules, session policies, and policy control request triggers, the 5GC counterpart of Gx.
+  Npcf_UEPolicyControl:
+    description: >-
+      The PCF service through which the AMF creates a UE policy association so the PCF can deliver UE policies, such as URSP and ANDSP rules, transparently to the UE over NAS.
+  Nsmf_EventExposure:
+    description: >-
+      The SMF service through which the NEF, NWDAF, AF, and other NFs subscribe to PDU session events, such as UE IP address changes, session establishment or release, and UP path changes.
+  Nsmf_NIDD:
+    description: >-
+      The SMF service through which the NEF delivers mobile-terminated non-IP data to the SMF, which forwards it to the UE over its NIDD PDU session.
+  Nsmf_PDUSession:
+    description: >-
+      The SMF service through which the AMF creates, updates, and releases PDU session contexts, and through which a V-SMF or I-SMF and the H-SMF manage home-routed sessions.
+  Nsmf_TrafficCorrelation:
+    description: >-
+      The SMF service that notifies the NEF of 5GC-determined information, such as the common EAS or DNAI selected, for the PDU sessions of a set of UEs sharing a traffic correlation ID.
+  Nsmsf_SMService:
+    description: >-
+      The SMSF service through which the AMF activates or deactivates SMS over NAS for a UE and forwards uplink SMS, and through which the SMS-GMSC or IP-SM-GW delivers mobile-terminated SMS.
+  Ntsctsf_ASTI:
+    description: >-
+      The TSCTSF service through which the NEF or an AF activates, updates, queries, and removes 5G access stratum time distribution for UEs and is notified of its status changes.
+  Ntsctsf_QoSandTSCAssistance:
+    description: >-
+      The TSCTSF service through which the NEF or an AF requests QoS for time-sensitive traffic and provides TSC assistance information, such as burst arrival time and periodicity.
+  Ntsctsf_TimeSynchronization:
+    description: >-
+      The TSCTSF service through which the NEF or an AF configures and activates (g)PTP time synchronization for UEs and subscribes to their time synchronization capabilities.
+  Nucmf_Provisioning:
+    description: >-
+      The UCMF service through which the NEF or OAM provisions manufacturer-assigned UE radio capability IDs and their capability data into the UCMF dictionary.
+  Nucmf_UECapabilityManagement:
+    description: >-
+      The UCMF service the AMF uses to resolve a UE radio capability ID into the full capability set, have a PLMN-assigned ID allocated, and subscribe to dictionary changes.
+  Nudm_EventExposure:
+    description: >-
+      The UDM service through which the NEF, HSS, or other NFs subscribe to UE events, such as reachability, roaming status, or loss of connectivity, which the UDM reports or delegates to the AMF.
+  Nudm_MT:
+    description: >-
+      The UDM service through which the HSS obtains a UE's 5GS user state, location, IMS voice terminating domain selection information, and 5G-SRVCC capability for IMS services.
+  Nudm_NIDDAuthorisation:
+    description: >-
+      The UDM service through which the NEF obtains authorisation for an AF's NIDD configuration for a UE and is told when that authorisation changes.
+  Nudm_ParameterProvision:
+    description: >-
+      The UDM service through which the NEF, or the HSS for 5G-SRVCC data, provisions UE parameters such as expected UE behaviour and network configuration, and manages 5G VN group data.
+  Nudm_ReportSMDeliveryStatus:
+    description: >-
+      The UDM service through which the SMS-GMSC reports the outcome of a mobile-terminated SMS delivery attempt, so the UDM can update the message waiting data.
+  Nudm_ServiceSpecificAuthorisation:
+    description: >-
+      The UDM service through which the NEF obtains, and later removes, authorisation for a specific service configuration requested by an AF, and is told when that authorisation changes.
+  Nudm_SubscriberDataManagement:
+    description: >-
+      The UDM service through which the AMF, SMF, SMSF, and other NFs retrieve a UE's subscription data and subscribe to changes in it.
+  Nudm_UEAuthentication:
+    description: >-
+      The UDM service through which the AUSF obtains authentication vectors and reports the result of UE authentication, and through which the HSS obtains vectors for UEs whose subscription is in the UDM.
+  Nudm_UECM:
+    description: >-
+      The UDM service where the AMF, SMF, SMSF, and NWDAF register as the NFs serving a UE, letting other NFs find the serving NF and triggering deregistration when it changes.
+  Nudm_UEIdentifier:
+    description: >-
+      The UDM service that de-conceals a SUCI into the SUPI for 5G ProSe UE-to-network relay security, as TS 33.503 defines.
+  Nudr_DataManagement:
+    description: >-
+      The UDR service through which the UDM, PCF, and NEF read, write, and subscribe to subscription, policy, application, and exposure data.
+  Nudr_GroupIDmap:
+    description: >-
+      The UDR service through which a consumer such as the NRF finds the NF group ID that serves a given subscriber identifier, used to pick the right UDM, AUSF, or PCF instances.
+  Nudsf_Timer:
+    description: >-
+      The UDSF service through which NFs start, update, stop, and search timers held in the UDSF and are notified when they expire, so timers survive NF instance changes.
+  Nudsf_UnstructuredDataManagement:
+    description: >-
+      The UDSF service through which NFs such as the AMF and SMF store, read, update, and delete unstructured data such as UE contexts, so stateless NF instances can share state.
+  Nupf_EventExposure:
+    description: >-
+      The UPF service that reports user-plane events, such as QoS monitoring results and traffic usage, directly to the NWDAF or other consumers, with subscriptions set up through the SMF.
+  Nupf_GetUEPrivateIPaddrAndIdentifiers:
+    description: >-
+      The UPF service through which a consumer such as the NEF maps a public IP address and port behind NAT to the UE's private IP address and IP domain assigned by 5GC.

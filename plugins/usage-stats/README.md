@@ -25,6 +25,11 @@ Open it from the **Usage** entry in the sidebar navigation, or at
 switch between all usage, bb threads, and Claude Code sessions outside bb
 (`/plugins/usage-stats/usage/bb` and `/plugins/usage-stats/usage/outside`).
 
+The **Open Usage** command (`plugin:usage-stats/open-usage` in bb's command
+palette) opens the page too. Other plugins can run it through bb's app command
+API, and today's totals are the `dashboard` RPC with
+`{ days: 1, source: "all", sort: "cost" }` (`current.costUsd`, `current.tokens`).
+
 ## Where the numbers come from
 
 | Source | What it records |
@@ -35,12 +40,19 @@ switch between all usage, bb threads, and Claude Code sessions outside bb
 A bb thread's Claude Code session id is its provider thread id, so a session
 found in both is counted once, from its transcript. Claude Code writes one
 transcript line per content block, all with the same message id and usage;
-the importer records each message id once. Transcript messages are priced with
-the same Anthropic list prices bb uses. Other providers use the cost bb
-reports, which is empty for models bb has no price for.
+the importer records each message id once. Transcript messages are priced at
+import with the Anthropic list prices in `pricing.ts` (cache writes at the
+5-minute rate; Haiku 5.5 prompts over 100K tokens at its long-prompt rates).
+When that table's `PRICING_VERSION` changes, the next plugin start re-prices
+every stored transcript row once. Other providers use the cost bb reports,
+which is empty for models bb has no price for.
 
 The transcript import runs at startup and every 5 minutes, and reads only the
-bytes appended since the last run. Subscription windows are sampled every 10
+bytes appended since the last run. Each file keeps a cursor: its size, mtime,
+byte offset, and a hash of the last line read. A file that shrank or whose
+last read line changed is read again from the start. The import works in
+slices of at most 200 files or 2 seconds, so a large catch-up never holds the
+ledger for long, and an unreadable file is retried once it changes. Subscription windows are sampled every 10
 minutes so their line has history. On startup the plugin records every bb
 thread that changed while it was not running. On bb builds without the
 thread cost call, the ledger prices the thread's latest token event itself.

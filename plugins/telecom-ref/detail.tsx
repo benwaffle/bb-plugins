@@ -1,8 +1,26 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { experimental_Icon as Icon, experimental_usePluginId, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { entityCode, entityShortName, entityTitle, KIND_BADGES, vendorLabel, type Dataset } from "./dataset";
-import { abnfLine, cardinality, codeLabel, specLabel } from "./format";
-import type { AppEntity, AvpEntity, AvpFlags, AvpRef, CommandEntity, Entity, InterfaceEntity, NfEntity } from "./types";
+import { entityCode, entityShortName, entityTitle, gtpLabel, hexByte, KIND_BADGES, vendorLabel, type Dataset } from "./dataset";
+import { diagramPath, diagramsShowing, diagramSubPath } from "./diagrams";
+import { abnfLine, cardinality, codeLabel, PANEL_PATH, specLabel } from "./format";
+import type {
+  AppEntity,
+  AvpEntity,
+  AvpFlags,
+  AvpRef,
+  CommandEntity,
+  Entity,
+  GtpCauseEntity,
+  GtpExtensionHeaderEntity,
+  GtpIeEntity,
+  GtpIeRow,
+  GtpIeTable,
+  GtpMessageEntity,
+  InterfaceEntity,
+  NfEntity,
+  ProtocolEntity,
+  ServiceEntity,
+} from "./types";
 import { CodeBadge, EntityLink, KindBadge, SECTION_HEADING, SpecPill } from "./ui";
 import { openSearch, rememberRecent } from "./view";
 
@@ -96,6 +114,41 @@ function LinkGroup({ title, ids, dataset }: { title: string; ids: readonly strin
           {expanded ? "Show fewer" : `Show all ${ids.length}`}
         </button>
       ) : null}
+    </section>
+  );
+}
+
+/** The architecture diagrams that draw this entry, each opening with it picked. */
+function DiagramLinks({ id }: { id: string }) {
+  const pluginId = experimental_usePluginId();
+  const navigate = useBbNavigate();
+  const diagrams = diagramsShowing(id);
+  if (diagrams.length === 0) return null;
+  return (
+    <section className="space-y-1.5">
+      <h2 className={`${SECTION_HEADING} flex items-baseline gap-1.5`}>
+        In diagrams
+        <span className="tabular-nums text-muted-foreground/70">{diagrams.length}</span>
+      </h2>
+      <ul className="-mx-2">
+        {diagrams.map((diagram) => (
+          <li key={diagram.id}>
+            <a
+              href={diagramPath(pluginId, diagram.id, id)}
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                event.preventDefault();
+                navigate.toPluginPanel(PANEL_PATH, { subPath: diagramSubPath(diagram.id, id) });
+              }}
+              className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground transition-colors duration-150 hover:bg-foreground/[0.05]"
+            >
+              <Icon name="Map" className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{diagram.title}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{diagram.variant}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -324,8 +377,277 @@ function interfaceBody(entity: InterfaceEntity): Body {
     ),
     links: [
       ["Terminated by", entity.endpoints],
+      ["Protocols", entity.protocols],
       ["Diameter applications", entity.apps],
+      ["SBI services", entity.services],
+      ["GTP messages", entity.gtpMessages],
     ],
+  };
+}
+
+function serviceBody(entity: ServiceEntity, dataset: Dataset): Body {
+  return {
+    main: (
+      <>
+        <Facts
+          rows={[
+            ["Producer", <EntityLink id={entity.producer} dataset={dataset} />],
+            ["Also called", entity.aliases.length > 0 ? entity.aliases.join(", ") : null],
+          ]}
+        />
+        {entity.operations.length > 0 ? (
+          <Section title={`Operations · ${entity.operations.length}`}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={TH}>Operation</th>
+                  <th className={TH}>Semantics</th>
+                  <th className={`${TH} pr-0`}>Example consumers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entity.operations.map((operation) => (
+                  <tr key={operation.name} className="border-b border-border/50 last:border-b-0">
+                    <td className={`${TD} font-mono text-[13px]`}>{operation.name}</td>
+                    <td className={`${TD} text-muted-foreground`}>{operation.semantics ?? "—"}</td>
+                    <td className={`${TD} pr-0`}>
+                      <InlineLinks ids={operation.consumers} dataset={dataset} separator=", " />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Section>
+        ) : null}
+      </>
+    ),
+    links: [
+      ["Consumers", entity.consumers],
+      ["Reference points", entity.interfaces],
+    ],
+  };
+}
+
+function protocolBody(entity: ProtocolEntity): Body {
+  return {
+    main: (
+      <>
+        <Facts
+          rows={[
+            ["Transport", entity.transport ?? "—"],
+            ["Also called", entity.aliases.length > 0 ? entity.aliases.join(", ") : null],
+          ]}
+        />
+        {entity.header ? (
+          <section className="space-y-2.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className={SECTION_HEADING}>Header</h2>
+              <span className="ml-auto">
+                <SpecPill spec={entity.header.spec} />
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={`${TH} w-24`}>Octets</th>
+                  <th className={`${TH} w-12`}>Bits</th>
+                  <th className={TH}>Field</th>
+                  <th className={`${TH} pr-0`}>Use</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entity.header.fields.map((field) => (
+                  <tr key={`${field.octets}-${field.bits ?? ""}-${field.name}`} className="border-b border-border/50 last:border-b-0">
+                    <td className={`${TD} font-mono text-xs tabular-nums text-muted-foreground`}>{field.octets}</td>
+                    <td className={`${TD} font-mono text-xs tabular-nums text-muted-foreground`}>{field.bits ?? ""}</td>
+                    <td className={TD}>{field.name}</td>
+                    <td className={`${TD} pr-0 text-muted-foreground`}>{field.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null}
+      </>
+    ),
+    links: [
+      ["Interfaces", entity.interfaces],
+      ["Messages", entity.messages],
+      ["Runs over", entity.over],
+      ["Carries", entity.carries],
+    ],
+  };
+}
+
+/** The rows of a GTP IE table, each grouped IE's rows indented under it. */
+function IeRows({ rows, dataset, depth }: { rows: readonly GtpIeRow[]; dataset: Dataset; depth: number }) {
+  return (
+    <>
+      {rows.map((row, index) => {
+        const ie = row.ie ? dataset.byId.get(row.ie) : undefined;
+        return (
+          <IeRowGroup key={`${row.name}-${row.instance ?? ""}-${index}`} row={row} dataset={dataset} depth={depth}>
+            <tr className="border-b border-border/50 last:border-b-0">
+              <td className={TD} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+                {row.name}
+              </td>
+              <td className={TD}>
+                {ie?.kind === "gtpie" ? <EntityLink id={ie.id} dataset={dataset}>{row.type}</EntityLink> : row.type}
+                {ie?.kind === "gtpie" ? <span className="text-muted-foreground/70">{`  ${ie.type}`}</span> : null}
+              </td>
+              <td className={`${TD} font-mono text-xs text-muted-foreground`}>{row.presence.join(" ")}</td>
+              <td className={`${TD} pr-0 text-right font-mono text-xs tabular-nums text-muted-foreground`}>{row.instance ?? ""}</td>
+            </tr>
+          </IeRowGroup>
+        );
+      })}
+    </>
+  );
+}
+
+function IeRowGroup({ row, dataset, depth, children }: { row: GtpIeRow; dataset: Dataset; depth: number; children: ReactNode }) {
+  return (
+    <>
+      {children}
+      {row.group ? (
+        <>
+          <tr>
+            <td colSpan={4} className="pt-2 pb-1 text-xs text-muted-foreground" style={{ paddingLeft: `${(depth + 1) * 1.25}rem` }}>
+              {`${row.group.title} · Table ${row.group.table}`}
+            </td>
+          </tr>
+          <IeRows rows={row.group.rows} dataset={dataset} depth={depth + 1} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function IeTableSection({ table, dataset }: { table: GtpIeTable; dataset: Dataset }) {
+  return (
+    <section className="space-y-2.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h2 className="text-sm font-medium text-foreground">{table.title}</h2>
+        <span className="text-xs text-muted-foreground">Table {table.table}</span>
+        <span className="ml-auto">
+          <SpecPill spec={table.spec} />
+        </span>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border">
+            <th className={TH}>Information element</th>
+            <th className={TH}>IE type</th>
+            <th className={`${TH} w-16`}>P</th>
+            <th className={`${TH} w-12 pr-0 text-right`}>Ins.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <IeRows rows={table.rows} dataset={dataset} depth={0} />
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function versionLink(protocol: string, id: string, dataset: Dataset): ReactNode {
+  return <EntityLink id={protocol} dataset={dataset}>{gtpLabel(id) ?? protocol}</EntityLink>;
+}
+
+function gtpMessageBody(entity: GtpMessageEntity, dataset: Dataset): Body {
+  const roles = [entity.initial ? "Initial" : null, entity.triggered ? "Triggered" : null].filter(Boolean).join(", ");
+  return {
+    main: (
+      <>
+        <Facts
+          rows={[
+            ["Message type", <span className="font-mono tabular-nums">{entity.type}</span>],
+            ["Protocol", versionLink(entity.protocol, entity.id, dataset)],
+            ["Role", roles || null],
+            ["Reply", entity.reply ? <EntityLink id={entity.reply} dataset={dataset} /> : null],
+            ["Replies to", entity.replyTo.length > 0 ? <InlineLinks ids={entity.replyTo} dataset={dataset} separator=", " /> : null],
+            [
+              "Flow",
+              entity.flow ? (
+                <span>
+                  <InlineLinks ids={entity.flow.from} dataset={dataset} separator=" / " />
+                  <span className="text-muted-foreground">{" → "}</span>
+                  <InlineLinks ids={entity.flow.to} dataset={dataset} separator=" / " />
+                </span>
+              ) : null,
+            ],
+            ["Type table group", entity.group],
+          ]}
+        />
+        {entity.ieTables.map((table) => (
+          <IeTableSection key={table.table} table={table} dataset={dataset} />
+        ))}
+        {entity.ieTables.length === 0 ? <p className="text-sm text-muted-foreground">The spec gives this message no IE table.</p> : null}
+      </>
+    ),
+    links: [
+      ["Used on", entity.interfaces],
+      ["Sent by", entity.flow?.from ?? []],
+      ["Received by", entity.flow?.to ?? []],
+    ],
+  };
+}
+
+function gtpIeBody(entity: GtpIeEntity, dataset: Dataset): Body {
+  return {
+    main: (
+      <Facts
+        rows={[
+          ["IE type", <span className="font-mono tabular-nums">{entity.type}</span>],
+          ["Protocol", versionLink(entity.protocol, entity.id, dataset)],
+          ["Short name", entity.abbrev],
+          ["Also called", entity.aliases.length > 0 ? entity.aliases.join(", ") : null],
+          ["Encoding", entity.encoding],
+          ["Length", entity.length],
+          ["Fixed octets", entity.fixedOctets],
+        ]}
+      />
+    ),
+    links: [
+      ["Carried in", entity.carriedIn],
+      ["Used on", entity.interfaces],
+    ],
+  };
+}
+
+const CAUSE_CATEGORIES: Record<GtpCauseEntity["category"], string> = {
+  request: "Request or initial message",
+  acceptance: "Acceptance in a response or triggered message",
+  rejection: "Rejection in a response or triggered message",
+};
+
+function gtpCauseBody(entity: GtpCauseEntity, dataset: Dataset): Body {
+  return {
+    main: (
+      <Facts
+        rows={[
+          ["Cause value", <span className="font-mono tabular-nums">{entity.code}</span>],
+          ["Protocol", versionLink(entity.protocol, entity.id, dataset)],
+          ["Used in", CAUSE_CATEGORIES[entity.category]],
+        ]}
+      />
+    ),
+    links: [],
+  };
+}
+
+function gtpExtensionBody(entity: GtpExtensionHeaderEntity, dataset: Dataset): Body {
+  return {
+    main: (
+      <Facts
+        rows={[
+          ["Type value", <span className="font-mono tabular-nums">{`${hexByte(entity.type)} (${entity.type})`}</span>],
+          ["Protocol", versionLink(entity.protocol, entity.id, dataset)],
+          ["Comprehension", entity.comprehension],
+        ]}
+      />
+    ),
+    links: [],
   };
 }
 
@@ -370,6 +692,7 @@ function nfBody(entity: NfEntity, dataset: Dataset): Body {
       </>
     ),
     links: [
+      ["Produces", entity.services],
       ["Takes over from", entity.replaces],
       ["Taken over by", entity.replacedBy],
     ],
@@ -388,6 +711,18 @@ function entityBody(entity: Entity, dataset: Dataset): Body {
       return interfaceBody(entity);
     case "nf":
       return nfBody(entity, dataset);
+    case "svc":
+      return serviceBody(entity, dataset);
+    case "proto":
+      return protocolBody(entity);
+    case "gtpmsg":
+      return gtpMessageBody(entity, dataset);
+    case "gtpie":
+      return gtpIeBody(entity, dataset);
+    case "gtpcause":
+      return gtpCauseBody(entity, dataset);
+    case "gtpext":
+      return gtpExtensionBody(entity, dataset);
   }
 }
 
@@ -433,6 +768,7 @@ export function DetailPage({ dataset, id }: { dataset: Dataset; id: string }) {
   };
   const body = entityBody(entity, dataset);
   const links = body.links.filter(([, ids]) => ids.length > 0);
+  const inDiagrams = diagramsShowing(entity.id).length > 0;
   return (
     <div className="h-full overflow-y-auto px-4 py-6 md:px-6">
       <article className="mx-auto w-full max-w-5xl">
@@ -462,10 +798,11 @@ export function DetailPage({ dataset, id }: { dataset: Dataset; id: string }) {
             <p className="mt-4 text-sm text-muted-foreground">No summary yet. The spec references above define this entry.</p>
           )}
         </header>
-        <div key={entity.id} className={`mt-8 grid gap-x-12 gap-y-8 ${links.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}>
+        <div key={entity.id} className={`mt-8 grid gap-x-12 gap-y-8 ${links.length > 0 || inDiagrams ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}>
           <div className="min-w-0 space-y-8">{body.main}</div>
-          {links.length > 0 ? (
+          {links.length > 0 || inDiagrams ? (
             <aside aria-label="Related entries" className="space-y-6 lg:border-l lg:border-border lg:pl-8">
+              <DiagramLinks id={entity.id} />
               {links.map(([title, ids]) => (
                 <LinkGroup key={title} title={title} ids={ids} dataset={dataset} />
               ))}

@@ -1,0 +1,51 @@
+{
+  "id": "epc-roaming-hr",
+  "title": "EPC roaming",
+  "group": "epc-roaming",
+  "variant": "Home routed",
+  "summary": "A roaming UE's traffic is routed home: the visited network's SGW reaches the home PDN Gateway over S8, and the visited MME reaches the home HSS over S6a. Policy (Gx, Rx) stays in the home network.",
+  "figures": [
+    {
+      "doc": "TS 23.401",
+      "clause": "4.2.2",
+      "figure": "4.2.2-1",
+      "title": "Roaming architecture for 3GPP accesses. Home routed traffic",
+      "shows": ["if/LTE-Uu", "if/S1-MME", "if/S1-U", "if/S3", "if/S4", "if/S6a", "if/S8", "if/S10", "if/S11", "if/S12", "if/SGi", "if/Gx", "if/Rx"]
+    }
+  ],
+  "width": 1200,
+  "height": 520,
+  "regions": [
+    { "label": "VPLMN", "x": 10, "y": 30, "w": 640, "h": 480, "labelAt": "bottom-left" },
+    { "label": "HPLMN", "x": 670, "y": 30, "w": 520, "h": 480, "labelAt": "bottom-right" }
+  ],
+  "nodes": [
+    { "id": "ue", "nfs": ["nf/UE"], "x": 60, "y": 400, "w": 64 },
+    { "id": "utran", "nfs": ["nf/NodeB", "nf/RNC"], "labels": ["NodeB", "RNC"], "x": 200, "y": 250, "shape": "network" },
+    { "id": "eutran", "nfs": ["nf/eNodeB"], "labels": ["E-UTRAN"], "x": 200, "y": 400, "shape": "network" },
+    { "id": "sgsn", "nfs": ["nf/SGSN"], "x": 350, "y": 110 },
+    { "id": "mme", "nfs": ["nf/MME"], "x": 350, "y": 250 },
+    { "id": "sgw", "nfs": ["nf/SGW"], "labels": ["Serving GW"], "x": 550, "y": 400, "w": 110 },
+    { "id": "hss", "nfs": ["nf/HSS"], "x": 780, "y": 110 },
+    { "id": "pcrf", "nfs": ["nf/PCRF"], "x": 980, "y": 110 },
+    { "id": "pgw", "nfs": ["nf/PGW"], "labels": ["PDN GW"], "x": 780, "y": 400 },
+    { "id": "dn", "nfs": ["nf/AF", "nf/DN"], "labels": ["AF", "Operator IP services"], "x": 1080, "y": 400, "w": 165, "h": 64, "shape": "network" }
+  ],
+  "edges": [
+    { "if": "if/LTE-Uu", "from": "ue", "to": "eutran", "plane": "user" },
+    { "if": "if/Uu", "from": "ue", "to": "utran", "via": [[60, 234]], "plane": "user", "at": 0.4 },
+    { "if": "if/Iu-PS", "from": "utran", "to": "sgsn", "via": [[200, 110]], "at": 0.4 },
+    { "if": "if/S12", "from": "utran", "to": "sgw", "via": [[215, 330], [450, 330], [450, 388]], "plane": "user", "at": 0.5 },
+    { "if": "if/S1-MME", "from": "eutran", "to": "mme", "at": 0.3 },
+    { "if": "if/S1-U", "from": "eutran", "to": "sgw", "via": [[320, 412]], "plane": "user", "at": 0.5 },
+    { "if": "if/S3", "from": "sgsn", "to": "mme" },
+    { "if": "if/S4", "from": "sgsn", "to": "sgw", "via": [[525, 110]], "at": 0.6 },
+    { "if": "if/S10", "from": "mme", "to": "mme", "loop": "left" },
+    { "if": "if/S11", "from": "mme", "to": "sgw", "via": [[575, 250]], "at": 0.2 },
+    { "if": "if/S6a", "from": "mme", "to": "hss", "at": 0.6 },
+    { "if": "if/S8", "from": "sgw", "to": "pgw", "plane": "user" },
+    { "if": "if/Gx", "from": "pgw", "to": "pcrf", "at": 0.5 },
+    { "if": "if/SGi", "from": "pgw", "to": "dn", "plane": "user" },
+    { "if": "if/Rx", "from": "pcrf", "to": "dn" }
+  ]
+}
